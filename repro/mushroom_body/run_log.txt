@@ -1,0 +1,36 @@
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-eyx6l9g7/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   18 s
+>>> Experiment:     odor_a_da1_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-eyx6l9g7/odor_a_da1_left/odor_a_da1_left.parquet
+    Excited neurons: 9
+    Elapsed time:   60 s
+>>> Experiment:     odor_b_dl2d_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-eyx6l9g7/odor_b_dl2d_left/odor_b_dl2d_left.parquet
+    Excited neurons: 7
+    Elapsed time:   59 s
+baseline: KC >0 Hz=0.0000%, >5 Hz=0.0000%, mean=0.0000 Hz, nonzero MBONs=0
+odor_a_da1_left: KC >0 Hz=65.6944%, >5 Hz=64.1491%, mean=31.3204 Hz, nonzero MBONs=69
+odor_b_dl2d_left: KC >0 Hz=65.3467%, >5 Hz=63.9173%, mean=30.6216 Hz, nonzero MBONs=69
+Odor A/B active-KC Jaccard (>0 Hz): 0.991195
+Summary JSON: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316.json
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316.csv
+      153.92 real       119.12 user        22.19 sys
+          2328395776  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             5538772  page reclaims
+               44711  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+               12881  voluntary context switches
+              532500  involuntary context switches
+       1384452134626  instructions retired
+        324275231856  cycles elapsed
+          3955265496  peak memory footprint
