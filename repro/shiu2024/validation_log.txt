@@ -1,0 +1,50 @@
+>>> Experiment:     sugar_default
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-shiu-validation-giwpauoa/first/sugar_default.parquet
+    Excited neurons: 21
+    Elapsed time:   782 s
+>>> Experiment:     sugar_default
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-shiu-validation-giwpauoa/second/sugar_default.parquet
+    Excited neurons: 21
+    Elapsed time:   823 s
+VALIDATION_PARAMETERS
+TRIAL_DURATION_MS=1000
+TRIAL_COUNT=30
+STIMULATION_RATE_HZ=150
+SEED=20260316
+FIRST_RUNTIME_SECONDS=785.953
+SECOND_RUNTIME_SECONDS=824.901
+FIRST_SPIKE_COUNT=410625
+SECOND_SPIKE_COUNT=410625
+IDENTICAL_SEEDED_RESULTS=True
+READOUT_RATES_HZ
+MN9_left_contralateral	720575940660219265	83.866667
+MN9_right_ipsilateral	720575940645521262	57.066667
+TOP_DOWNSTREAM_NEURONS_HZ
+720575940622695448	138.833333
+720575940629888530	127.100000
+720575940627383685	124.233333
+720575940615041430	113.366667
+720575940618165019	113.200000
+720575940619973712	110.666667
+720575940630868793	109.466667
+720575940629778554	101.700000
+720575940626191306	99.833333
+720575940638103349	98.766667
+     1613.68 real       818.35 user       163.61 sys
+          2153644032  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            35941620  page reclaims
+              391958  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              273031  voluntary context switches
+             4198326  involuntary context switches
+       5891246717159  instructions retired
+       1552893207694  cycles elapsed
+          4675965416  peak memory footprint
