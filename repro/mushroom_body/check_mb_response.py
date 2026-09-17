@@ -26,6 +26,7 @@ import utils as utl  # noqa: E402
 
 IDS_PATH = ROOT / "repro" / "mushroom_body" / "neuron_ids_783.json"
 RESULTS_DIR = ROOT / "repro" / "mushroom_body" / "results"
+FLYWIRE_ANNOTATIONS = ROOT / "third_party" / "flywire_annotations" / "supplemental_files" / "Supplemental_file1_neuron_annotations.tsv"
 ODOR_A_GLOMERULUS = "DA1"
 ODOR_B_GLOMERULUS = "DL2d"
 SIDE = "left"
@@ -47,6 +48,32 @@ def parser() -> argparse.ArgumentParser:
     argument_parser.add_argument("--seed", type=int, default=20260316, help="Brian2/NumPy seed per condition.")
     argument_parser.add_argument("--duration-ms", type=float, default=1000.0, help="Trial duration in ms (default: 1000).")
     argument_parser.add_argument("--kc-kc-off", action="store_true", help="Candidate diagnostic: zero only KC-to-KC weights in memory after upstream model construction.")
+    argument_parser.add_argument(
+        "--dan-kc-off",
+        action="store_true",
+        help=(
+            "Candidate diagnostic: zero synapses from annotated dopaminergic neurons "
+            "(PAM, PPL1, and other cell_class=='DAN' subtypes) onto KCs, in memory only. "
+            "Rationale: these DAN->KC synapses are currently treated as fast excitatory "
+            "(see docs/reproduction/mushroom_body_check.md); in vivo dopamine acts as a "
+            "slow modulator of KC plasticity, not a fast driver of KC spiking."
+        ),
+    )
+    argument_parser.add_argument(
+        "--modulatory-fast-off",
+        action="store_true",
+        help=(
+            "Candidate diagnostic: zero all outgoing synapses from any neuron whose "
+            "predicted fast transmitter (top_nt) is dopamine, serotonin, or octopamine, "
+            "in memory only. Rationale: these three transmitters are biological "
+            "neuromodulators, not fast ionotropic transmitters, so the model's blanket "
+            "fast-excitatory sign for them is suspect. CAVEAT: about half of the "
+            "synapses this flag removes originate from Kenyon cells themselves, because "
+            "the EM neurotransmitter classifier mispredicts nearly all KCs as top_nt== "
+            "'dopamine' (true/known transmitter is acetylcholine); see "
+            "docs/reproduction/mushroom_body_check.md before interpreting results."
+        ),
+    )
     return argument_parser
 
 
@@ -94,24 +121,124 @@ def kc_by_side(records: list[dict[str, object]], rates: dict[int, float]) -> dic
     return summary
 
 
-def install_kc_kc_silencer(kc_ids: list[int]):
-    """Return the original upstream silencer after adding an in-memory KC→KC mask.
+def load_annotations() -> pd.DataFrame:
+    """Load the official flywire_annotations release used by prepare_neuron_ids.py."""
+    return pd.read_csv(
+        FLYWIRE_ANNOTATIONS,
+        sep="\t",
+        low_memory=False,
+        usecols=["root_id", "cell_class", "cell_type", "top_nt"],
+    )
 
-    This is a candidate diagnostic manipulation only. It does not edit upstream
-    source or connectivity files and is enabled solely by ``--kc-kc-off``.
+
+def dan_ids_from_annotations() -> list[int]:
+    """All annotated dopaminergic neurons: PAM, PPL1, and other DAN subtypes (e.g. PPL2)."""
+    annotations = load_annotations()
+    dans = annotations[annotations["cell_class"] == "DAN"]
+    return sorted(int(root_id) for root_id in dans["root_id"])
+
+
+def modulatory_ids_from_annotations() -> list[int]:
+    """Neurons whose predicted fast transmitter (top_nt) is dopamine, serotonin, or octopamine.
+
+    Includes Kenyon cells: the EM neurotransmitter classifier mispredicts ~99.9% of
+    KCs as top_nt=='dopamine' even though their known/literature transmitter is
+    acetylcholine (see docs/reproduction/mushroom_body_check.md).
     """
+    annotations = load_annotations()
+    modulatory = annotations[annotations["top_nt"].isin(["dopamine", "serotonin", "octopamine"])]
+    return sorted(int(root_id) for root_id in modulatory["root_id"])
+
+
+def brian_indices(neuron_ids: list[int], index_by_id: dict[int, int]) -> np.ndarray:
+    return np.array([index_by_id[neuron_id] for neuron_id in neuron_ids if neuron_id in index_by_id], dtype=int)
+
+
+def zero_between(synapses, pre_indices: np.ndarray, post_indices: np.ndarray) -> int:
+    """Zero synapse weights where both endpoints match; return the number zeroed."""
+    mask = np.isin(np.asarray(synapses.i[:]), pre_indices) & np.isin(np.asarray(synapses.j[:]), post_indices)
+    indices = np.flatnonzero(mask)
+    synapses.w[indices] = 0 * mV
+    return int(len(indices))
+
+
+def zero_from(synapses, pre_indices: np.ndarray) -> int:
+    """Zero all outgoing synapse weights from the given presynaptic indices; return count zeroed."""
+    mask = np.isin(np.asarray(synapses.i[:]), pre_indices)
+    indices = np.flatnonzero(mask)
+    synapses.w[indices] = 0 * mV
+    return int(len(indices))
+
+
+def report_synapse_removal_counts(args: argparse.Namespace, kc_ids: list[int]) -> None:
+    """Print, from the connectivity table alone, how many synapses each active
+    diagnostic flag will zero. Purely informational; does not touch Brian2."""
+    if not (args.dan_kc_off or args.modulatory_fast_off):
+        return
+    connectivity = pd.read_parquet(
+        UPSTREAM_ROOT / "Connectivity_783.parquet",
+        columns=["Presynaptic_ID", "Postsynaptic_ID", "Connectivity"],
+    )
+    kc_id_set = set(kc_ids)
+    if args.dan_kc_off:
+        dan_ids = set(dan_ids_from_annotations())
+        removed = connectivity[
+            connectivity["Presynaptic_ID"].isin(dan_ids) & connectivity["Postsynaptic_ID"].isin(kc_id_set)
+        ]
+        print(
+            f"    --dan-kc-off will zero {int(removed['Connectivity'].sum())} synapses "
+            f"({len(removed)} pre/post pairs) from {len(dan_ids)} annotated DANs onto {len(kc_ids)} KCs."
+        )
+    if args.modulatory_fast_off:
+        modulatory_ids = set(modulatory_ids_from_annotations())
+        removed = connectivity[connectivity["Presynaptic_ID"].isin(modulatory_ids)]
+        kc_share = removed[removed["Presynaptic_ID"].isin(kc_id_set)]["Connectivity"].sum()
+        total = int(removed["Connectivity"].sum())
+        kc_fraction = kc_share / total if total else 0.0
+        print(
+            f"    --modulatory-fast-off will zero {total} synapses ({len(removed)} pairs) "
+            f"from {len(modulatory_ids)} neurons with top_nt in "
+            f"{{dopamine, serotonin, octopamine}}, network-wide. "
+            f"{kc_fraction:.1%} of the removed synapses originate from Kenyon cells "
+            f"(misclassified top_nt, true transmitter acetylcholine) rather than true "
+            f"dopaminergic/serotonergic/octopaminergic neurons."
+        )
+
+
+def install_diagnostic_silencers(args: argparse.Namespace, kc_ids: list[int]):
+    """Return the original upstream silencer after composing in-memory synapse masks
+    for every requested diagnostic (--kc-kc-off, --dan-kc-off, --modulatory-fast-off).
+
+    These are candidate diagnostic manipulations only, not validated fixes. None of
+    them edit upstream source or connectivity files; all masking happens on the live
+    brian2.Synapses object after upstream model construction.
+    """
+    if not (args.kc_kc_off or args.dan_kc_off or args.modulatory_fast_off):
+        return None
+
     completeness = pd.read_csv(UPSTREAM_ROOT / "Completeness_783.csv", index_col=0)
     index_by_id = {int(root_id): index for index, root_id in enumerate(completeness.index)}
-    kc_indices = np.array([index_by_id[neuron_id] for neuron_id in kc_ids], dtype=int)
+    kc_indices = brian_indices(kc_ids, index_by_id)
+
+    manipulations: list = []
+    if args.kc_kc_off:
+        manipulations.append(lambda synapses: zero_between(synapses, kc_indices, kc_indices))
+    if args.dan_kc_off:
+        dan_indices = brian_indices(dan_ids_from_annotations(), index_by_id)
+        manipulations.append(lambda synapses: zero_between(synapses, dan_indices, kc_indices))
+    if args.modulatory_fast_off:
+        modulatory_indices = brian_indices(modulatory_ids_from_annotations(), index_by_id)
+        manipulations.append(lambda synapses: zero_from(synapses, modulatory_indices))
+
     original_silence = shiu_model.silence
 
-    def silence_kc_to_kc(silenced_indices, synapses):
+    def combined_silence(silenced_indices, synapses):
         synapses = original_silence(silenced_indices, synapses)
-        mask = np.isin(np.asarray(synapses.i[:]), kc_indices) & np.isin(np.asarray(synapses.j[:]), kc_indices)
-        synapses.w[np.flatnonzero(mask)] = 0 * mV
+        for mask_fn in manipulations:
+            mask_fn(synapses)
         return synapses
 
-    shiu_model.silence = silence_kc_to_kc
+    shiu_model.silence = combined_silence
     return original_silence
 
 
@@ -216,7 +343,9 @@ def main() -> None:
     odor_a = groups[ODOR_A_GLOMERULUS][SIDE]
     odor_b = groups[ODOR_B_GLOMERULUS][SIDE]
 
-    original_silence = install_kc_kc_silencer(ids(payload["kenyon_cells"]["records"])) if args.kc_kc_off else None
+    kc_ids = ids(payload["kenyon_cells"]["records"])
+    report_synapse_removal_counts(args, kc_ids)
+    original_silence = install_diagnostic_silencers(args, kc_ids)
     try:
         with tempfile.TemporaryDirectory(prefix="flyshi-mb-check-") as temporary_directory:
             scratch_dir = Path(temporary_directory)
@@ -238,6 +367,8 @@ def main() -> None:
             "seed": args.seed,
             "n_proc": 1,
             "kc_kc_off": args.kc_kc_off,
+            "dan_kc_off": args.dan_kc_off,
+            "modulatory_fast_off": args.modulatory_fast_off,
         },
         "glomeruli": {
             "odor_a": {"glomerulus": ODOR_A_GLOMERULUS, "side": SIDE, "pn_count": len(odor_a)},
@@ -251,6 +382,8 @@ def main() -> None:
         f"seed_{args.seed}_trials_{args.trials}_duration_ms_{args.duration_ms:g}"
         f"_pn_rate_hz_{args.pn_rate:g}"
         + ("_kc_kc_off" if args.kc_kc_off else "")
+        + ("_dan_kc_off" if args.dan_kc_off else "")
+        + ("_modulatory_fast_off" if args.modulatory_fast_off else "")
     )
     json_path = RESULTS_DIR / f"mb_response_{suffix}.json"
     csv_path = RESULTS_DIR / f"mb_response_{suffix}.csv"
