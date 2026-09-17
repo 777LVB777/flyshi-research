@@ -127,7 +127,7 @@ def load_annotations() -> pd.DataFrame:
         FLYWIRE_ANNOTATIONS,
         sep="\t",
         low_memory=False,
-        usecols=["root_id", "cell_class", "cell_type", "top_nt"],
+        usecols=["root_id", "cell_class", "cell_type", "top_nt", "side"],
     )
 
 
@@ -242,12 +242,140 @@ def install_diagnostic_silencers(args: argparse.Namespace, kc_ids: list[int]):
     return original_silence
 
 
+def pn_glomerulus_map(payload: dict[str, object]) -> dict[int, str]:
+    """root_id -> glomerulus for every uniglomerular PN, from the same grouping
+    used to pick odor A/B, so it stays consistent with the rest of the script."""
+    groups = payload["uniglomerular_antenna_lobe_projection_neurons"]["groups_by_glomerulus_and_side"]
+    return {
+        int(root_id): glomerulus
+        for glomerulus, sides in groups.items()
+        for root_id_list in sides.values()
+        for root_id in root_id_list
+    }
+
+
+def pn_rate_rows(payload: dict[str, object], pn_glomerulus: dict[int, str], rates: object, name: str) -> list[dict[str, object]]:
+    """Per-PN rate rows for all 277 uniglomerular PNs, so non-stimulated glomeruli
+    firing (a candidate leak pathway) is directly visible."""
+    pn_records = payload["uniglomerular_antenna_lobe_projection_neurons"]["records"]
+    pn_rates = rates_for(rates, name, ids(pn_records))
+    return [
+        {
+            "root_id": int(record["root_id"]),
+            "glomerulus": pn_glomerulus.get(int(record["root_id"]), ""),
+            "side": record.get("side", ""),
+            "rate_hz": pn_rates[int(record["root_id"])],
+        }
+        for record in pn_records
+    ]
+
+
+def direct_kc_targets(connectivity: pd.DataFrame, pn_ids: list[int], kc_id_set: set[int]) -> set[int]:
+    """KCs that are direct postsynaptic targets of the given PNs (anatomy only)."""
+    if not pn_ids:
+        return set()
+    matches = connectivity[
+        connectivity["Presynaptic_ID"].isin(pn_ids) & connectivity["Postsynaptic_ID"].isin(kc_id_set)
+    ]
+    return {int(root_id) for root_id in matches["Postsynaptic_ID"].unique()}
+
+
+def brain_wide_summary(rates: object, name: str, annotations: pd.DataFrame, total_neurons: int) -> dict[str, object]:
+    """Brain-wide activity spread: overall active fraction plus the top 20
+    cell types by mean rate (0 for non-spiking members of that type)."""
+    active_rate = rates[name].dropna() if name in getattr(rates, "columns", []) else pd.Series(dtype=float)
+    active_rate.index = active_rate.index.astype("int64")
+
+    by_type = annotations.set_index("root_id")[["cell_class", "cell_type"]].copy()
+    by_type["rate_hz"] = active_rate.reindex(by_type.index).fillna(0.0).astype(float)
+    by_type["active"] = by_type["rate_hz"] > 0
+
+    grouped = by_type.groupby("cell_type", dropna=False).agg(
+        cell_class=("cell_class", "first"),
+        n_total=("rate_hz", "size"),
+        n_active=("active", "sum"),
+        mean_rate_hz=("rate_hz", "mean"),
+    )
+    grouped["fraction_active"] = grouped["n_active"] / grouped["n_total"]
+    top20 = grouped.sort_values("mean_rate_hz", ascending=False).head(20)
+
+    return {
+        "active_neuron_count": int(len(active_rate)),
+        "active_neuron_fraction": len(active_rate) / total_neurons,
+        "top_active_cell_types": [
+            {
+                "cell_type": str(cell_type),
+                "cell_class": str(row["cell_class"]),
+                "n_total": int(row["n_total"]),
+                "n_active": int(row["n_active"]),
+                "fraction_active": float(row["fraction_active"]),
+                "mean_rate_hz": float(row["mean_rate_hz"]),
+            }
+            for cell_type, row in top20.iterrows()
+        ],
+    }
+
+
+def first_spike_latencies_ms(
+    spikes: pd.DataFrame,
+    kc_target_ids: set[int],
+    kc_nontarget_ids: set[int],
+    apl_ids: list[int],
+    nonstim_pn_ids: list[int],
+    right_kc_ids: set[int],
+) -> dict[str, object]:
+    """First-spike latency (ms) in trial 0 only, before any temp files are deleted.
+
+    kc_target/kc_nontarget report the median first-spike time across neurons in
+    that group that spiked at all; apl/nonstim_pn/right_kc report the single
+    earliest first-spike time (and which neuron) in that group, since those
+    groups probe "how fast does activity leak/cross", not a typical latency.
+    """
+    trial0 = spikes[spikes["trial"] == 0]
+    first_spike_s = trial0.groupby("flywire_id")["t"].min()
+    first_spike_s.index = first_spike_s.index.astype("int64")
+
+    def median_ms(neuron_ids: set[int]) -> tuple[float | None, int]:
+        values = first_spike_s.reindex(sorted(neuron_ids)).dropna()
+        return (float(values.median()) * 1000.0, int(len(values))) if len(values) else (None, 0)
+
+    def earliest_ms(neuron_ids: list[int]) -> tuple[float | None, int | None]:
+        values = first_spike_s.reindex(sorted(set(neuron_ids))).dropna()
+        if len(values) == 0:
+            return None, None
+        winner = values.idxmin()
+        return float(values.min()) * 1000.0, int(winner)
+
+    kc_target_ms, kc_target_n = median_ms(kc_target_ids)
+    kc_nontarget_ms, kc_nontarget_n = median_ms(kc_nontarget_ids)
+    apl_ms, apl_id = earliest_ms(apl_ids)
+    pn_ms, pn_id = earliest_ms(nonstim_pn_ids)
+    right_kc_ms, right_kc_id = earliest_ms(list(right_kc_ids))
+
+    return {
+        "kc_target_median_ms": kc_target_ms,
+        "kc_target_n_spiked": kc_target_n,
+        "kc_nontarget_median_ms": kc_nontarget_ms,
+        "kc_nontarget_n_spiked": kc_nontarget_n,
+        "apl_first_ms": apl_ms,
+        "apl_first_id": apl_id,
+        "first_nonstim_pn_ms": pn_ms,
+        "first_nonstim_pn_id": pn_id,
+        "first_right_kc_ms": right_kc_ms,
+        "first_right_kc_id": right_kc_id,
+    }
+
+
 def run_condition(
     name: str,
     stimulated_ids: list[int],
     payload: dict[str, object],
     args: argparse.Namespace,
     scratch_dir: Path,
+    annotations: pd.DataFrame,
+    pn_glomerulus: dict[int, str],
+    target_kc_ids: set[int],
+    total_brain_neurons: int,
 ) -> dict[str, object]:
     """Run one condition and return only derived summaries, never raw spikes."""
     np.random.seed(args.seed)
@@ -285,6 +413,13 @@ def run_condition(
     apl_rates = rates_for(rates, name, ids(apl))
     active_kcs = sorted(neuron_id for neuron_id, rate in kc_rates.items() if rate > 0)
 
+    all_kc_ids = set(ids(kcs))
+    kc_nontarget_ids = all_kc_ids - target_kc_ids
+    right_kc_ids = {int(record["root_id"]) for record in kcs if record["side"] == "right"}
+    pn_ids_all = ids(payload["uniglomerular_antenna_lobe_projection_neurons"]["records"])
+    nonstim_pn_ids = [pn_id for pn_id in pn_ids_all if pn_id not in set(stimulated_ids)]
+    apl_ids = ids(apl)
+
     return {
         "condition": name,
         "stimulated_pn_ids": stimulated_ids,
@@ -305,6 +440,11 @@ def run_condition(
         "pam_nonzero": annotated_rates(pam, pam_rates),
         "ppl1_nonzero": annotated_rates(ppl1, ppl1_rates),
         "apl_nonzero": annotated_rates(apl, apl_rates),
+        "pn_rates": pn_rate_rows(payload, pn_glomerulus, rates, name),
+        "brain_wide": brain_wide_summary(rates, name, annotations, total_brain_neurons),
+        "first_spike_latency_trial0_ms": first_spike_latencies_ms(
+            spikes, target_kc_ids, kc_nontarget_ids, apl_ids, nonstim_pn_ids, right_kc_ids
+        ),
     }
 
 
@@ -334,6 +474,47 @@ def write_kc_rates_csv(summary: dict[str, object], payload: dict[str, object], o
                 writer.writerow({"condition": condition["condition"], "root_id": root_id, "side": kc_sides[int(root_id)], "rate_hz": rate})
 
 
+def write_pn_rates_csv(summary: dict[str, object], output: Path) -> None:
+    with output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["condition", "root_id", "glomerulus", "side", "rate_hz"])
+        writer.writeheader()
+        for condition in summary["conditions"]:
+            for row in condition.pop("pn_rates"):
+                writer.writerow({"condition": condition["condition"], **row})
+
+
+def write_brain_wide_csv(summary: dict[str, object], output: Path) -> None:
+    with output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["condition", "active_neuron_count", "active_neuron_fraction"])
+        writer.writeheader()
+        for condition in summary["conditions"]:
+            brain_wide = condition["brain_wide"]
+            writer.writerow({
+                "condition": condition["condition"],
+                "active_neuron_count": brain_wide["active_neuron_count"],
+                "active_neuron_fraction": brain_wide["active_neuron_fraction"],
+            })
+
+
+def write_top_active_types_csv(summary: dict[str, object], output: Path) -> None:
+    fieldnames = ["condition", "rank", "cell_type", "cell_class", "n_total", "n_active", "fraction_active", "mean_rate_hz"]
+    with output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for condition in summary["conditions"]:
+            for rank, row in enumerate(condition["brain_wide"].pop("top_active_cell_types"), start=1):
+                writer.writerow({"condition": condition["condition"], "rank": rank, **row})
+
+
+def write_latency_csv(summary: dict[str, object], output: Path) -> None:
+    fieldnames = ["condition"] + list(next(iter(summary["conditions"]))["first_spike_latency_trial0_ms"].keys())
+    with output.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for condition in summary["conditions"]:
+            writer.writerow({"condition": condition["condition"], **condition["first_spike_latency_trial0_ms"]})
+
+
 def main() -> None:
     args = parser().parse_args()
     if args.trials <= 0 or args.pn_rate < 0 or args.duration_ms <= 0:
@@ -346,12 +527,30 @@ def main() -> None:
     kc_ids = ids(payload["kenyon_cells"]["records"])
     report_synapse_removal_counts(args, kc_ids)
     original_silence = install_diagnostic_silencers(args, kc_ids)
+
+    annotations = load_annotations()
+    pn_glomerulus = pn_glomerulus_map(payload)
+    total_brain_neurons = len(pd.read_csv(UPSTREAM_ROOT / "Completeness_783.csv", index_col=0))
+    connectivity = pd.read_parquet(
+        UPSTREAM_ROOT / "Connectivity_783.parquet", columns=["Presynaptic_ID", "Postsynaptic_ID"]
+    )
+    kc_id_set = set(kc_ids)
+    odor_a_targets = direct_kc_targets(connectivity, odor_a, kc_id_set)
+    odor_b_targets = direct_kc_targets(connectivity, odor_b, kc_id_set)
+    del connectivity
+
     try:
         with tempfile.TemporaryDirectory(prefix="flyshi-mb-check-") as temporary_directory:
             scratch_dir = Path(temporary_directory)
-            baseline = run_condition("baseline", [], payload, args, scratch_dir)
-            condition_a = run_condition("odor_a_da1_left", odor_a, payload, args, scratch_dir)
-            condition_b = run_condition("odor_b_dl2d_left", odor_b, payload, args, scratch_dir)
+            baseline = run_condition(
+                "baseline", [], payload, args, scratch_dir, annotations, pn_glomerulus, set(), total_brain_neurons
+            )
+            condition_a = run_condition(
+                "odor_a_da1_left", odor_a, payload, args, scratch_dir, annotations, pn_glomerulus, odor_a_targets, total_brain_neurons
+            )
+            condition_b = run_condition(
+                "odor_b_dl2d_left", odor_b, payload, args, scratch_dir, annotations, pn_glomerulus, odor_b_targets, total_brain_neurons
+            )
     finally:
         if original_silence is not None:
             shiu_model.silence = original_silence
@@ -388,7 +587,16 @@ def main() -> None:
     json_path = RESULTS_DIR / f"mb_response_{suffix}.json"
     csv_path = RESULTS_DIR / f"mb_response_{suffix}.csv"
     kc_rates_path = RESULTS_DIR / f"mb_kc_rates_{suffix}.csv"
+    pn_rates_path = RESULTS_DIR / f"mb_pn_rates_{suffix}.csv"
+    brain_wide_path = RESULTS_DIR / f"mb_brain_wide_{suffix}.csv"
+    top_types_path = RESULTS_DIR / f"mb_top_active_types_{suffix}.csv"
+    latency_path = RESULTS_DIR / f"mb_latency_{suffix}.csv"
+
     write_kc_rates_csv(summary, payload, kc_rates_path)
+    write_pn_rates_csv(summary, pn_rates_path)
+    write_brain_wide_csv(summary, brain_wide_path)
+    write_top_active_types_csv(summary, top_types_path)
+    write_latency_csv(summary, latency_path)
     json_path.write_text(json.dumps(summary, indent=2) + "\n")
     write_csv(summary, csv_path)
 
@@ -397,12 +605,17 @@ def main() -> None:
         print(
             f"{condition['condition']}: KC >0 Hz={kc['active_fraction_gt_0_hz']:.4%}, "
             f">5 Hz={kc['active_fraction_gt_5_hz']:.4%}, mean={kc['mean_rate_hz']:.4f} Hz, "
-            f"nonzero MBONs={len(condition['mbons_nonzero'])}"
+            f"nonzero MBONs={len(condition['mbons_nonzero'])}, "
+            f"brain-wide active={condition['brain_wide']['active_neuron_fraction']:.4%}"
         )
     print(f"Odor A/B active-KC Jaccard (>0 Hz): {overlap:.6f}")
     print(f"Summary JSON: {json_path}")
     print(f"Summary CSV: {csv_path}")
     print(f"Per-KC rates CSV: {kc_rates_path}")
+    print(f"Per-PN rates CSV: {pn_rates_path}")
+    print(f"Brain-wide activity CSV: {brain_wide_path}")
+    print(f"Top active cell types CSV: {top_types_path}")
+    print(f"First-spike latency (trial 0) CSV: {latency_path}")
 
 
 if __name__ == "__main__":

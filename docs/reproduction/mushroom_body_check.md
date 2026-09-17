@@ -164,6 +164,8 @@ recurrent dynamics, not unequal rate application.
 | 150 Hz, `--kc-kc-off` | Odor B | 59.30% / 51.68% | 25.26 / 16.99 | 0.9760 |
 | 50 Hz | Odor A | 68.68% / 62.53% | 36.84 / 24.82 | 0.9903 |
 | 50 Hz | Odor B | 68.22% / 62.19% | 15.02 / 10.16 | 0.9903 |
+| 150 Hz, `--dan-kc-off` | Odor A | 66.01% / 57.64% | 33.10 / 21.70 | 0.9863 |
+| 150 Hz, `--dan-kc-off` | Odor B | 65.47% / 57.64% | 33.12 / 21.48 | 0.9863 |
 
 ¹ The original run predates the per-KC-rate CSV; only active/inactive IDs were
 retained, not individual rates, so per-side mean rate cannot be recovered.
@@ -173,6 +175,59 @@ Baseline is 0.00% / 0.00 Hz on both sides in every run.
 65.7% to 56.0% and Jaccard from 0.991 to 0.976 — a real but modest effect,
 consistent with the KC-input audit below showing KC→KC is a large (40%) but
 not majority source of excitatory drive onto KCs.
+
+`--dan-kc-off` (60,657 synapses from 331 annotated DANs onto KCs zeroed; run
+2026-09-16, logged in `repro/mushroom_body/run_log_dan_kc_off.txt`) gives
+overall active 61.81%/61.54% and Jaccard 0.986 — an even smaller effect than
+`--kc-kc-off`. Combined with the KC-input audit's finding that true DAN input
+is only 7.48% of excitatory KC drive, this is consistent, not surprising.
+
+### Ruled out as the sole/main cause of non-sparse, non-selective KC activity
+
+Three independent single-factor manipulations each produced only a modest
+reduction from the ~65% baseline non-sparse state, none approaching the
+5–20% target:
+
+- **DAN→KC excitation** (`--dan-kc-off`): 65.7% → 61.8%/61.5%, Jaccard 0.991 → 0.986.
+- **KC→KC recurrence** (`--kc-kc-off`): 65.7% → 56.0%, Jaccard 0.991 → 0.976.
+- **Input drive strength** (`--pn-rate 50` vs. 150): overall active fraction essentially unchanged (65.6%/65.2% vs. 65.7%/65.4%), even though odor B's mean rate dropped by more than half — the *fraction of KCs crossing spike threshold* is nearly rate-invariant even though *how hard* they fire is not.
+
+Any odor, at either 50 Hz or 150 Hz, with or without DAN→KC or KC→KC
+connectivity, converges on the same ~60–65% KC active state with >0.97
+odor A/B overlap. This points toward either (a) a combination/interaction of
+these factors rather than any single one, or (b) a distinct pathway not yet
+tested (e.g. broad PN→KC connectivity itself, or activity that is already
+saturated after the first few excitatory relays regardless of how it's driven
+downstream — see the target-vs-non-target analysis below).
+
+## Are non-target KCs driven through direct PN input, or through spread?
+
+Using the existing per-KC-rate CSVs (`--kc-kc-off`, `--pn-rate 50`, and
+`--dan-kc-off` runs — the only three with per-KC rates saved) split against
+the anatomical direct-target KC sets (374 KCs downstream of left DA1 PNs, 174
+downstream of left DL2d PNs, computed straight from `Connectivity_783.parquet`,
+no simulation needed):
+
+| Run | Odor | Direct targets: active% / mean Hz | Non-targets: active% / mean Hz |
+| --- | --- | --- | --- |
+| `--kc-kc-off` | A (DA1, n=374 targets / 4,803 non) | 81.28% / 37.40 Hz | 54.01% / 20.36 Hz |
+| `--kc-kc-off` | B (DL2d, n=174 targets / 5,003 non) | 81.61% / 40.19 Hz | 54.57% / 20.45 Hz |
+| `--pn-rate 50` | A | 84.76% / 46.82 Hz | 64.11% / 29.56 Hz |
+| `--pn-rate 50` | B | 83.33% / 20.46 Hz | 64.56% / 12.30 Hz |
+| `--dan-kc-off` | A | 85.29% / 45.80 Hz | 59.98% / 26.43 Hz |
+| `--dan-kc-off` | B | 82.76% / 48.65 Hz | 60.80% / 26.54 Hz |
+
+**Finding: non-target KCs are not merely noisy — they fire at 54–65% active
+and roughly half-to-two-thirds the mean rate of direct targets, in every run
+tested.** Direct anatomical PN→KC input explains why targets fire *somewhat*
+more than non-targets, but it clearly does not explain why 54–65% of the
+4,800+ KCs that receive **no direct synapse from the stimulated PNs** are
+active at all, often at tens of Hz. This is consistent with the "spread, not
+direct-input selectivity" picture the DAN/KC-KC/rate manipulations already
+pointed toward — the mechanism recruiting non-target KCs was not identified by
+any single-factor removal tried so far, and is the leading open question for
+the next round of diagnostics (the new timing/brain-wide probes below are
+aimed at localizing where that spread originates).
 
 ## Neurotransmitter sign rules
 
@@ -275,13 +330,14 @@ be reported alongside any modified/diagnostic run for comparison.**
   excitatory KC→KC connectivity (40.2% of excitatory KC input, all treated as
   excitatory per the sign table above) is a documented candidate for runaway
   activity spread.
-- `--dan-kc-off` (new) — zeroes synapses from all annotated dopaminergic
+- `--dan-kc-off` — zeroes synapses from all annotated dopaminergic
   neurons (`cell_class=='DAN'`: PAM, PPL1, and 4 other PPL2ab-type neurons)
   onto KCs. From the connectivity table alone (no simulation needed to count
   this): **60,657 synapses (47,404 pre/post pairs)**. Rationale: dopamine is a
   slow neuromodulator of KC plasticity in vivo, not a fast driver of KC
   spiking; this model currently gives it the same fast-excitatory sign as
-  acetylcholine (see sign-rule section above).
+  acetylcholine (see sign-rule section above). **Run 2026-09-16**: KC active
+  61.81%/61.54%, Jaccard 0.986 — ruled out as the sole/main cause (see above).
 - `--modulatory-fast-off` (new) — zeroes **all** outgoing synapses from any
   neuron with `top_nt` in `{dopamine, serotonin, octopamine}`, network-wide
   (not just onto KCs). From the connectivity table alone: **1,958,576
@@ -306,6 +362,54 @@ stand-in synapses object (no Brian2/simulation involved) and reproduces the
 same 47,404 and 832,432 pair counts obtained directly from the connectivity
 table.
 
+## Diagnostics added this round (localizing the spread; not yet run)
+
+Since DAN→KC, KC→KC, and input-rate manipulations each ruled out only a modest
+share of the ~65% non-sparse KC state, and non-target KCs turn out to fire
+almost as much as direct targets (see above), every future run of
+`check_mb_response.py` now also saves four small (each well under 1 MB), self-
+documenting CSVs, computed with no new CLI flags — they run automatically:
+
+- **`mb_pn_rates_<suffix>.csv`** — rate for all 277 uniglomerular PNs, tagged
+  with `glomerulus` and `side` (from the same grouping used to pick odor A/B).
+  Lets us check whether PNs *outside* the two stimulated glomeruli fire at all
+  — if they do, activity is leaking upstream of the MB, not just spreading
+  within it.
+- **`mb_brain_wide_<suffix>.csv`** — per condition, the count and fraction of
+  *all* ~138,639 v783 neurons with nonzero rate (not just MB-related groups).
+- **`mb_top_active_types_<suffix>.csv`** — per condition, the top 20
+  `cell_type`s ranked by mean rate (computed over the type's full membership,
+  0 for non-spiking members), each with `cell_class`, `n_total`, `n_active`,
+  `fraction_active`. Shows whether the spread stays inside olfactory/MB
+  circuitry or reaches unrelated brain regions.
+- **`mb_latency_<suffix>.csv`** — first-spike latency in trial 0 only (raw
+  spikes are read before the temporary run directory is cleaned up), in ms:
+  - `kc_target_median_ms` / `kc_nontarget_median_ms` — median first-spike time
+    among direct-target vs. non-target KCs that spiked at all, plus `_n_spiked`.
+  - `apl_first_ms` / `apl_first_id` — earliest of the 2 APL neurons' first spikes.
+  - `first_nonstim_pn_ms` / `first_nonstim_pn_id` — earliest first-spike among
+    the ~268–277 PNs *not* in the stimulated glomerulus, i.e. how fast a signal
+    could in principle leak back into other PN channels.
+  - `first_right_kc_ms` / `first_right_kc_id` — earliest first-spike among all
+    right-hemisphere KCs, i.e. how fast activity crosses the midline.
+  - If `kc_nontarget_median_ms` is close to (not much later than)
+    `kc_target_median_ms`, that would argue against a multi-synapse relay
+    picture and for something closer to simultaneous broad recruitment.
+
+Direct-target KC sets (used for `kc_target`/`kc_nontarget` above) are computed
+once per run straight from `Connectivity_783.parquet` (no simulation), exactly
+as in the target-vs-non-target analysis above. `--duration-ms` (default 1000)
+already existed before this round and is unchanged; it can be set to 200 for
+short exploratory runs, e.g. to see whether the latency ordering already holds
+well before 1 s.
+
+All four writer functions (`write_pn_rates_csv`, `write_brain_wide_csv`,
+`write_top_active_types_csv`, `write_latency_csv`) and their underlying
+analysis functions (`pn_rate_rows`, `direct_kc_targets`, `brain_wide_summary`,
+`first_spike_latencies_ms`) were unit-tested against synthetic data (no Brian2,
+no simulation) before being added; `--help` was confirmed working after the
+change (exit code 0).
+
 ## Acceptance target for any fix
 
 A candidate fix (not yet attempted) should be judged against:
@@ -325,8 +429,14 @@ A candidate fix (not yet attempted) should be judged against:
 Run each in a normal terminal; do not run long simulations inside Codex.
 
 ```bash
-# Repeat the observed configuration with per-KC/hemisphere reporting (unmodified baseline for comparison).
+# Repeat the observed configuration with per-KC/hemisphere reporting (unmodified
+# baseline for comparison). Now also produces mb_pn_rates_*, mb_brain_wide_*,
+# mb_top_active_types_*, and mb_latency_* CSVs (new diagnostics, no flags needed).
 uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/check_mb_response.py --trials 5 --pn-rate 150 --seed 20260316
+
+# Optional: short 200 ms trials to check whether the latency ordering (target vs.
+# non-target KC, APL, non-stim PN, right-hemisphere KC) already holds before 1 s.
+uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/check_mb_response.py --trials 5 --pn-rate 150 --duration-ms 200 --seed 20260316
 
 # Test whether recurrent KC-to-KC excitation is necessary for broad overlap.
 uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/check_mb_response.py --trials 5 --pn-rate 150 --seed 20260316 --kc-kc-off

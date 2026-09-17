@@ -1,0 +1,20 @@
+    --dan-kc-off will zero 60657 synapses (47404 pre/post pairs) from 331 annotated DANs onto 5177 KCs.
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-mpm7ps8d/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   19 s
+>>> Experiment:     odor_a_da1_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-mpm7ps8d/odor_a_da1_left/odor_a_da1_left.parquet
+    Excited neurons: 9
+    Elapsed time:   23 s
+>>> Experiment:     odor_b_dl2d_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-mpm7ps8d/odor_b_dl2d_left/odor_b_dl2d_left.parquet
+    Excited neurons: 7
+    Elapsed time:   23 s
+baseline: KC >0 Hz=0.0000%, >5 Hz=0.0000%, mean=0.0000 Hz, nonzero MBONs=0
+odor_a_da1_left: KC >0 Hz=61.8119%, >5 Hz=60.1314%, mean=27.8291 Hz, nonzero MBONs=69
+odor_b_dl2d_left: KC >0 Hz=61.5414%, >5 Hz=59.8030%, mean=27.2799 Hz, nonzero MBONs=69
+Odor A/B active-KC Jaccard (>0 Hz): 0.986314
+Summary JSON: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_dan_kc_off.json
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_dan_kc_off.csv
+Per-KC rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_kc_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_dan_kc_off.csv
