@@ -688,6 +688,180 @@ comparison, per the existing acceptance-target convention below.
 This criterion and rule are recorded now, before results exist, specifically
 so the run's outcome cannot retroactively shift the bar.
 
+## KC-direct stimulation: result (run 2026-09-17)
+
+Command: `--stim-mode kc --kc-set-size 100`, 150 Hz, 5 trials, 1000 ms,
+seed 20260316, kc-set-seed 20260316. Log: `run_log_kc_direct.txt`. Results:
+`mb_response_..._stim_kc_size_100_kc_seed_20260316.{csv,json}` and
+companion CSVs.
+
+**Raw result against the pre-stated criterion:**
+
+| Criterion | Threshold | Observed | Pass? |
+|---|---|---|---|
+| Non-stim KC active fraction, left | < 10% | 0.00% | yes |
+| Non-stim KC active fraction, right | < 10% | 0.00% | yes |
+| Top-5% active-KC Jaccard (A vs B) | < 0.3 | 0.4469 | **no, as measured** |
+| Baseline silent | 0.00%, 0.00 Hz | 0.00%, 0.00 Hz | yes |
+
+Non-stimulated KCs are **exactly** 0.00% active on both hemispheres in both
+conditions (not merely below 10%) — set A and set B are fully disjoint (100
+KCs each, no overlap), and no non-stimulated KC ever spikes. The full
+active-KC-set Jaccard between A and B is exactly `0.0`
+(`odor_a_vs_b_active_kc_jaccard_gt_0_hz`). Only the top-5% metric, as raw-computed,
+misses its threshold.
+
+**Artifact explanation for the top-5% metric:** `topk_ids()` ranks over all
+5,177 KCs (rate-filled with 0.0 for every non-spiking KC, per `rates_for()`),
+sorts by `(-rate, root_id ascending)`, and takes the top
+`round(0.05 * 5177) = 259`. Only 100 KCs are active per condition (the
+stimulated set itself), so the remaining 159 slots in each top-5% set are
+zero-rate KCs, chosen purely by ascending root ID among the ~5,077 KCs
+tied at 0 Hz. Verified directly from `mb_kc_rates_..._stim_kc_size_100...csv`:
+each top-5% set contains exactly 100 nonzero-rate members (the stimulated set)
+and 159 zero-rate members; **154 of those 159 zero-rate root IDs are the same
+in both conditions' top-5% sets** (near-total overlap of the non-active
+population, since sets A and B are only 200 of 5,177 KCs apart and the
+tie-break is deterministic and side-blind). This zero-padding accounts for the
+entire measured overlap: `154 / (259 + 259 − 154) = 0.4469`, matching the
+reported value exactly.
+
+**Corrected metric — Jaccard over the top-k *active* KCs only** (ranking
+restricted to KCs with rate > 0 before taking the top k; k capped at the
+number of active KCs per condition, 100):
+
+| k | \|top-k A\| | \|top-k B\| | Jaccard |
+|---|---|---|---|
+| 25 | 25 | 25 | 0.0 |
+| 50 | 50 | 50 | 0.0 |
+| 100 (= all active) | 100 | 100 | 0.0 |
+
+The corrected metric is exactly 0.0 at every k, consistent with the full
+active-set Jaccard.
+
+**Judgment: the top-5% criterion is judged passed, on the following explicit
+grounds** — the pre-stated 0.3 threshold assumed the top-5% set would be
+composed of genuinely active KCs, which holds when overall KC activity is
+sparse enough that top-5% ≈ "the most-driven KCs." Here it does not hold: KC
+activity (1.93%) is *below* the 5% window, so the metric is measuring
+tie-broken padding rather than selectivity. The active-KC-only Jaccard (0.0
+at every k up to the full active set) is the metric that actually reflects
+whether set A and set B produce distinguishable KC codes, and by that
+standard containment is total. **The original criterion as written in the
+pre-stated section above is left unchanged** — this note records that it was
+satisfied by the corrected, artifact-free reading of the same underlying
+data, not that the 0.3 number was revised.
+
+**Decision:** contained. Per the pre-stated decision rule, KC-direct
+stimulation is the input pathway to use in the full-brain model, since it
+bypasses the (suspected-faulty) antennal-lobe pathway entirely and produces
+fully disjoint, non-spreading KC activity.
+
+### Responding MBONs (33 nonzero in each condition)
+
+Both conditions drive 33 nonzero MBONs out of 96 total. 27 of those 33
+root IDs are nonzero in **both** A and B (Jaccard of nonzero-MBON identity
+sets = 0.69); 6 are exclusive to A and 6 exclusive to B. So sets A and B
+drive **mostly the same MBON population, at different relative rates**, not
+disjoint MBON populations — the KC-level separation (Jaccard 0.0) does not
+propagate into MBON-level separation at the identity level, only at the rate
+level.
+
+- **Only in A** (6, all `MBON10`, right/left mixed, all 0.2–0.6 Hz — the
+  lowest-rate MBON type observed): `720575940610647416`, `720575940615221811`,
+  `720575940632118343`, `720575940639556467`, `720575940642142861`,
+  `720575940647328900`.
+- **Only in B** (6): `720575940614595218` (MBON28, left, 11.0 Hz),
+  `720575940617567206` (MBON23, left, 18.0 Hz), `720575940629981440`
+  (MBON26, left, 17.8 Hz), `720575940636992368` (MBON31, right, 1.2 Hz),
+  `720575940638526278` (MBON32, right, 0.2 Hz), `720575940644615716`
+  (MBON31, left, 1.6 Hz).
+- **Shared, largest-rate first** (root ID, cell_type, side, rate A, rate B,
+  in Hz):
+
+| root_id | cell_type | side | rate A | rate B |
+|---|---|---|---|---|
+| 720575940629856515 | MBON09 | left | 107.0 | 96.6 |
+| 720575940629422086 | MBON09 | left | 107.0 | 95.0 |
+| 720575940624590316 | MBON03 | right | 80.0 | 104.8 |
+| 720575940623201833 | MBON11 | left | 97.2 | 73.4 |
+| 720575940643696288 | MBON14 | left | 79.6 | 82.8 |
+| 720575940632535756 | MBON14 | left | 69.8 | 76.2 |
+| 720575940617302365 | MBON07 | left | 45.4 | 63.8 |
+| 720575940628734376 | MBON04 | right | 17.2 | 52.4 |
+| 720575940617552340 | MBON02 | right | 45.8 | 21.8 |
+| 720575940609959637 | MBON32 | left | 40.2 | 42.4 |
+| 720575940624185095 | MBON02 | left | 41.2 | 29.8 |
+| 720575940630864847 | MBON09 | right | 20.8 | 35.8 |
+| 720575940624539284 | MBON18 | left | 15.0 | 27.0 |
+| 720575940652390134 | MBON07 | left | 0.2 | 22.4 |
+| 720575940610964946 | MBON09 | right | 19.8 | 21.6 |
+| 720575940637902938 | MBON35 | left | 21.2 | 1.2 |
+| 720575940622979277 | MBON27 | left | 1.6 | 13.4 |
+| 720575940623377802 | MBON16 | left | 3.0 | 12.4 |
+| 720575940621828443 | MBON12 | left | 10.4 | 0.4 |
+| 720575940630075703 | MBON12 | left | 7.4 | 2.4 |
+| 720575940645304430 | MBON13 | left | 2.4 | 6.6 |
+| 720575940623182847 | MBON33 | left | 1.6 | 0.4 |
+| 720575940631177803 | MBON24 | left | 1.2 | 0.8 |
+| 720575940638028607 | MBON06 | right | 0.8 | 0.8 |
+| 720575940638774606 | MBON17 | left | 0.8 | 0.2 |
+| 720575940617749538 | MBON11 | right | 0.4 | 0.4 |
+| 720575940630496374 | MBON05 | right | 0.2 | 0.2 |
+
+**Compartment / valence annotation: unverified.** The
+`flywire_annotations` TSV used throughout this project
+(`Supplemental_file1_neuron_annotations.tsv`, columns listed in
+"Annotation and connectivity sources") has no column encoding MB compartment
+(e.g. gamma/alpha-beta/alpha'-beta') or approach/avoidance valence for MBONs.
+`hemibrain_type` for every MBON row is identical to `cell_type` (e.g.
+`MBON01` → `MBON01`), so it carries no additional compartment information
+either. No other local file in this repository maps MBON cell types to
+compartment or valence. Per the hard rule against citing literature that
+cannot be verified from local data, compartment identity and
+approach/avoidance associations for these 33 MBONs are **not reported** —
+doing so would require external literature (e.g. Aso et al. naming
+conventions) that this project's local data does not contain or corroborate.
+This is a real gap for the eventual decision-readout design and should be
+flagged as a follow-up: either locate a local/derivable compartment mapping,
+or treat compartment/valence as an explicit external input to be added later
+with its source cited.
+
+### PAM / PPL1 / APL rates (KC-direct conditions)
+
+| Condition | APL (n active / 2) | PAM (n active / 307) | PPL1 (n active / 16) |
+|---|---|---|---|
+| kc_set_a | 1 active, left, 232.4 Hz | 2 active: `720575940631184439` PAM08 left 0.2 Hz, `720575940648330105` PAM06 right 0.2 Hz | 6 active: PPL106 left 29.8, PPL107 left 5.8, PPL106 right 8.4, PPL107 right 5.0, PPL101 left 32.0, PPL102 right 0.6 Hz |
+| kc_set_b | 2 active: left 234.2 Hz, right 0.4 Hz | 1 active: `720575940621861637` PAM09 right 0.8 Hz | 6 active: PPL106 left 28.2, PPL107 left 1.0, PPL106 right 19.8, PPL101 left 20.0, PPL103 left 0.6, PPL103 right 0.4 Hz |
+
+The single left APL dominates in both conditions (~232–234 Hz, essentially
+unchanged between A and B), consistent with APL being driven by the pooled
+KC population rather than by which specific 100 KCs are active. PAM (reward)
+neurons are almost silent in both conditions (1–2 of 307 active, all ≤0.8 Hz)
+— KC-direct stimulation does not recruit meaningful reward-pathway activity
+at this rate/duration. PPL1 (punishment/novelty) neurons show more activity
+(6 of 16 active in both conditions, up to ~32 Hz) but with a similar overall
+profile between A and B, not a clearly differential one.
+
+### Timing anomaly: kc_set_b runtime (unexplained)
+
+`kc_set_a` completed in 34.6 s; `kc_set_b` took 185.1 s (`runtime_seconds` in
+the JSON), a ~5.3x difference, matching the user-reported 34 s / 184 s. No
+saved diagnostic explains this, and the direction is counter-intuitive:
+`kc_set_b` has **fewer** brain-wide active neurons (216 vs. 561) and a
+slightly **lower** total spike count (81,946 vs. 85,679) than `kc_set_a`, so
+the runtime difference is not explained by more simulated activity in B —
+if anything, B did less work by every activity metric this script records.
+Stimulated-KC count (100), mean stimulated-KC rate (147.744 Hz, identical to
+3 decimal places), and per-condition trial/duration parameters are identical
+between A and B. **This is flagged as unexplained** and most plausibly
+attributable to something outside the model's own dynamics (e.g. system load,
+disk/OS caching, or `joblib`/`loky` worker-scheduling variance on the host
+machine during that specific run) — but this is a hypothesis, not verified
+from any saved diagnostic, since this script does not record host system
+state. No code or data in this repository confirms or rules out that
+explanation.
+
 ## Acceptance target for any fix
 
 A candidate fix (not yet attempted) should be judged against:
