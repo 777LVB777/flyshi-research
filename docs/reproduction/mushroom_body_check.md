@@ -573,6 +573,121 @@ for DA1, 174 for DL2d, from `Connectivity_783.parquet`, no simulation).
   diagnostics should prioritize the antennal lobe over further MB-internal
   probes.
 
+## Antennal-lobe local-neuron sign audit
+
+Follow-up to the previous section's open question: checked the predicted
+transmitter and model-assigned sign for the antennal-lobe local-neuron classes
+in the v783 annotations, and their total synapses onto the 277 uniglomerular
+PNs. All numbers below are from `Connectivity_783.parquet` and
+`Supplemental_file1_neuron_annotations.tsv` directly — no simulation was run,
+and no literature is cited (per instruction, only annotation/connectivity data).
+
+**Classes found.** `cell_class=='ALLN'` is the only class in the v783
+annotations literally named "AL local neuron" (n=429, split 214 left / 213
+right / 2 center). Two smaller, separate classes are also antennal-lobe
+associated but their local-vs-output status is **unverified from this data
+alone**: `cell_class=='ALIN'` (n=24, "AL interneuron"?) and `cell_class=='ALON'`
+(n=14, "AL output neuron"? — the name suggests these may project out of the AL
+rather than stay local, so grouping them with ALLN below should be treated
+with that caveat).
+
+| Class | n | Predicted transmitter (`top_nt`) counts |
+| --- | ---: | --- |
+| ALLN | 429 | glutamate 148, gaba 147, acetylcholine 80, serotonin 40, dopamine 12, octopamine 2 |
+| ALIN | 24 | glutamate 9, gaba 8, acetylcholine 7 |
+| ALON | 14 | acetylcholine 8, glutamate 3, gaba 2, serotonin 1 |
+
+By neuron count, ALLN is 68.8% GABA/glutamate (295/429, "classically
+inhibitory" transmitters per the sign-rule table established two sessions
+ago) versus 31.2% ACh/dopamine/serotonin/octopamine (134/429, "classically
+excitatory" per that same rule).
+
+**Synapses onto the 277 uniglomerular PNs, split by assigned sign:**
+
+| Class | Total synapses | Excitatory (+1) | Inhibitory (−1) |
+| --- | ---: | ---: | ---: |
+| ALLN | 178,856 | 123,710 (69.17%) | 55,146 (30.83%) |
+| ALIN | 4,588 | 748 (16.30%) | 3,840 (83.70%) |
+| ALON | 326 | 97 (29.75%) | 229 (70.25%) |
+| **ALLN + ALIN + ALON combined** | **183,770** | **124,555 (67.78%)** | **59,215 (32.22%)** |
+
+Breakdown of ALLN→PN synapses by predicted transmitter and assigned sign
+(synapse counts):
+
+| `top_nt` | Excitatory (+1) | Inhibitory (−1) |
+| --- | ---: | ---: |
+| serotonin | 54,188 | 0 |
+| acetylcholine | 28,729 | 449 |
+| gaba | 19,131 | 45,834 |
+| dopamine | 14,686 | 0 |
+| glutamate | 6,816 | 8,863 |
+| octopamine | 160 | 0 |
+
+**Finding, verified from data: the model's ALLN population is net excitatory
+onto uniglomerular PNs (69.2% of ALLN→PN synapses are signed excitatory),
+despite most individual ALLN neurons (68.8%) being predicted GABAergic or
+glutamatergic.** Two things drive this: (1) the small serotonin-predicted
+minority of ALLN neurons (40/429 = 9.3% of the class) contributes the single
+largest transmitter-specific excitatory synapse total onto PNs (54,188
+synapses, more than ACh's 28,729) — consistent with the serotonin/dopamine/
+octopamine "always excitatory" sign rule found previously, now shown to apply
+heavily within the AL itself; and (2) a meaningful fraction of GABA-predicted
+(29.4%) and glutamate-predicted (43.5%) ALLN→PN synapses are *still* signed
+excitatory, a much higher deviation rate than the ~1–3% seen for GABA/
+glutamate connectome-wide (see the sign-rule table above) — **the cause of
+this higher deviation specifically for ALLN→PN synapses was not investigated
+and is unverified.**
+
+Combined ALLN+ALIN+ALON is also net excitatory (67.78%), though ALIN and ALON
+individually lean net inhibitory (83.70% and 70.25% inhibitory respectively) —
+it is ALLN, by far the largest of the three classes, that dominates the
+combined total and sets its sign.
+
+**Conclusion, from annotation/connectivity data only: this model's antennal-
+lobe local-neuron network, taken as a whole, provides net excitatory rather
+than net inhibitory synaptic drive onto the uniglomerular PNs.** This is
+offered as a concrete, data-verified mechanism consistent with (not proof of)
+last session's hypothesis that AL-local-circuit excitation, not KC recurrence
+or DAN input, is what turns single-glomerulus stimulation into brain-wide
+spread. No claim is made here about what the *correct* biological sign should
+be — that would require literature this session was instructed not to cite.
+
+## KC-direct stimulation: acceptance criterion and decision rule (pre-stated, before running)
+
+To keep this diagnostic honest, the acceptance criterion and the decision it
+drives are recorded here **before** the `--stim-mode kc` run is executed.
+
+**"Contained" means, for the KC-direct-stimulation run:**
+
+- Non-stimulated KC active fraction (`kc_target_vs_nontarget.nontarget_by_side`,
+  both left and right) is **below 10%**.
+- Top-5% active-KC Jaccard between set A and set B
+  (`odor_a_vs_b_top5pct_kc_jaccard`) is **below 0.3**.
+- Baseline remains silent (0.00% active, 0.00 Hz), as in every run so far.
+
+All three must hold; if any one fails, KC-direct stimulation is "not
+contained." The unmodified PN-driven run must be reported alongside for
+comparison, per the existing acceptance-target convention below.
+
+**Decision rule:**
+
+- **Contained → use KC-direct input in the full-brain model.** If stimulating
+  a KC set directly does not recruit the antennal-lobe spread pathway (because
+  it bypasses the AL entirely), it becomes the input pathway for the
+  full-brain model going forward, sidestepping the AL sign issue rather than
+  fixing it.
+- **Not contained → build a connectome-extracted mushroom-body subcircuit.**
+  If KC-direct stimulation *also* spreads broadly (e.g. because of KC→KC
+  recurrence, APL feedback loops, or the AL still gets recruited via KC→APL→AL
+  or KC→other pathways), that would indicate the non-selectivity is not
+  specific to the AL pathway, and the more tractable path forward is an
+  isolated MB subcircuit (PNs of interest + KCs + APL + relevant DANs/MBONs,
+  extracted from the connectome) rather than continuing to fight spread in
+  the full brain-wide model.
+
+This criterion and rule are recorded now, before results exist, specifically
+so the run's outcome cannot retroactively shift the bar.
+
 ## Acceptance target for any fix
 
 A candidate fix (not yet attempted) should be judged against:
@@ -614,6 +729,11 @@ uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repr
 # NOTE: run --dan-kc-off first and read its result before this one — this flag
 # is confounded by the KC top_nt misclassification (see caveat above).
 uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/check_mb_response.py --trials 5 --pn-rate 150 --seed 20260316 --modulatory-fast-off
+
+# New: KC-direct stimulation mode. Bypasses the antennal lobe entirely by driving
+# two disjoint 100-KC left-hemisphere sets directly. Judge against the pre-stated
+# "contained" criterion above BEFORE deciding KC-direct-input vs. MB-subcircuit.
+uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/check_mb_response.py --stim-mode kc --kc-set-size 100 --trials 5 --pn-rate 150 --duration-ms 1000 --seed 20260316
 ```
 
 Use a normal terminal for these long model runs. The script prints the standard

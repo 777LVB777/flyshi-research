@@ -74,6 +74,25 @@ def parser() -> argparse.ArgumentParser:
             "docs/reproduction/mushroom_body_check.md before interpreting results."
         ),
     )
+    argument_parser.add_argument(
+        "--stim-mode",
+        choices=["pn", "kc"],
+        default="pn",
+        help=(
+            "Stimulation target (default: pn, unchanged prior behavior). 'pn' drives "
+            "the odor A/B uniglomerular PNs. 'kc' drives two disjoint random "
+            "left-hemisphere KC sets directly (see --kc-set-size/--kc-set-seed), to "
+            "test whether KC-direct input stays contained to those KCs instead of "
+            "spreading through the antenna-lobe local-neuron network."
+        ),
+    )
+    argument_parser.add_argument("--kc-set-size", type=int, default=100, help="KC set size per condition for --stim-mode kc (default: 100).")
+    argument_parser.add_argument(
+        "--kc-set-seed",
+        type=int,
+        default=20260316,
+        help="Seed for the two disjoint KC sets in --stim-mode kc, independent of --seed (default: 20260316).",
+    )
     return argument_parser
 
 
@@ -270,6 +289,62 @@ def pn_rate_rows(payload: dict[str, object], pn_glomerulus: dict[int, str], rate
     ]
 
 
+def select_disjoint_kc_sets(kc_records: list[dict[str, object]], size: int, seed: int) -> tuple[list[int], list[int]]:
+    """Two disjoint random left-hemisphere KC sets for --stim-mode kc.
+
+    Uses an isolated numpy Generator keyed on `seed` (independent of --seed,
+    which drives the Brian2/trial RNG), so the sets are reproducible regardless
+    of trial count/seed and don't perturb simulation randomness.
+    """
+    left_kc_ids = sorted(int(record["root_id"]) for record in kc_records if record["side"] == "left")
+    if 2 * size > len(left_kc_ids):
+        raise ValueError(
+            f"--kc-set-size {size} too large: only {len(left_kc_ids)} left-hemisphere KCs available, need {2 * size}"
+        )
+    rng = np.random.default_rng(seed)
+    shuffled = rng.permutation(left_kc_ids)
+    set_a = sorted(int(x) for x in shuffled[:size])
+    set_b = sorted(int(x) for x in shuffled[size : 2 * size])
+    return set_a, set_b
+
+
+def topk_ids(rates_by_id: dict[int, float], fraction: float) -> list[int]:
+    """Top-`fraction` neuron IDs by rate; ties broken by ascending root ID (deterministic)."""
+    k = max(1, round(fraction * len(rates_by_id)))
+    ordered = sorted(rates_by_id.items(), key=lambda item: (-item[1], item[0]))
+    return [neuron_id for neuron_id, _ in ordered[:k]]
+
+
+def target_vs_nontarget_kc_summary(
+    kc_records: list[dict[str, object]], kc_rates: dict[int, float], target_kc_ids: set[int]
+) -> dict[str, object]:
+    """Activity of directly-stimulated (--stim-mode kc) or anatomically-targeted
+    (--stim-mode pn) KCs vs. every other KC, the latter split by hemisphere."""
+
+    def stats(rate_values: list[float]) -> dict[str, object]:
+        if not rate_values:
+            return {"count": 0, "active_count_gt_0_hz": 0, "active_fraction_gt_0_hz": 0.0, "mean_rate_hz": 0.0}
+        active = sum(rate > 0 for rate in rate_values)
+        return {
+            "count": len(rate_values),
+            "active_count_gt_0_hz": active,
+            "active_fraction_gt_0_hz": active / len(rate_values),
+            "mean_rate_hz": sum(rate_values) / len(rate_values),
+        }
+
+    target_rates = [kc_rates[neuron_id] for neuron_id in target_kc_ids if neuron_id in kc_rates]
+    nontarget_by_side = {}
+    for side in ("left", "right"):
+        side_rates = [
+            kc_rates[int(record["root_id"])]
+            for record in kc_records
+            if record["side"] == side and int(record["root_id"]) not in target_kc_ids
+        ]
+        nontarget_by_side[side] = stats(side_rates)
+
+    return {"target": stats(target_rates), "nontarget_by_side": nontarget_by_side}
+
+
 def direct_kc_targets(connectivity: pd.DataFrame, pn_ids: list[int], kc_id_set: set[int]) -> set[int]:
     """KCs that are direct postsynaptic targets of the given PNs (anatomy only)."""
     if not pn_ids:
@@ -417,12 +492,17 @@ def run_condition(
     kc_nontarget_ids = all_kc_ids - target_kc_ids
     right_kc_ids = {int(record["root_id"]) for record in kcs if record["side"] == "right"}
     pn_ids_all = ids(payload["uniglomerular_antenna_lobe_projection_neurons"]["records"])
-    nonstim_pn_ids = [pn_id for pn_id in pn_ids_all if pn_id not in set(stimulated_ids)]
+    stimulated_id_set = set(stimulated_ids)
+    nonstim_pn_ids = [pn_id for pn_id in pn_ids_all if pn_id not in stimulated_id_set]
     apl_ids = ids(apl)
+    pn_rates_list = pn_rate_rows(payload, pn_glomerulus, rates, name)
+    active_nonstim_pn_count = sum(
+        1 for row in pn_rates_list if row["rate_hz"] > 0 and row["root_id"] not in stimulated_id_set
+    )
 
     return {
         "condition": name,
-        "stimulated_pn_ids": stimulated_ids,
+        "stimulated_ids": stimulated_ids,
         "runtime_seconds": runtime_seconds,
         "spike_count": len(spikes),
         "kc": {
@@ -435,12 +515,14 @@ def run_condition(
             "active_ids_gt_0_hz": active_kcs,
             "by_side": kc_by_side(kcs, kc_rates),
         },
+        "kc_target_vs_nontarget": target_vs_nontarget_kc_summary(kcs, kc_rates, target_kc_ids),
         "kc_rates_hz_by_id": kc_rates,
         "mbons_nonzero": annotated_rates(mbons, mbon_rates),
         "pam_nonzero": annotated_rates(pam, pam_rates),
         "ppl1_nonzero": annotated_rates(ppl1, ppl1_rates),
         "apl_nonzero": annotated_rates(apl, apl_rates),
-        "pn_rates": pn_rate_rows(payload, pn_glomerulus, rates, name),
+        "pn_rates": pn_rates_list,
+        "active_nonstim_pn_count": active_nonstim_pn_count,
         "brain_wide": brain_wide_summary(rates, name, annotations, total_brain_neurons),
         "first_spike_latency_trial0_ms": first_spike_latencies_ms(
             spikes, target_kc_ids, kc_nontarget_ids, apl_ids, nonstim_pn_ids, right_kc_ids
@@ -519,10 +601,12 @@ def main() -> None:
     args = parser().parse_args()
     if args.trials <= 0 or args.pn_rate < 0 or args.duration_ms <= 0:
         raise ValueError("trials and duration must be positive; rate must be non-negative")
+    if args.stim_mode == "kc" and args.kc_set_size <= 0:
+        raise ValueError("--kc-set-size must be positive")
     payload = read_ids()
     groups = payload["uniglomerular_antenna_lobe_projection_neurons"]["groups_by_glomerulus_and_side"]
-    odor_a = groups[ODOR_A_GLOMERULUS][SIDE]
-    odor_b = groups[ODOR_B_GLOMERULUS][SIDE]
+    odor_a_pns = groups[ODOR_A_GLOMERULUS][SIDE]
+    odor_b_pns = groups[ODOR_B_GLOMERULUS][SIDE]
 
     kc_ids = ids(payload["kenyon_cells"]["records"])
     report_synapse_removal_counts(args, kc_ids)
@@ -531,13 +615,24 @@ def main() -> None:
     annotations = load_annotations()
     pn_glomerulus = pn_glomerulus_map(payload)
     total_brain_neurons = len(pd.read_csv(UPSTREAM_ROOT / "Completeness_783.csv", index_col=0))
-    connectivity = pd.read_parquet(
-        UPSTREAM_ROOT / "Connectivity_783.parquet", columns=["Presynaptic_ID", "Postsynaptic_ID"]
-    )
-    kc_id_set = set(kc_ids)
-    odor_a_targets = direct_kc_targets(connectivity, odor_a, kc_id_set)
-    odor_b_targets = direct_kc_targets(connectivity, odor_b, kc_id_set)
-    del connectivity
+
+    kc_set_a: list[int] | None = None
+    kc_set_b: list[int] | None = None
+    if args.stim_mode == "kc":
+        kc_set_a, kc_set_b = select_disjoint_kc_sets(payload["kenyon_cells"]["records"], args.kc_set_size, args.kc_set_seed)
+        condition_a_name, condition_b_name = "kc_set_a", "kc_set_b"
+        stim_a, stim_b = kc_set_a, kc_set_b
+        target_a, target_b = set(kc_set_a), set(kc_set_b)
+    else:
+        condition_a_name, condition_b_name = "odor_a_da1_left", "odor_b_dl2d_left"
+        stim_a, stim_b = odor_a_pns, odor_b_pns
+        connectivity = pd.read_parquet(
+            UPSTREAM_ROOT / "Connectivity_783.parquet", columns=["Presynaptic_ID", "Postsynaptic_ID"]
+        )
+        kc_id_set = set(kc_ids)
+        target_a = direct_kc_targets(connectivity, odor_a_pns, kc_id_set)
+        target_b = direct_kc_targets(connectivity, odor_b_pns, kc_id_set)
+        del connectivity
 
     try:
         with tempfile.TemporaryDirectory(prefix="flyshi-mb-check-") as temporary_directory:
@@ -546,16 +641,19 @@ def main() -> None:
                 "baseline", [], payload, args, scratch_dir, annotations, pn_glomerulus, set(), total_brain_neurons
             )
             condition_a = run_condition(
-                "odor_a_da1_left", odor_a, payload, args, scratch_dir, annotations, pn_glomerulus, odor_a_targets, total_brain_neurons
+                condition_a_name, stim_a, payload, args, scratch_dir, annotations, pn_glomerulus, target_a, total_brain_neurons
             )
             condition_b = run_condition(
-                "odor_b_dl2d_left", odor_b, payload, args, scratch_dir, annotations, pn_glomerulus, odor_b_targets, total_brain_neurons
+                condition_b_name, stim_b, payload, args, scratch_dir, annotations, pn_glomerulus, target_b, total_brain_neurons
             )
     finally:
         if original_silence is not None:
             shiu_model.silence = original_silence
 
     overlap = jaccard(condition_a["kc"]["active_ids_gt_0_hz"], condition_b["kc"]["active_ids_gt_0_hz"])
+    top5pct_overlap = jaccard(
+        topk_ids(condition_a["kc_rates_hz_by_id"], 0.05), topk_ids(condition_b["kc_rates_hz_by_id"], 0.05)
+    )
     summary = {
         "flywire_version": "783",
         "annotation_release": payload["annotation_source"],
@@ -568,13 +666,18 @@ def main() -> None:
             "kc_kc_off": args.kc_kc_off,
             "dan_kc_off": args.dan_kc_off,
             "modulatory_fast_off": args.modulatory_fast_off,
+            "stim_mode": args.stim_mode,
+            "kc_set_size": args.kc_set_size,
+            "kc_set_seed": args.kc_set_seed,
         },
         "glomeruli": {
-            "odor_a": {"glomerulus": ODOR_A_GLOMERULUS, "side": SIDE, "pn_count": len(odor_a)},
-            "odor_b": {"glomerulus": ODOR_B_GLOMERULUS, "side": SIDE, "pn_count": len(odor_b)},
+            "odor_a": {"glomerulus": ODOR_A_GLOMERULUS, "side": SIDE, "pn_count": len(odor_a_pns)},
+            "odor_b": {"glomerulus": ODOR_B_GLOMERULUS, "side": SIDE, "pn_count": len(odor_b_pns)},
         },
+        "kc_direct_stim_sets": {"set_a": kc_set_a, "set_b": kc_set_b} if args.stim_mode == "kc" else None,
         "conditions": [baseline, condition_a, condition_b],
         "odor_a_vs_b_active_kc_jaccard_gt_0_hz": overlap,
+        "odor_a_vs_b_top5pct_kc_jaccard": top5pct_overlap,
     }
     RESULTS_DIR.mkdir(exist_ok=True)
     suffix = (
@@ -583,6 +686,7 @@ def main() -> None:
         + ("_kc_kc_off" if args.kc_kc_off else "")
         + ("_dan_kc_off" if args.dan_kc_off else "")
         + ("_modulatory_fast_off" if args.modulatory_fast_off else "")
+        + (f"_stim_kc_size_{args.kc_set_size}_kc_seed_{args.kc_set_seed}" if args.stim_mode == "kc" else "")
     )
     json_path = RESULTS_DIR / f"mb_response_{suffix}.json"
     csv_path = RESULTS_DIR / f"mb_response_{suffix}.csv"
@@ -602,13 +706,24 @@ def main() -> None:
 
     for condition in summary["conditions"]:
         kc = condition["kc"]
+        tvn = condition["kc_target_vs_nontarget"]
         print(
             f"{condition['condition']}: KC >0 Hz={kc['active_fraction_gt_0_hz']:.4%}, "
             f">5 Hz={kc['active_fraction_gt_5_hz']:.4%}, mean={kc['mean_rate_hz']:.4f} Hz, "
             f"nonzero MBONs={len(condition['mbons_nonzero'])}, "
-            f"brain-wide active={condition['brain_wide']['active_neuron_fraction']:.4%}"
+            f"brain-wide active={condition['brain_wide']['active_neuron_fraction']:.4%}, "
+            f"active non-stim PNs={condition['active_nonstim_pn_count']}"
+        )
+        print(
+            f"    stimulated/target KC: active={tvn['target']['active_fraction_gt_0_hz']:.4%} "
+            f"mean={tvn['target']['mean_rate_hz']:.4f} Hz (n={tvn['target']['count']}); "
+            f"non-target KC left: active={tvn['nontarget_by_side']['left']['active_fraction_gt_0_hz']:.4%} "
+            f"mean={tvn['nontarget_by_side']['left']['mean_rate_hz']:.4f} Hz; "
+            f"non-target KC right: active={tvn['nontarget_by_side']['right']['active_fraction_gt_0_hz']:.4%} "
+            f"mean={tvn['nontarget_by_side']['right']['mean_rate_hz']:.4f} Hz"
         )
     print(f"Odor A/B active-KC Jaccard (>0 Hz): {overlap:.6f}")
+    print(f"Odor A/B top-5% active-KC Jaccard: {top5pct_overlap:.6f}")
     print(f"Summary JSON: {json_path}")
     print(f"Summary CSV: {csv_path}")
     print(f"Per-KC rates CSV: {kc_rates_path}")
