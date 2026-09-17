@@ -1,0 +1,4 @@
+condition,kc_target_median_ms,kc_target_n_spiked,kc_nontarget_median_ms,kc_nontarget_n_spiked,apl_first_ms,apl_first_id,first_nonstim_pn_ms,first_nonstim_pn_id,first_right_kc_ms,first_right_kc_id
+baseline,,0,,0,,,,,,
+kc_set_a,6.1000000000000005,100,,0,4.0,720575940624547622,,,,
+kc_set_b,6.1000000000000005,100,,0,4.2,720575940624547622,,,,

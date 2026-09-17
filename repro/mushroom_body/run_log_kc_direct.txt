@@ -1,0 +1,27 @@
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-8lnbyguu/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   25 s
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-8lnbyguu/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   34 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-8lnbyguu/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   184 s
+baseline: KC >0 Hz=0.0000%, >5 Hz=0.0000%, mean=0.0000 Hz, nonzero MBONs=0, brain-wide active=0.0000%, active non-stim PNs=0
+    stimulated/target KC: active=0.0000% mean=0.0000 Hz (n=0); non-target KC left: active=0.0000% mean=0.0000 Hz; non-target KC right: active=0.0000% mean=0.0000 Hz
+kc_set_a: KC >0 Hz=1.9316%, >5 Hz=1.9316%, mean=2.8539 Hz, nonzero MBONs=33, brain-wide active=0.4046%, active non-stim PNs=0
+    stimulated/target KC: active=100.0000% mean=147.7440 Hz (n=100); non-target KC left: active=0.0000% mean=0.0000 Hz; non-target KC right: active=0.0000% mean=0.0000 Hz
+kc_set_b: KC >0 Hz=1.9316%, >5 Hz=1.9316%, mean=2.8539 Hz, nonzero MBONs=33, brain-wide active=0.1558%, active non-stim PNs=0
+    stimulated/target KC: active=100.0000% mean=147.7440 Hz (n=100); non-target KC left: active=0.0000% mean=0.0000 Hz; non-target KC right: active=0.0000% mean=0.0000 Hz
+Odor A/B active-KC Jaccard (>0 Hz): 0.000000
+Odor A/B top-5% active-KC Jaccard: 0.446927
+Summary JSON: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.json
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv
+Per-KC rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_kc_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv
+Per-PN rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_pn_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv
+Brain-wide activity CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_brain_wide_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv
+Top active cell types CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_top_active_types_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv
+First-spike latency (trial 0) CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_latency_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.csv

@@ -1,0 +1,4 @@
+condition,active_neuron_count,active_neuron_fraction
+baseline,0,0.0
+kc_set_a,561,0.004046480427585312
+kc_set_b,216,0.001558003159284184
