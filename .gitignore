@@ -7,8 +7,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.venv-shiu/
 venv/
 .env
 .env.*
 build/
 dist/
+third_party/
