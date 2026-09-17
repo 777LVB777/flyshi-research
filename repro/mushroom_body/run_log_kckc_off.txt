@@ -1,0 +1,19 @@
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-z9jahuxc/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   20 s
+>>> Experiment:     odor_a_da1_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-z9jahuxc/odor_a_da1_left/odor_a_da1_left.parquet
+    Excited neurons: 9
+    Elapsed time:   22 s
+>>> Experiment:     odor_b_dl2d_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-z9jahuxc/odor_b_dl2d_left/odor_b_dl2d_left.parquet
+    Excited neurons: 7
+    Elapsed time:   22 s
+baseline: KC >0 Hz=0.0000%, >5 Hz=0.0000%, mean=0.0000 Hz, nonzero MBONs=0
+odor_a_da1_left: KC >0 Hz=55.9784%, >5 Hz=53.0423%, mean=21.5934 Hz, nonzero MBONs=67
+odor_b_dl2d_left: KC >0 Hz=55.4761%, >5 Hz=52.5787%, mean=21.1105 Hz, nonzero MBONs=67
+Odor A/B active-KC Jaccard (>0 Hz): 0.976027
+Summary JSON: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_kc_kc_off.json
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_kc_kc_off.csv
+Per-KC rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_kc_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_kc_kc_off.csv
