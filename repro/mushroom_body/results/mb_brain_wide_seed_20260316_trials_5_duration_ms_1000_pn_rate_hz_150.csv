@@ -1,0 +1,4 @@
+condition,active_neuron_count,active_neuron_fraction
+baseline,0,0.0
+odor_a_da1_left,8619,0.062168653841992515
+odor_b_dl2d_left,8592,0.06197390344708199

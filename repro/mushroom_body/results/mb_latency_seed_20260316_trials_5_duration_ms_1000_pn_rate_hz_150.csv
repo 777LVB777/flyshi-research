@@ -1,0 +1,4 @@
+condition,kc_target_median_ms,kc_target_n_spiked,kc_nontarget_median_ms,kc_nontarget_n_spiked,apl_first_ms,apl_first_id,first_nonstim_pn_ms,first_nonstim_pn_id,first_right_kc_ms,first_right_kc_id
+baseline,,0,,0,,,,,,
+odor_a_da1_left,33.9,322,45.00000000000001,3073,18.500000000000004,720575940624547622,13.8,720575940628467611,35.6,720575940614887830
+odor_b_dl2d_left,45.1,145,55.5,3216,27.1,720575940624547622,27.8,720575940628467611,46.7,720575940614887830

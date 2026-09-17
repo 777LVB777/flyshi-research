@@ -362,7 +362,7 @@ stand-in synapses object (no Brian2/simulation involved) and reproduces the
 same 47,404 and 832,432 pair counts obtained directly from the connectivity
 table.
 
-## Diagnostics added this round (localizing the spread; not yet run)
+## Diagnostics added this round (localizing the spread)
 
 Since DAN→KC, KC→KC, and input-rate manipulations each ruled out only a modest
 share of the ~65% non-sparse KC state, and non-target KCs turn out to fire
@@ -409,6 +409,169 @@ analysis functions (`pn_rate_rows`, `direct_kc_targets`, `brain_wide_summary`,
 `first_spike_latencies_ms`) were unit-tested against synthetic data (no Brian2,
 no simulation) before being added; `--help` was confirmed working after the
 change (exit code 0).
+
+### Results (run 2026-09-16, unmodified model, 150 Hz, 5 trials, 1000 ms, seed 20260316)
+
+**Non-stimulated PNs fire heavily, on both sides, in every glomerulus.**
+Stimulating only the 9 left-DA1 PNs (odor A) or 7 left-DL2d PNs (odor B) drives:
+
+| Group | n | Active | Mean rate (active only) |
+| --- | ---: | ---: | ---: |
+| Odor A: stimulated left-DA1 PNs | 9 | 100% | 265.8 Hz |
+| Odor A: same-glomerulus right-DA1 PNs (not stimulated) | 8 | 100% | 129.8 Hz |
+| Odor A: all other-glomerulus PNs, both sides | 260 | 97.3% | 127.0 Hz (123.6 Hz incl. silent) |
+| Odor B: stimulated left-DL2d PNs | 7 | 100% | 231.2 Hz |
+| Odor B: same-glomerulus right-DL2d PNs (not stimulated) | 7 | 100% | 106.6 Hz |
+| Odor B: all other-glomerulus PNs, both sides | 263 | 97.0% | 127.2 Hz (123.4 Hz incl. silent) |
+
+Non-stim activation is essentially bilaterally symmetric (odor A: 127 active
+left / 126 active right among the 260 non-stim PNs; odor B: 128 / 127). This
+is measured directly from `mb_pn_rates_*.csv`; no simulation was run to
+produce this number, only post-hoc analysis of the existing file.
+
+**Brain-wide:** 0% of ~138,639 v783 neurons active at baseline; 6.22% (8,619
+neurons) for odor A; 6.20% (8,592 neurons) for odor B (`mb_brain_wide_*.csv`).
+So the spread, while already well beyond the MB and AL, has not saturated the
+whole brain.
+
+**Top 10 active cell types** (by mean rate, from `mb_top_active_types_*.csv`;
+nearly identical top-10 for both odors):
+
+| Rank | Cell type | Cell class | Mean rate (odor A / odor B) |
+| ---: | --- | --- | --- |
+| 1 | APL | MBIN | 336.3 / 331.8 Hz |
+| 2 | v2LN30 | ALLN | 295.4 / 290.6 Hz |
+| 3 | il3LN6 | ALLN | 287.9 / 284.0 Hz |
+| 4 | lLN1_bc | ALLN | 285.9 / 281.8 Hz |
+| 5 | lLN2X03 | ALLN | 285.1 / 281.7 Hz |
+| 6 | DPM (odor A) / lLN1_a (odor B) | MBIN / ALLN | 284.0 / 278.9 Hz |
+| 7 | lLN1_a (odor A) / DPM (odor B) | ALLN / MBIN | 282.5 / 278.8 Hz |
+| 8 | lLN2F_b | ALLN | 282.1 / 278.3 Hz |
+| 9 | lLN2T_c | ALLN | 281.4 / 278.0 Hz |
+| 10 | lLN2X04 | ALLN | 280.1 / 276.9 Hz |
+
+All 10 are at or near saturating rates (the refractory period `t_rfc=2.2ms`
+caps the theoretical max near ~455 Hz). Ranks 14–20 are dominated by
+`_adPN` cell types (e.g. `DP1m_adPN`, `VP2_adPN`, `DC1_adPN`) — uniglomerular
+PNs from glomeruli that are neither DA1 nor DL2d, confirming the PN-level
+finding above at the cell-type-ranking level. `cell_class=ALLN` (antennal-lobe
+local neuron) dominates the top 10 for both odors; KCs and DANs do not appear
+in the top 10 at all.
+
+**Latency (trial 0), from `mb_latency_*.csv`:**
+
+| Metric | Odor A | Odor B |
+| --- | ---: | ---: |
+| First non-stim PN (`first_nonstim_pn_ms`, neuron `...628467611`, VL2p-left, same for both odors) | 13.8 ms | 27.8 ms |
+| APL first spike (`apl_first_ms`, same 2-neuron pair both odors) | 18.5 ms | 27.1 ms |
+| KC direct-target median first spike (`kc_target_median_ms`, n=322/145) | 33.9 ms | 45.1 ms |
+| Right-hemisphere KC earliest first spike (`first_right_kc_ms`) | 35.6 ms | 46.7 ms |
+| KC non-target median first spike (`kc_nontarget_median_ms`, n=3073/3216) | 45.0 ms | 55.5 ms |
+
+Ordering (earliest to latest) is the same for both odors: **non-stim PN ≈ APL
+< KC direct-target median < right-hemisphere-KC earliest < KC non-target
+median.** The non-stimulated PN and APL both fire before the *median*
+direct-target KC. **Caveat:** the non-stim-PN/APL/right-KC values are each a
+single earliest-spike time across a group, while the KC target/non-target
+values are medians across all spiking members of a (much larger) group — these
+are not the same kind of statistic, so "X ms before Y" here means "before the
+midpoint of Y's response," not "before every member of Y." The true earliest
+KC-target spike (not reported by this metric) could well be earlier than 18.5
+or 13.8 ms; this was not measured and is **unverified**.
+
+## Top-k KC selectivity analysis
+
+For k ∈ {2%, 5%, 10%} of the 5,177 KCs, took each odor's top-k most active KCs
+by mean rate (ties broken deterministically: rate descending, then FlyWire
+root ID ascending), across all four runs with a per-KC-rate CSV. Reports the
+odor A/B Jaccard overlap of the two top-k sets, and what fraction of each
+odor's top-k set are direct anatomical targets of that odor's own PNs (374 KCs
+for DA1, 174 for DL2d, from `Connectivity_783.parquet`, no simulation).
+
+| Run | k | n | A/B Jaccard | A-set is DA1-target | B-set is DL2d-target |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| unmodified 150 Hz | 2% | 104 | 0.748 | 21.15% | 17.31% |
+| unmodified 150 Hz | 5% | 259 | 0.799 | 22.01% | 14.29% |
+| unmodified 150 Hz | 10% | 518 | 0.860 | 20.85% | 12.36% |
+| `--kc-kc-off` | 2% | 104 | 0.719 | 26.92% | 14.42% |
+| `--kc-kc-off` | 5% | 259 | 0.818 | 20.46% | 13.90% |
+| `--kc-kc-off` | 10% | 518 | 0.857 | 19.31% | 10.42% |
+| `--dan-kc-off` | 2% | 104 | 0.691 | 25.00% | 17.31% |
+| `--dan-kc-off` | 5% | 259 | 0.830 | 21.62% | 13.13% |
+| `--dan-kc-off` | 10% | 518 | 0.857 | 20.66% | 12.16% |
+| `--pn-rate 50` | 2% | 104 | 0.857 | 14.42% | 12.50% |
+| `--pn-rate 50` | 5% | 259 | 0.884 | 17.37% | 10.04% |
+| `--pn-rate 50` | 10% | 518 | 0.901 | 17.76% | 10.42% |
+
+**Findings:**
+
+- Restricting to only the top 2% most active KCs does not recover
+  selectivity: Jaccard stays 0.69–0.86 across all four runs, versus the
+  full-active-set Jaccard of 0.976–0.991 reported earlier — some improvement,
+  but nowhere near "well below 0.5."
+- **Only 10–27% of each odor's top-k KCs are direct anatomical targets of that
+  odor's own PNs**, in every run and at every k. So even the *most* active
+  KCs for a given odor are, 73–90% of the time, KCs the odor's PNs never
+  directly synapse onto. Whatever is putting a KC at the top of the activity
+  ranking, it is usually not that KC receiving direct odor-specific PN input.
+- `--dan-kc-off` and `--kc-kc-off` produce essentially no improvement in top-k
+  Jaccard over the unmodified model (differences are within the noise of a
+  single 5-trial seed). `--pn-rate 50` actually has *higher* top-k Jaccard
+  (0.86–0.90) than the unmodified 150 Hz run (0.75–0.86), despite the two
+  odors' full-active-set Jaccard being nearly identical (0.990 vs. 0.991) —
+  weakening the input drive did not make the top responders more
+  odor-specific.
+
+## Diagnosis: where does the spread originate?
+
+**Shown by data (this session, no simulation needed for the analysis itself):**
+
+- Stimulating one glomerulus's ~7–9 left-hemisphere PNs drives 97%+ of *all*
+  277 uniglomerular PNs — every glomerulus, both hemispheres — to fire, at
+  rates comparable to the stimulated PNs themselves. This happens in the
+  antennal-lobe PN population itself, upstream of the mushroom body.
+- The cell types firing hardest (250–336 Hz, near the refractory-period
+  ceiling) are APL, DPM, and a large set of `cell_class=ALLN`/`lLN*`
+  antennal-lobe local neurons — not KCs, not DANs, not even the stimulated
+  glomerulus's own PNs particularly more than other glomeruli's PNs.
+- A non-stimulated PN and APL both reach their first spike (13.8–27.8 ms)
+  before the *median* direct-target KC responds (33.9–45.1 ms).
+- Even the top 2–10% most active KCs by rate are 73–90% NOT direct anatomical
+  targets of the stimulating odor's PNs, and their odor A/B overlap (0.69–0.86)
+  is only modestly better than the full active-set overlap (0.976–0.991).
+- Three independent single-factor removals — DAN→KC, KC→KC, and halving PN
+  input rate — each left the ~65% non-sparse KC state and top-k
+  non-selectivity essentially intact.
+
+**Hypothesis, not yet verified:**
+
+- The most likely primary locus of the pathological non-selectivity is
+  **upstream of the mushroom body, in the antennal-lobe local-interneuron
+  network** (the ALLN/lLN population), not in KC recurrence or DAN input as
+  originally hypothesized. The evidence above is consistent with this: the
+  spread is already essentially complete at the PN layer, before signal ever
+  reaches KCs, and the hardest-firing cell types are AL local neurons, not MB
+  neurons.
+- A plausible mechanism (**unverified — not checked this session**): real
+  antennal-lobe local neurons are predominantly GABAergic and provide lateral
+  inhibition/contrast enhancement between glomeruli; if this connectome-derived
+  model's ALLN/lLN population is instead net excitatory (or has the same
+  broad fast-excitatory sign issue documented for DA/5-HT/OA), stimulating one
+  glomerulus could excite the local-neuron network into broadcasting activity
+  to every other glomerulus instead of suppressing them. **This has not been
+  checked** — the sign/neurotransmitter breakdown for `cell_class=ALLN` (or
+  whatever local-neuron classes exist) was not audited this session and is the
+  natural next diagnostic.
+- It is also plausible (**unverified**) that this reflects a calibration issue
+  — `w_syn`/`f_poi` too strong for this connectome density — rather than a
+  transmitter-sign issue specifically. This was not tested this session (would
+  require sweeping `w_syn`/`f_poi`, not requested) and should not be assumed
+  correct or ruled out.
+- The MB-internal manipulations tried so far (`--dan-kc-off`, `--kc-kc-off`,
+  `--pn-rate`) were, in retrospect, looking downstream of where the data now
+  points; that does not mean they are wrong to have tried, but future
+  diagnostics should prioritize the antennal lobe over further MB-internal
+  probes.
 
 ## Acceptance target for any fix
 

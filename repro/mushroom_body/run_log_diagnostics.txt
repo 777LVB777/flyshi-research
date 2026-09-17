@@ -1,0 +1,23 @@
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-vl7ov4i2/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   16 s
+>>> Experiment:     odor_a_da1_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-vl7ov4i2/odor_a_da1_left/odor_a_da1_left.parquet
+    Excited neurons: 9
+    Elapsed time:   27 s
+>>> Experiment:     odor_b_dl2d_left
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-check-vl7ov4i2/odor_b_dl2d_left/odor_b_dl2d_left.parquet
+    Excited neurons: 7
+    Elapsed time:   25 s
+baseline: KC >0 Hz=0.0000%, >5 Hz=0.0000%, mean=0.0000 Hz, nonzero MBONs=0, brain-wide active=0.0000%
+odor_a_da1_left: KC >0 Hz=65.6944%, >5 Hz=64.1491%, mean=31.3204 Hz, nonzero MBONs=69, brain-wide active=6.2169%
+odor_b_dl2d_left: KC >0 Hz=65.3467%, >5 Hz=63.9173%, mean=30.6216 Hz, nonzero MBONs=69, brain-wide active=6.1974%
+Odor A/B active-KC Jaccard (>0 Hz): 0.991195
+Summary JSON: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.json
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
+Per-KC rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_kc_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
+Per-PN rates CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_pn_rates_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
+Brain-wide activity CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_brain_wide_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
+Top active cell types CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_top_active_types_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
+First-spike latency (trial 0) CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mb_latency_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150.csv
