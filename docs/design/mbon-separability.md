@@ -160,24 +160,103 @@ signal precisely because it does not rely on the noise model — but it is not a
 substitute for a direct noise measurement, since the 12 cells differ in duration
 and trials and so are not clean replicates of one condition.
 
-### Smallest experiment that would settle it (NOT run here)
+### The noise-floor experiment (specified here; not yet run)
 
-Rerun the **same** cue set under **different simulation seeds**, at a fixed cell,
-holding the KC-set choice fixed:
+Rerun the **same** cue set (cue A) under **different simulation seeds**, at a
+fixed cell, holding the KC-set choice fixed, so the only thing that varies is the
+simulation's random noise. This measures the noise directly:
 
-- Keep `--kc-set-seed 20260316` (so the identical 100 Kenyon cells are stimulated)
-  and `--stim-mode kc`, at one cell each of the fine and coarse extremes
-  (e.g. 1000 ms / 5 trials, and 100 ms / 1 trial).
-- Run **cue A only** at, say, 5 different `--seed` values → 5 independent noise
-  realizations of the *same* cue. Their MBON-rate spread is the **noise**.
-- Compare against the existing A-vs-B difference, the **signal**.
-- The clean test is then: is the A-vs-B difference on the top discriminating
-  MBONs large relative to the A-vs-A′ spread on those same MBONs?
+- Keep `--kc-set-seed 20260316` so the identical 100 Kenyon cells are stimulated
+  every time.
+- Run **cue A only** at **5 new seeds** (`20260317, 20260318, 20260319, 20260320,
+  20260321`), all distinct from the existing `20260316`, at **two cells**: the
+  low-noise fine cell (**1000 ms / 5 trials**) and the coarse cheap cell
+  (**100 ms / 1 trial**). That is 10 runs.
+- The spread among the 5 cue-A vectors is the **noise** (A vs A′). The existing
+  cue-B vector at each cell (from the calibration data, seed 20260316) is the
+  comparison, giving the **signal** (A vs B).
 
-This is a handful of extra KC-direct runs (cheap at 100 ms / 1 trial per the
-speed calibration) and would convert "strong circumstantial evidence" into a
-measured signal-to-noise ratio and a defensible decode probability. Until it is
-run, the noise floor is **unverified**.
+The dedicated script `repro/mushroom_body/run_single_cue.py` runs exactly one cue
+at one seed and saves its per-MBON rates; it reuses `check_mb_response.py`'s
+KC-direct machinery and is restartable (skips a seed whose output file already
+exists).
+
+### Pre-stated acceptance criterion (recorded BEFORE the run)
+
+Written now, before any noise run exists, so the outcome cannot move the bar.
+All vectors are per-MBON firing-rate vectors over the union of MBONs nonzero in
+any cue-A noise run or in the existing cue-B run at that cell; missing MBONs are
+filled with 0. Distances are Euclidean (Hz).
+
+Define, **per cell**, using the 5 new-seed cue-A vectors `A_1..A_5` and the
+existing cue-B vector `B` (seed 20260316):
+
+- **Noise (A vs A′)** `d_AA` = the mean Euclidean distance between distinct pairs
+  of the 5 cue-A vectors — the typical run-to-run difference of the *same* cue.
+- **Signal (A vs B)** `d_AB` = the mean Euclidean distance from each of the 5
+  cue-A vectors to `B` — the typical cue-A-to-cue-B difference.
+- **Separation ratio** `R = d_AB / d_AA`.
+
+**Decision rule (numeric margin = 3×):**
+
+1. **Separability is CONFIRMED (signal is real, not noise) if `R ≥ 3.0` at the
+   fine cell (1000 ms / 5 trials).** This is the definitive, low-noise test: the
+   cue-A-vs-cue-B difference must be at least three times the same-cue run-to-run
+   spread. If `1.0 ≤ R < 3.0`, the signal is present but not by a clear margin
+   ("marginal"); if `R < 1.0`, the ~0.05 difference is **not** distinguishable
+   from noise and the readout design fails.
+2. **Cheap-setting usability (secondary):** the 100 ms / 1 trial cell is usable
+   for a single run per decision if `R ≥ 3.0` there too; if `1.0 ≤ R < 3.0`, the
+   signal is real at that cell but too noisy for a single shot, so the study must
+   average trials (or use the fine cell); if `R < 1.0`, that cell is unusable per
+   decision.
+3. **Per-MBON companion check (interpretability, not the gate):** on the eight
+   consistently-discriminating MBONs identified in §1 (MBON03·90316, MBON02·52340,
+   MBON07·90134, MBON07·02365, MBON04·34376, MBON26·81440, MBON11·01833,
+   MBON23·67206), the criterion should also hold per-MBON — `|mean_A − B| ≥ 3 ×
+   SD_across_seeds(A)` — for a **majority (≥ 5 of 8)** at the fine cell. This is a
+   sanity check that the ratio is driven by the expected MBONs, not an artifact.
+
+**One-sided caveat, stated in advance:** this measures noise from **cue A only**
+(as scoped). It therefore assumes cue B has comparable run-to-run noise; the true
+noise on the A−B difference is roughly `√(SD_A² + SD_B²) ≈ √2 · SD_A` if the two
+are symmetric. Comparing `d_AB` to the cue-A-only `d_AA` with a **3× margin**
+deliberately builds in headroom against that assumption. The symmetry assumption
+is **unverified**; running cue B at the same 5 seeds (optional, 10 more runs)
+would remove it. The existing seed-20260316 cue-A data is *not* mixed into the
+noise estimate (its RNG is paired with B — see §4); it is available only as
+corroboration.
+
+### Exact commands to run yourself
+
+Run in a normal terminal (each is a Brian2 simulation). On macOS prefix with
+`caffeinate -i` so the machine does not sleep. Order runs the cheap cell first.
+Runs are restartable — re-running skips any seed already saved.
+
+```bash
+# --- Cheap cell: 100 ms / 1 trial, cue A, 5 seeds ---
+for S in 20260317 20260318 20260319 20260320 20260321; do
+  caffeinate -i uv run --python .venv-shiu/bin/python --no-project -- \
+    .venv-shiu/bin/python repro/mushroom_body/run_single_cue.py \
+    --cue a --seed "$S" --duration-ms 100 --trials 1 \
+    --pn-rate 150 --kc-set-size 100 --kc-set-seed 20260316
+done
+
+# --- Fine cell: 1000 ms / 5 trials, cue A, 5 seeds (the definitive test) ---
+for S in 20260317 20260318 20260319 20260320 20260321; do
+  caffeinate -i uv run --python .venv-shiu/bin/python --no-project -- \
+    .venv-shiu/bin/python repro/mushroom_body/run_single_cue.py \
+    --cue a --seed "$S" --duration-ms 1000 --trials 5 \
+    --pn-rate 150 --kc-set-size 100 --kc-set-seed 20260316
+done
+```
+
+Each run writes one small CSV,
+`repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_<D>_trials_<T>_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_<S>.csv`.
+After all 10 finish, the ratio `R` and the per-MBON check above will be computed
+from those files against the existing cue-B rates (analysis only, no new
+simulation). Until then, the noise floor and the size of the decodable margin
+remain **unverified**.
 
 ## 5. Limitations, restated plainly
 
