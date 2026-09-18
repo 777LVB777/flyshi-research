@@ -1,0 +1,30 @@
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-noise-m1m1qzrr/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   3 s
+cue a @ seed 20260317, 100ms x 1 trials: 23 nonzero MBONs, runtime 3.1s
+Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_100_trials_1_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260317.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-noise-stk451ss/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   2 s
+cue a @ seed 20260318, 100ms x 1 trials: 29 nonzero MBONs, runtime 2.4s
+Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_100_trials_1_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260318.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-noise-_zwf7dtj/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   2 s
+cue a @ seed 20260319, 100ms x 1 trials: 23 nonzero MBONs, runtime 2.6s
+Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_100_trials_1_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260319.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-noise-qyb2bsgq/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   2 s
+cue a @ seed 20260320, 100ms x 1 trials: 24 nonzero MBONs, runtime 2.4s
+Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_100_trials_1_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260320.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-noise-3jhm32k6/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   2 s
+cue a @ seed 20260321, 100ms x 1 trials: 23 nonzero MBONs, runtime 2.3s
+Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_100_trials_1_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260321.csv

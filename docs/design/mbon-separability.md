@@ -22,9 +22,16 @@ signal, a readout can exploit it. This document tests which.
 
 ## Verdict
 
-**VIABLE — the ~0.05 difference is a real, reproducible, concentrated signal, not
-noise.** One honest gap remains (we have not measured the noise floor directly;
-see §5), but the in-hand evidence is strong and one-directional. Details below.
+**VIABLE — CONFIRMED against the pre-stated criterion.** The noise-floor
+experiment (§4) has now been run: at the definitive fine cell (1000 ms / 5
+trials) the cue-A-vs-cue-B difference is **R = 15.6×** the same-cue run-to-run
+noise (pre-stated threshold: ≥ 3.0), and **all 8** consistently-discriminating
+MBONs individually clear the 3×-standard-deviation bar. The ~0.05 cosine
+difference is a real, reproducible, concentrated signal, not noise. **One
+qualification:** at the cheap 100 ms / 1 trial cell the ratio is only **R =
+1.9×** — the signal is still real there but *too noisy for a single run per
+decision*, so the study must average trials or use a longer duration at that end
+(§4 decision rule, secondary clause). Details below.
 
 The headline reason the "0.05" is misleading: cosine distance is **normalized by
 the total MBON activity**, which is large because both cues drive many of the
@@ -253,18 +260,85 @@ done
 
 Each run writes one small CSV,
 `repro/mushroom_body/results/mbon_noise_floor_cue_a_duration_ms_<D>_trials_<T>_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_<S>.csv`.
-After all 10 finish, the ratio `R` and the per-MBON check above will be computed
-from those files against the existing cue-B rates (analysis only, no new
-simulation). Until then, the noise floor and the size of the decodable margin
-remain **unverified**.
+
+### Noise-floor results (run 2026-09-17), against the pre-stated criterion
+
+All 10 runs completed (cue A, seeds 20260317–20260321, both cells;
+logs `run_log_noise_cheap.txt`, `run_log_noise_fine.txt`). Metrics computed
+**exactly as pre-stated above** — the criterion was not changed. Support = union
+of MBONs nonzero in any cue-A noise run or in the existing cue-B run; absent
+MBONs are zero (see the support note below).
+
+| Cell | d_AA (noise, Hz) | d_AB (signal, Hz) | **R = d_AB/d_AA** | verdict |
+|---|---:|---:|---:|---|
+| **1000 ms / 5 trials (fine)** | 5.10 | 79.44 | **15.57** | **CONFIRMED** (≥ 3.0) |
+| **100 ms / 1 trial (cheap)** | 46.09 | 88.25 | **1.91** | marginal (1.0–3.0): real but too noisy for a single run |
+
+**Primary verdict (fine cell): CONFIRMED.** R = 15.6 is far above the pre-stated
+3.0 threshold — the cue-A-vs-cue-B difference (~79 Hz) is ~15× the same-cue
+run-to-run spread (~5 Hz). The ~0.05 cosine separation carries real, decodable
+information.
+
+**Cheap-cell usability (secondary): marginal.** R = 1.91 falls in the pre-stated
+1.0–3.0 band: the signal is real (it exceeds the noise) but not by the clear 3×
+margin, so a single 100 ms / 1 trial run per decision is too noisy to rely on.
+Per the pre-stated rule, the study must **average trials** (or use a longer
+duration) at the cheap end, or use the fine cell. The earlier speed-calibration
+finding that "100 ms / 1 trial separates as well as 1000 ms / 5 trials" was based
+on the *cosine distance of a single pair*, which does not see run-to-run noise;
+this noise-floor test now shows that single-shot cheap runs are in fact much
+noisier, and the calibration's cost saving must be spent on trial-averaging, not
+on dropping to one short trial.
+
+**Per-MBON companion check** (|mean_A − B| ≥ 3 × SD_across_seeds(A), on the 8
+consistent discriminators):
+
+- **Fine cell: 8 / 8 pass** (majority ≥ 5 → MET). Every discriminator's
+  cue-A rate is stable across seeds (SD ≤ ~0.9 Hz) while its A−B gap is 17–36 Hz.
+- **Cheap cell: 6 / 8 pass.** MBON07·90134 (|A−B| = 16.0 vs 3·SD = 16.4) and
+  MBON11·01833 (14.0 vs 16.4) narrowly fail — both because coarse 100 ms / 1
+  trial quantization (10 Hz steps) both shrinks their measured gap and inflates
+  their per-seed SD (5.48 Hz). This is consistent with the cheap cell being
+  noise-limited, not with the discriminators being spurious.
+
+**Noise structure (are the discriminators the noisiest MBONs?) — No.** At the
+fine cell the mean across-seed SD of the 8 discriminators is **0.51 Hz** versus
+**0.41 Hz** for all other MBONs — essentially the same, and both ~30–70× smaller
+than the discriminators' A−B gaps. Only 4 of the 8 discriminators appear in the
+top-10 noisiest MBONs, and the two single noisiest MBONs (both MBON12 variants)
+are *not* discriminators. At the cheap cell the discriminators are, if anything,
+slightly *less* noisy than average (3.98 vs 4.71 Hz). **The result is therefore
+not an artifact of the discriminating MBONs being unusually noisy** — the
+opposite of the weakening scenario flagged in the task.
+
+**Support / varying-count note (pre-stated data-handling).** Nonzero MBON counts
+varied across runs — 34–38 (cue A) and 33 (cue B) at the fine cell; 23–29 (cue A)
+and 30 (cue B) at the cheap cell. The saved CSVs store *only* MBONs that fired
+(rate > 0), so a MBON absent from a run's file had rate **exactly 0** in that run
+— zero-fill on the union support is the faithful value, not an imputation choice.
+This does not affect the verdict: at the fine cell R = 15.6 has enormous margin,
+and the per-MBON check is computed per neuron regardless of union membership. At
+the cheap cell the coarse quantization (which drives the count variation) is
+already the reason R is only marginal, and zero-fill is the correct reading of
+"did not fire."
+
+**Remaining unverified caveats (unchanged by this experiment):** the noise was
+measured from cue A only, so the A-vs-B noise is assumed symmetric (the 3× margin
+builds in headroom; running cue B at these seeds would remove the assumption);
+and this is for two *specific* random 100-KC cue sets, not the eventual
+market-feature encoding.
 
 ## 5. Limitations, restated plainly
 
-- No classifier, no decode-accuracy number: only 2 conditions per cell.
-- No independent repeats of a single cue (shared seed 20260316 everywhere), so no
-  measured noise floor and no rigorous signal-to-noise ratio.
-- The Poisson-noise threshold behind "n_signif" is an **unverified** modeling
-  assumption; treat those counts as indicative only.
+- No classifier, no decode-accuracy number: only 2 conditions per cell in the
+  original calibration data. (The noise-floor experiment in §4 added 5 same-cue
+  repeats per cell, which measured the noise floor directly — see those results.)
+- The noise floor is **now measured** at the two tested cells (fine: R = 15.6;
+  cheap: R = 1.9); it is *not* measured at the other 10 grid cells, and the noise
+  was sampled from cue A only (cue-B symmetry assumed).
+- The Poisson-noise threshold behind "n_signif" (§1) is an **unverified** modeling
+  assumption; treat those counts as indicative only. The §4 measured noise, not
+  this model, is the basis for the verdict.
 - All results are for two *specific* random 100-KC cue sets. Whether a similar
   margin holds for arbitrary market-feature encodings (the real design input) is
   **not** established here and must be checked once the encoding exists.
@@ -280,7 +354,13 @@ alignment across 12 independent duration/trial realizations. This is the
 "few strongly different MBONs a readout can weight" regime, not "identical
 everywhere."
 
-**Verdict: viable.** The one owed item — a direct noise-floor measurement via
-repeat-seed runs of a single cue (§4) — does not overturn this, but should be run
-to put a rigorous number on the margin before the readout is relied upon. Any
-claim about the *size* of the decodable margin remains **unverified** until then.
+**Verdict: viable — CONFIRMED.** The owed item — a direct noise-floor measurement
+via repeat-seed runs of a single cue (§4) — has now been run and confirms the
+result: at 1000 ms / 5 trials the signal is **15.6× the run-to-run noise** (pre-
+stated threshold 3.0), with all 8 discriminating MBONs individually clearing the
+bar. The decodable margin at the fine setting is now measured, not merely
+plausible. The remaining qualification is operational, not existential: single
+100 ms / 1 trial runs are too noisy (R = 1.9), so the study must average trials
+or use a longer duration; and the margin for the eventual market-feature encoding
+(rather than these specific 100-KC cue sets) still has to be checked once that
+encoding exists.
