@@ -4,6 +4,25 @@ This document is written **before** `repro/mushroom_body/calibrate_speed.py` is
 executed, so the grid, the separation-score definition, and the acceptance
 rule cannot be shifted retroactively based on results.
 
+> **Correction note (2026-09-18), added after the run.** This calibration's
+> headline result — that **100 ms / 1 trial separates the two cues as well as
+> 1000 ms / 5 trials** — was based on the **cosine distance of a single A/B
+> pair per cell**. That single-pair measure **cannot see run-to-run noise**: it
+> compares one cue-A run against one cue-B run, with no repeat of either cue to
+> reveal how much a rate would jitter from seed to seed. The later noise-floor
+> experiment (see [`mbon-separability.md`](mbon-separability.md)) repeated the
+> same cue under five seeds and found the cheap 100 ms / 1 trial setting is in
+> fact **much noisier** — signal-to-noise ratio only **1.9×**, versus **15.6×**
+> at 1000 ms / 5 trials. **That experiment supersedes the timing/separation
+> conclusion below for the purpose of choosing a run setting.** Corrected
+> planning assumption: budget **~28 s per run at 1000 ms / 5 trials on a quiet
+> machine** (the wall-clock timings *within* this calibration are host-load
+> dominated and unusable — see "Two competing cost models" — but the clean
+> same-cell noise-floor runs measured ~28 s each), and remember the **Option B
+> readout needs two runs per decision**. A cheaper setting is only usable if its
+> run-to-run noise is re-checked and averaged down (e.g. more trials or a longer
+> window), not by dropping to a single short trial.
+
 ## Purpose
 
 `--stim-mode kc` (see `docs/reproduction/mushroom_body_check.md`, "KC-direct

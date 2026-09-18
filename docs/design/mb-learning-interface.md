@@ -189,10 +189,10 @@ is impossible if timing reflected real work. So we trust the *separation*
 results but treat the *timing* results as unusable. Speed on real research
 hardware is an open question (Section 8).
 
-#### Input separation is excellent; readout separation is small — this is our biggest risk
+#### Input separation is excellent; readout separation is small — flagged as our biggest risk, and since tested and resolved
 
-It is important not to blur two different "separations" here, because one is
-great and the other is worrying:
+It is important not to blur two different "separations" here, because one looked
+great and the other looked worrying:
 
 - **Input side (the Kenyon cells):** the two cues drive **completely separate**
   Kenyon-cell patterns. They share *no* active cells — overlap **0.0**. This is
@@ -202,15 +202,26 @@ great and the other is worrying:
   0-to-1 scale (higher means more different). That is **small**.
 
 In plain terms: the two cues go *in* looking totally distinct, but by the time
-the signal reaches the neurons we read the answer from, the two responses have
-become **nearly identical**. We read the output, not the input — so it is the
-small number that governs whether this can work.
+the signal reaches the neurons we read the answer from, the two responses look
+**nearly identical** by that one summary number. We read the output, not the
+input — so it is the small number that seemed to govern whether this can work.
 
-**This gap is the single biggest technical risk in the project.** If a readout
-difference of about 0.05 is too small for any learning rule to build on, the
-whole approach could fail regardless of how clean the input is. We do not yet
-know whether it is enough. This is not a detail to be smoothed over; it is
-carried as a top open risk in **Section 8**.
+**We originally flagged this gap as the single biggest technical risk in the
+project:** if a readout difference of about 0.05 were too small for any learning
+rule to build on, the whole approach could fail regardless of how clean the
+input is. We did not, at first, know whether it was enough.
+
+**Update — this risk has now been tested and resolved (see
+[`docs/design/mbon-separability.md`](mbon-separability.md)).** The "0.05" turned
+out to be misleading: cosine distance is *normalized* by the large activity the
+two cues share in common, so it hides a difference that is actually large in
+absolute terms (tens of Hz) and concentrated in a handful of MBONs. We measured
+the run-to-run noise directly (repeating the same cue under five different
+simulation seeds) and found that, at 1000 ms / 5 trials, the cue-A-vs-cue-B
+readout difference is **15.6× the same-cue noise**, with **all 8** consistently
+discriminating MBONs passing an individual per-neuron check. The two cues are
+reliably distinguishable at the readout. The residual caveats now live in
+**Section 8**; this is no longer an existential risk.
 
 ---
 
@@ -405,9 +416,10 @@ about the decision it actually caused.
 
 **What could go wrong.** The learning could still collapse or saturate despite
 the floor and drift; the "recently active" window and the drift speed are
-tuning choices that could dominate results; and if the built-in cue separation
-is too small (Section 8), there may not be enough of a difference for any rule
-to learn from.
+tuning choices that could dominate results. (The earlier worry that the built-in
+cue separation might be too small for any rule to learn from has since been
+tested and resolved — Section 8 — though the separability of the eventual
+market-feature encoding still has to be confirmed.)
 
 **What tests it.** The **learning-off control** (Section 6) is the direct
 ablation: same everything, learning disabled. If performance is no better with
@@ -515,12 +527,23 @@ Stated without softening. These are real, and some could stop the project.
   which output neurons are "approach" and which are "avoidance." The Section 4b
   readout **cannot be built** until we do, and we will not invent them. This is
   the single most immediate blocker.
-- **The measured cue separation may be too small to learn from.** In our
-  KC-direct tests, the difference between the two cues' output patterns was a
-  cosine distance of only **about 0.05** on the 0-to-1 scale (Section 3d, at the
-  1000 ms / 5 trial reference setting). That is a *small* difference. It is
-  **unverified** whether a difference that small is enough for any learning rule
-  to work. It could be fatal.
+- **Cue separation at the readout — RESOLVED (was flagged "could be fatal").**
+  We originally worried that the two cues' output patterns differed by a cosine
+  distance of only **about 0.05** (Section 3d), and that this might be too small
+  for any learning rule to use. We have now measured this directly (see
+  [`docs/design/mbon-separability.md`](mbon-separability.md)): the "0.05" is
+  small only because cosine distance is normalized by the large activity the two
+  cues share; the actual difference is tens of Hz, concentrated in a few MBONs.
+  Measuring the run-to-run noise (same cue, five different simulation seeds), the
+  readout difference is **15.6× the same-cue noise at 1000 ms / 5 trials, with
+  8/8 discriminating MBONs passing the per-neuron check.** The cues are reliably
+  distinguishable; this is no longer an existential risk. **Two residual caveats
+  remain:** (a) at the cheap 100 ms / 1 trial setting the ratio is only **1.9×**,
+  too noisy for a single run per decision, so the study must **average trials or
+  use a longer window** at that end; and (b) this was shown for two *specific*
+  random 100-Kenyon-cell cue sets, **not** for the eventual market-feature
+  encoding (Section 4a), whose separability **must be checked separately** once
+  that encoding exists.
 - **Reward normalization is unsettled.** The exact clip-and-normalize scheme for
   the teaching signal (Section 4c) is not decided, and different choices could
   change the outcome.
