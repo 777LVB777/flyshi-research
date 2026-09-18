@@ -1,0 +1,42 @@
+{
+  "condition": "baseline",
+  "runtime_seconds": 8.16244345800078,
+  "spike_count": 0,
+  "kc": {
+    "count": 5177,
+    "active_count_gt_0_hz": 0,
+    "active_fraction_gt_0_hz": 0.0,
+    "mean_rate_hz": 0.0
+  },
+  "kc_target_vs_nontarget": {
+    "target": {
+      "count": 0,
+      "active_count_gt_0_hz": 0,
+      "active_fraction_gt_0_hz": 0.0,
+      "mean_rate_hz": 0.0
+    },
+    "nontarget_by_side": {
+      "left": {
+        "count": 2580,
+        "active_count_gt_0_hz": 0,
+        "active_fraction_gt_0_hz": 0.0,
+        "mean_rate_hz": 0.0
+      },
+      "right": {
+        "count": 2597,
+        "active_count_gt_0_hz": 0,
+        "active_fraction_gt_0_hz": 0.0,
+        "mean_rate_hz": 0.0
+      }
+    }
+  },
+  "mbons_nonzero": [],
+  "pam_nonzero": [],
+  "ppl1_nonzero": [],
+  "apl_nonzero": [],
+  "active_nonstim_pn_count": 0,
+  "brain_wide": {
+    "active_neuron_count": 0,
+    "active_neuron_fraction": 0.0
+  }
+}

@@ -1,0 +1,532 @@
+{
+  "duration_ms": 200.0,
+  "trials": 2,
+  "condition_a": {
+    "condition": "kc_set_a",
+    "runtime_seconds": 273.1738295000032,
+    "spike_count": 7441,
+    "kc": {
+      "count": 5177,
+      "active_count_gt_0_hz": 100,
+      "active_fraction_gt_0_hz": 0.019316206297083253,
+      "mean_rate_hz": 2.8650762990148735
+    },
+    "kc_target_vs_nontarget": {
+      "target": {
+        "count": 100,
+        "active_count_gt_0_hz": 100,
+        "active_fraction_gt_0_hz": 1.0,
+        "mean_rate_hz": 148.325
+      },
+      "nontarget_by_side": {
+        "left": {
+          "count": 2480,
+          "active_count_gt_0_hz": 0,
+          "active_fraction_gt_0_hz": 0.0,
+          "mean_rate_hz": 0.0
+        },
+        "right": {
+          "count": 2597,
+          "active_count_gt_0_hz": 0,
+          "active_fraction_gt_0_hz": 0.0,
+          "mean_rate_hz": 0.0
+        }
+      }
+    },
+    "mbons_nonzero": [
+      {
+        "root_id": 720575940609959637,
+        "cell_type": "MBON32",
+        "side": "left",
+        "rate_hz": 35.0
+      },
+      {
+        "root_id": 720575940610964946,
+        "cell_type": "MBON09",
+        "side": "right",
+        "rate_hz": 30.0
+      },
+      {
+        "root_id": 720575940615221811,
+        "cell_type": "MBON10",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940617302365,
+        "cell_type": "MBON07",
+        "side": "left",
+        "rate_hz": 45.0
+      },
+      {
+        "root_id": 720575940617552340,
+        "cell_type": "MBON02",
+        "side": "right",
+        "rate_hz": 42.5
+      },
+      {
+        "root_id": 720575940617749538,
+        "cell_type": "MBON11",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940621828443,
+        "cell_type": "MBON12",
+        "side": "left",
+        "rate_hz": 15.0
+      },
+      {
+        "root_id": 720575940622979277,
+        "cell_type": "MBON27",
+        "side": "left",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940623182847,
+        "cell_type": "MBON33",
+        "side": "left",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940623201833,
+        "cell_type": "MBON11",
+        "side": "left",
+        "rate_hz": 90.0
+      },
+      {
+        "root_id": 720575940623377802,
+        "cell_type": "MBON16",
+        "side": "left",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940624185095,
+        "cell_type": "MBON02",
+        "side": "left",
+        "rate_hz": 40.0
+      },
+      {
+        "root_id": 720575940624539284,
+        "cell_type": "MBON18",
+        "side": "left",
+        "rate_hz": 17.5
+      },
+      {
+        "root_id": 720575940624590316,
+        "cell_type": "MBON03",
+        "side": "right",
+        "rate_hz": 75.0
+      },
+      {
+        "root_id": 720575940628734376,
+        "cell_type": "MBON04",
+        "side": "right",
+        "rate_hz": 15.0
+      },
+      {
+        "root_id": 720575940629422086,
+        "cell_type": "MBON09",
+        "side": "left",
+        "rate_hz": 107.5
+      },
+      {
+        "root_id": 720575940629856515,
+        "cell_type": "MBON09",
+        "side": "left",
+        "rate_hz": 107.5
+      },
+      {
+        "root_id": 720575940630075703,
+        "cell_type": "MBON12",
+        "side": "left",
+        "rate_hz": 10.0
+      },
+      {
+        "root_id": 720575940630864847,
+        "cell_type": "MBON09",
+        "side": "right",
+        "rate_hz": 25.0
+      },
+      {
+        "root_id": 720575940631177803,
+        "cell_type": "MBON24",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940632535756,
+        "cell_type": "MBON14",
+        "side": "left",
+        "rate_hz": 67.5
+      },
+      {
+        "root_id": 720575940636992368,
+        "cell_type": "MBON31",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940637902938,
+        "cell_type": "MBON35",
+        "side": "left",
+        "rate_hz": 17.5
+      },
+      {
+        "root_id": 720575940638028607,
+        "cell_type": "MBON06",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940639556467,
+        "cell_type": "MBON10",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940642142861,
+        "cell_type": "MBON10",
+        "side": "left",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940643696288,
+        "cell_type": "MBON14",
+        "side": "left",
+        "rate_hz": 80.0
+      },
+      {
+        "root_id": 720575940645304430,
+        "cell_type": "MBON13",
+        "side": "left",
+        "rate_hz": 7.5
+      },
+      {
+        "root_id": 720575940652390134,
+        "cell_type": "MBON07",
+        "side": "left",
+        "rate_hz": 2.5
+      }
+    ],
+    "pam_nonzero": [],
+    "ppl1_nonzero": [
+      {
+        "root_id": 720575940609180611,
+        "cell_type": "PPL106",
+        "side": "left",
+        "rate_hz": 27.5
+      },
+      {
+        "root_id": 720575940615953202,
+        "cell_type": "PPL107",
+        "side": "left",
+        "rate_hz": 20.0
+      },
+      {
+        "root_id": 720575940618943389,
+        "cell_type": "PPL106",
+        "side": "right",
+        "rate_hz": 10.0
+      },
+      {
+        "root_id": 720575940619245016,
+        "cell_type": "PPL107",
+        "side": "right",
+        "rate_hz": 15.0
+      },
+      {
+        "root_id": 720575940621040737,
+        "cell_type": "PPL101",
+        "side": "left",
+        "rate_hz": 37.5
+      },
+      {
+        "root_id": 720575940627594568,
+        "cell_type": "PPL103",
+        "side": "left",
+        "rate_hz": 2.5
+      }
+    ],
+    "apl_nonzero": [
+      {
+        "root_id": 720575940624547622,
+        "cell_type": "APL",
+        "side": "left",
+        "rate_hz": 237.5
+      }
+    ],
+    "active_nonstim_pn_count": 0,
+    "brain_wide": {
+      "active_neuron_count": 442,
+      "active_neuron_fraction": 0.0031881360944611544
+    }
+  },
+  "condition_b": {
+    "condition": "kc_set_b",
+    "runtime_seconds": 263.65469958299946,
+    "spike_count": 6649,
+    "kc": {
+      "count": 5177,
+      "active_count_gt_0_hz": 100,
+      "active_fraction_gt_0_hz": 0.019316206297083253,
+      "mean_rate_hz": 2.8650762990148735
+    },
+    "kc_target_vs_nontarget": {
+      "target": {
+        "count": 100,
+        "active_count_gt_0_hz": 100,
+        "active_fraction_gt_0_hz": 1.0,
+        "mean_rate_hz": 148.325
+      },
+      "nontarget_by_side": {
+        "left": {
+          "count": 2480,
+          "active_count_gt_0_hz": 0,
+          "active_fraction_gt_0_hz": 0.0,
+          "mean_rate_hz": 0.0
+        },
+        "right": {
+          "count": 2597,
+          "active_count_gt_0_hz": 0,
+          "active_fraction_gt_0_hz": 0.0,
+          "mean_rate_hz": 0.0
+        }
+      }
+    },
+    "mbons_nonzero": [
+      {
+        "root_id": 720575940609959637,
+        "cell_type": "MBON32",
+        "side": "left",
+        "rate_hz": 47.5
+      },
+      {
+        "root_id": 720575940610964946,
+        "cell_type": "MBON09",
+        "side": "right",
+        "rate_hz": 27.5
+      },
+      {
+        "root_id": 720575940614595218,
+        "cell_type": "MBON28",
+        "side": "left",
+        "rate_hz": 12.5
+      },
+      {
+        "root_id": 720575940617302365,
+        "cell_type": "MBON07",
+        "side": "left",
+        "rate_hz": 65.0
+      },
+      {
+        "root_id": 720575940617552340,
+        "cell_type": "MBON02",
+        "side": "right",
+        "rate_hz": 22.5
+      },
+      {
+        "root_id": 720575940617567206,
+        "cell_type": "MBON23",
+        "side": "left",
+        "rate_hz": 17.5
+      },
+      {
+        "root_id": 720575940621828443,
+        "cell_type": "MBON12",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940622979277,
+        "cell_type": "MBON27",
+        "side": "left",
+        "rate_hz": 15.0
+      },
+      {
+        "root_id": 720575940623182847,
+        "cell_type": "MBON33",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940623201833,
+        "cell_type": "MBON11",
+        "side": "left",
+        "rate_hz": 75.0
+      },
+      {
+        "root_id": 720575940623377802,
+        "cell_type": "MBON16",
+        "side": "left",
+        "rate_hz": 12.5
+      },
+      {
+        "root_id": 720575940624185095,
+        "cell_type": "MBON02",
+        "side": "left",
+        "rate_hz": 30.0
+      },
+      {
+        "root_id": 720575940624539284,
+        "cell_type": "MBON18",
+        "side": "left",
+        "rate_hz": 30.0
+      },
+      {
+        "root_id": 720575940624590316,
+        "cell_type": "MBON03",
+        "side": "right",
+        "rate_hz": 102.5
+      },
+      {
+        "root_id": 720575940628734376,
+        "cell_type": "MBON04",
+        "side": "right",
+        "rate_hz": 47.5
+      },
+      {
+        "root_id": 720575940629422086,
+        "cell_type": "MBON09",
+        "side": "left",
+        "rate_hz": 95.0
+      },
+      {
+        "root_id": 720575940629856515,
+        "cell_type": "MBON09",
+        "side": "left",
+        "rate_hz": 95.0
+      },
+      {
+        "root_id": 720575940629981440,
+        "cell_type": "MBON26",
+        "side": "left",
+        "rate_hz": 17.5
+      },
+      {
+        "root_id": 720575940630075703,
+        "cell_type": "MBON12",
+        "side": "left",
+        "rate_hz": 10.0
+      },
+      {
+        "root_id": 720575940630864847,
+        "cell_type": "MBON09",
+        "side": "right",
+        "rate_hz": 42.5
+      },
+      {
+        "root_id": 720575940631177803,
+        "cell_type": "MBON24",
+        "side": "left",
+        "rate_hz": 7.5
+      },
+      {
+        "root_id": 720575940632535756,
+        "cell_type": "MBON14",
+        "side": "left",
+        "rate_hz": 75.0
+      },
+      {
+        "root_id": 720575940636992368,
+        "cell_type": "MBON31",
+        "side": "right",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940637902938,
+        "cell_type": "MBON35",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940638028607,
+        "cell_type": "MBON06",
+        "side": "right",
+        "rate_hz": 7.5
+      },
+      {
+        "root_id": 720575940638526278,
+        "cell_type": "MBON32",
+        "side": "right",
+        "rate_hz": 2.5
+      },
+      {
+        "root_id": 720575940643696288,
+        "cell_type": "MBON14",
+        "side": "left",
+        "rate_hz": 85.0
+      },
+      {
+        "root_id": 720575940644615716,
+        "cell_type": "MBON31",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940645304430,
+        "cell_type": "MBON13",
+        "side": "left",
+        "rate_hz": 10.0
+      },
+      {
+        "root_id": 720575940652390134,
+        "cell_type": "MBON07",
+        "side": "left",
+        "rate_hz": 22.5
+      }
+    ],
+    "pam_nonzero": [],
+    "ppl1_nonzero": [
+      {
+        "root_id": 720575940609180611,
+        "cell_type": "PPL106",
+        "side": "left",
+        "rate_hz": 27.5
+      },
+      {
+        "root_id": 720575940618943389,
+        "cell_type": "PPL106",
+        "side": "right",
+        "rate_hz": 17.5
+      },
+      {
+        "root_id": 720575940621040737,
+        "cell_type": "PPL101",
+        "side": "left",
+        "rate_hz": 25.0
+      },
+      {
+        "root_id": 720575940627594568,
+        "cell_type": "PPL103",
+        "side": "left",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940631758393,
+        "cell_type": "PPL103",
+        "side": "right",
+        "rate_hz": 5.0
+      }
+    ],
+    "apl_nonzero": [
+      {
+        "root_id": 720575940613583001,
+        "cell_type": "APL",
+        "side": "right",
+        "rate_hz": 5.0
+      },
+      {
+        "root_id": 720575940624547622,
+        "cell_type": "APL",
+        "side": "left",
+        "rate_hz": 235.0
+      }
+    ],
+    "active_nonstim_pn_count": 0,
+    "brain_wide": {
+      "active_neuron_count": 187,
+      "active_neuron_fraction": 0.0013488268091951037
+    }
+  }
+}

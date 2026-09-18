@@ -1,0 +1,154 @@
+Speed calibration grid plan (--stim-mode kc, via check_mb_response.run_condition):
+  kc-set-size=100  kc-set-seed=20260316  pn-rate=150 Hz  seed=20260316
+  Baseline: run once per duration, at trials=5 (largest trial count in the grid).
+
+  Empirical basis (repro/mushroom_body/run_log_*.txt, 15 prior runs, all at duration_ms=1000/trials=5): elapsed seconds ranged 16-184s (median 23s, mean 38.3s). Two runs (pn50's 65s/52s, kc_direct's 184s) are documented unexplained host-load anomalies (mushroom_body_check.md), not attributable to any swept parameter; excluding them, the remaining 12 runs have median 22.5s / mean 22.8s.
+
+  Two competing cost models (duration was never varied historically, so these cannot yet be distinguished empirically -- resolving this is part of what this grid is for):
+    Stimulus-second model (cost scales with duration_ms x trials): 174s (~2.9 min) at the median rate, 290s (~4.8 min) at the outlier-inclusive mean rate.
+    Trial-dominated model (model.py's run_trial() calls create_model() -- rebuilding the whole network from the connectivity parquet -- once per trial, serially (n_proc=1), so cost may not shrink with shorter duration): 378s (~6.3 min) at the clean median per-trial rate, 644s (~10.7 min) at the outlier-inclusive mean per-trial rate.
+
+  MOST CONSERVATIVE estimate across both models: 644s (~10.7 min).
+  This is comfortably under the ~45-minute threshold, so the full grid above runs as specified -- no reduction is proposed.
+
+  Reuse note: the duration_ms=1000/trials=5 cell (the single most expensive cell, including the documented 184s anomaly) was already run in a prior --stim-mode kc diagnostic with identical seed/pn-rate/kc-set-seed/kc-set-size. If that result file is found (see calibration_dir()/seed_cache_from_existing_run), it is reused instead of re-simulated, saving ~243s of duplicate work.
+
+Exact command being run:
+  uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/bin/python repro/mushroom_body/calibrate_speed.py --pn-rate 150 --seed 20260316 --kc-set-size 100 --kc-set-seed 20260316
+Reminder: on macOS, run this under `caffeinate -i` to prevent sleep mid-run.
+
+[baseline] duration_ms=1000: reused from mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.json (not re-simulated)
+[cell] duration_ms=1000 trials=5: reused from mb_response_seed_20260316_trials_5_duration_ms_1000_pn_rate_hz_150_stim_kc_size_100_kc_seed_20260316.json (not re-simulated)
+[baseline] duration_ms=1000: cached, skipped
+[baseline] duration_ms=500: running (5 trials)...
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-0aoz3twp/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   11 s
+[baseline] duration_ms=200: running (5 trials)...
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-g7r0ss9s/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   8 s
+[baseline] duration_ms=100: running (5 trials)...
+>>> Experiment:     baseline
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-f1ya7kj5/baseline/baseline.parquet
+    Excited neurons: 0
+    Elapsed time:   7 s
+[cell] duration_ms=1000 trials=5: cached, skipped
+[cell] duration_ms=1000 trials=2: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-ukrge0z9/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   14 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-ukrge0z9/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   13 s
+[cell] duration_ms=1000 trials=1: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-4jz_jbsk/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   7 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-4jz_jbsk/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   7 s
+[cell] duration_ms=500 trials=5: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-cwgjjqu1/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   126 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-cwgjjqu1/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   551 s
+[cell] duration_ms=500 trials=2: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-qybboq1v/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   221 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-qybboq1v/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   218 s
+[cell] duration_ms=500 trials=1: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-c6xu621d/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   108 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-c6xu621d/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   104 s
+[cell] duration_ms=200 trials=5: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-fcr4fs6x/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   581 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-fcr4fs6x/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   593 s
+[cell] duration_ms=200 trials=2: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-v9l5jklg/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   273 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-v9l5jklg/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   263 s
+[cell] duration_ms=200 trials=1: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-8kbx20fd/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   130 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-8kbx20fd/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   123 s
+[cell] duration_ms=100 trials=5: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-l7t567eh/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   578 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-l7t567eh/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   587 s
+[cell] duration_ms=100 trials=2: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-9hvu5mvl/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   242 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-9hvu5mvl/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   232 s
+[cell] duration_ms=100 trials=1: running (set_a, set_b)...
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-wf_p2xor/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   113 s
+>>> Experiment:     kc_set_b
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-calibrate-wf_p2xor/kc_set_b/kc_set_b.parquet
+    Excited neurons: 100
+    Elapsed time:   111 s
+
+duration_ms=  1000 trials=5: wall=219.8s  separation=0.050957789910918816  ratio_to_ref=1.000  nonstim_kc_max=0.0000%  passes=True
+duration_ms=  1000 trials=2: wall=28.6s  separation=0.0482362877593856  ratio_to_ref=0.947  nonstim_kc_max=0.0000%  passes=True
+duration_ms=  1000 trials=1: wall=14.4s  separation=0.050574985072553647  ratio_to_ref=0.992  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   500 trials=5: wall=678.7s  separation=0.048431861661238584  ratio_to_ref=0.950  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   500 trials=2: wall=440.3s  separation=0.049055202981547086  ratio_to_ref=0.963  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   500 trials=1: wall=212.9s  separation=0.05159534452208714  ratio_to_ref=1.013  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   200 trials=5: wall=1175.2s  separation=0.046163641131152455  ratio_to_ref=0.906  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   200 trials=2: wall=536.8s  separation=0.046871651824491045  ratio_to_ref=0.920  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   200 trials=1: wall=253.3s  separation=0.05064665967713555  ratio_to_ref=0.994  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   100 trials=5: wall=1166.3s  separation=0.061898128664095164  ratio_to_ref=1.215  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   100 trials=2: wall=474.8s  separation=0.07057187390099862  ratio_to_ref=1.385  nonstim_kc_max=0.0000%  passes=True
+duration_ms=   100 trials=1: wall=224.9s  separation=0.0827358949128113  ratio_to_ref=1.624  nonstim_kc_max=0.0000%  passes=True
+
+Summary CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/speed_calibration_summary_kc_size_100_kc_seed_20260316_pn_rate_hz_150_seed_20260316.csv
+Per-MBON rate CSV: /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/speed_calibration_mbon_rates_kc_size_100_kc_seed_20260316_pn_rate_hz_150_seed_20260316.csv
+Per-cell/baseline cache (restart source): /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/speed_calibration_kc_size_100_kc_seed_20260316_pn_rate_hz_150_seed_20260316
