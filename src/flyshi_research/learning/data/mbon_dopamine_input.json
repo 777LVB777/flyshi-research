@@ -1,0 +1,26 @@
+{
+  "provenance": "Transcribed BY HAND from the per-MBON PAM/PPL1 synapse totals table in docs/design/readout-and-plasticity-options.md (which aggregated direct annotated dopamine->MBON edges in Connectivity_783.parquet, FlyWire v783). NOT re-derived from the parquet when this file was written: UNVERIFIED transcription. MBON20, MBON22 and MBON24+ are absent from the source table and therefore absent here (readout weight 0, no plasticity compartment).",
+  "units": "synapse counts (integers): pam = summed direct synapses from annotated PAM neurons; ppl1 = summed direct synapses from annotated PPL1 neurons",
+  "counts": {
+    "MBON01": {"pam": 397,  "ppl1": 0},
+    "MBON02": {"pam": 431,  "ppl1": 0},
+    "MBON03": {"pam": 1818, "ppl1": 2},
+    "MBON04": {"pam": 989,  "ppl1": 126},
+    "MBON05": {"pam": 1470, "ppl1": 15},
+    "MBON06": {"pam": 1329, "ppl1": 19},
+    "MBON07": {"pam": 1556, "ppl1": 5},
+    "MBON08": {"pam": 0,    "ppl1": 0},
+    "MBON09": {"pam": 889,  "ppl1": 4},
+    "MBON10": {"pam": 116,  "ppl1": 20},
+    "MBON11": {"pam": 61,   "ppl1": 954},
+    "MBON12": {"pam": 11,   "ppl1": 471},
+    "MBON13": {"pam": 0,    "ppl1": 294},
+    "MBON14": {"pam": 1,    "ppl1": 471},
+    "MBON15": {"pam": 6,    "ppl1": 39},
+    "MBON16": {"pam": 0,    "ppl1": 141},
+    "MBON17": {"pam": 0,    "ppl1": 49},
+    "MBON18": {"pam": 0,    "ppl1": 137},
+    "MBON19": {"pam": 0,    "ppl1": 27},
+    "MBON21": {"pam": 350,  "ppl1": 3}
+  }
+}

@@ -33,7 +33,7 @@ A single simulated P/L run is not evidence of profitability. Any apparent behavi
 
 ## Quick start
 
-Requires Python 3.11+.
+Requires Python 3.10+ (the core package is tested on 3.10 and 3.11).
 
 ```bash
 python3 -m pip install -e ".[dev]"

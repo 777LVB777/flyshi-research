@@ -1,0 +1,19 @@
+{
+  "provenance": "Explicit (non-derived) sign tables from docs/design/readout-and-plasticity-options.md, 'Readout options'. The CIRCUIT tables are NOT stored here: they are derived from mbon_dopamine_input.json by the dominant-family rule at a chosen threshold (see readout.circuit_sign_table).",
+  "sign_convention": "+1 = approach-like MBON, -1 = avoidance-like MBON, 0 (or absent) = zero readout weight. Keys are FlyWire cell_type labels (e.g. 'MBON05'), not root IDs.",
+  "tables": {
+    "strict": {
+      "description": "Individually, confidently labelled types only (activation-valence table). Avoidance: MBON05, MBON21. Approach: MBON11, MBON12.",
+      "weights": {"MBON05": -1, "MBON21": -1, "MBON11": 1, "MBON12": 1}
+    },
+    "group": {
+      "description": "STRICT plus an explicit MODELLING ASSUMPTION that group-level labels hold per type: glutamatergic MBON01/03/04 avoidance; MBON08/09 and MBON15-19 approach. All other labels zero.",
+      "weights": {
+        "MBON05": -1, "MBON21": -1, "MBON11": 1, "MBON12": 1,
+        "MBON01": -1, "MBON03": -1, "MBON04": -1,
+        "MBON08": 1, "MBON09": 1,
+        "MBON15": 1, "MBON16": 1, "MBON17": 1, "MBON18": 1, "MBON19": 1
+      }
+    }
+  }
+}

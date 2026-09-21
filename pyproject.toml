@@ -7,18 +7,21 @@ name = "flyshi-research"
 version = "0.1.0"
 description = "Reproducible synthetic prediction-market research scaffolding."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Flyshi Research contributors" }]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# flyshi_research.learning is pure numpy; it runs in the Python 3.10 brain-model venv.
+learning = ["numpy>=1.24"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
