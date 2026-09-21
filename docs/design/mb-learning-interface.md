@@ -280,9 +280,9 @@ presenting two separate framings of the same market:
 - once as **"NO at price 1 − p"**
 
 (if the market prices "yes" at 0.6, then "no" is priced at 0.4). We score each
-run on its own. The **score** is the activity of **approach-associated** output
-neurons minus the activity of **avoidance-associated** output neurons —
-explained just below. We then pick whichever framing (YES or NO) scored higher,
+run on its own. The **score** is the activity of output neurons assigned an
+**approach-like** sign minus the activity of output neurons assigned an
+**avoidance-like** sign by the CIRCUIT rule — explained just below. We then pick whichever framing (YES or NO) scored higher,
 **but only if the gap between the two scores clears a threshold**. The threshold
 is set using training data only (never the final test data). If the gap is too
 small, the system **abstains** — it declines to decide, which is a valid,
@@ -290,9 +290,22 @@ zero-stake action in our setup.
 
 Three terms:
 
-- **Approach vs. avoidance output neurons:** in flies, some mushroom-body output
-  neurons are associated with moving *toward* something and others with moving
-  *away*. The difference between the two is a natural "good vs. bad" signal.
+- **Compartment:** a small, named zone of the mushroom body where a particular
+  dopamine teaching neuron and a particular output neuron meet the same
+  Kenyon-cell inputs. It is the local piece of circuit we use to decide which
+  teaching signal belongs with which output.
+- **CIRCUIT sign:** our proposed primary readout is a modelling assumption based
+  on that circuit layout, not a behavioural measurement. An output neuron whose
+  dendritic compartment(s) receive PAM, the reward-family dopamine neurons,
+  gets an avoidance-like sign. One whose compartment(s) receive PPL1, the
+  punishment-family dopamine neurons, gets an approach-like sign. A neuron
+  spanning both families, or without a clear compartment mapping, gets zero
+  weight and does not affect the score. The compartment map is inferred from
+  the v783 wiring and is **unverified** at compartment level.
+- **STRICT and GROUP checks:** we will also rerun the analysis with two
+  preregistered robustness readouts. STRICT uses only individually supported
+  activation-valence labels; GROUP adds explicitly declared group-level labels.
+  Any result that appears only under CIRCUIT will be reported as CIRCUIT-only.
 - **Threshold:** a minimum confidence gap required before we act.
 - **Abstain:** choosing not to bet. In our markets, abstaining costs and earns
   nothing.
@@ -306,14 +319,12 @@ confidence level. The abstain option keeps the system from acting on noise.
 1. **Cost.** This readout needs **two simulation runs per decision**, doubling
    the compute for every market. That is a deliberate trade for symmetry, and it
    matters given our speed uncertainty (Section 8).
-2. **A blocker we do not yet have a way around.** The approach-vs-avoidance
-   split requires knowing which output neurons are "approach" and which are
-   "avoidance." **We do not have those labels.** They must come from the
-   published scientific literature, **with a specific citation for each neuron
-   type**, and any output neuron we cannot label from a citation will be
-   **excluded** from the score. We have not yet gathered these citations, and we
-   will not guess or invent them. Until we have them, this readout cannot be
-   built. (This is listed again in Section 8 as a top open risk.)
+2. **A circuit-logic assumption that can be wrong.** CIRCUIT does not use a
+   behavioural label for every output neuron. It assigns signs from the dopamine
+   family mapped to each compartment. That mapping is inferred rather than
+   directly annotated, and it disagrees with several available group-level
+   activation labels. STRICT and GROUP are therefore required robustness checks,
+   and we will not present a CIRCUIT-only effect as a general result.
 3. **A hidden confound around calibration.** We may pass the raw score through a
    fitted step that converts it into a probability (this is **calibration** —
    adjusting outputs so that, when the system says "70%," the event really
@@ -389,6 +400,11 @@ the circuit does with no teaching at all.
 connections **from Kenyon cells to output neurons (KC→MBON)**. Everything else
 in the model stays fixed at its measured values. The rule for changing them:
 
+- Plasticity is **compartment-matched**: each dopamine-neuron type can change
+  only the KC→MBON connections in the compartment(s) it innervates. It cannot
+  change KC→MBON connections elsewhere in the mushroom body. The current
+  v783-derived compartment map is an **unverified** inference and ambiguous
+  mappings remain disabled unless we explicitly declare an assumption.
 - When the teaching signal (dopamine) arrives, **weaken** the connections coming
   from Kenyon cells that were **recently active** for that decision. ("Gated"
   means the weakening only happens when dopamine is present.)
