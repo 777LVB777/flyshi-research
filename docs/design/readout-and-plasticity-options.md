@@ -39,27 +39,28 @@ table.
 
 | Option | MBONs assigned a nonzero readout weight | Responding instances used | Of 8 discriminators used | Risk |
 |---|---|---:|---:|---|
-| **CIRCUIT (proposed primary)** | Give an MBON an avoidance-like sign when all mapped dendritic compartments are innervated by PAM (reward-family) dopamine types, and an approach-like sign when they are all innervated by PPL1 (punishment-family) types. Give zero weight to a type spanning both families or with no clear mapped compartment. This is a declared mushroom-body-circuit modelling assumption, not a behavioural measurement. | 26/33 | 4/8 (MBON02, MBON07×2, MBON11) | Its signs come from circuit logic and an inferred, unverified compartment map, and can disagree with activation-valence experiments. |
+| **CIRCUIT (primary; 80% dominant-family rule)** | Sum annotated direct PAM and PPL1 synapses onto an MBON. Give it an avoidance-like sign if PAM supplies ≥80%; an approach-like sign if PPL1 supplies ≥80%; otherwise give zero weight. This is a declared mushroom-body-circuit modelling assumption, not a behavioural measurement. | 28/33 | 6/8 (MBON02, MBON03, MBON04, MBON07×2, MBON11) | Its signs come from circuit logic and an inferred, unverified compartment map, and can disagree with activation-valence experiments. |
 | **STRICT** | Individual, confidently labelled types only: MBON05 and MBON21 for avoidance; MBON11 and MBON12 for approach. | 5/33 (MBON05×1, MBON11×2, MBON12×2) | 1/8 (MBON11) | It is conservative about the literature, but discards almost all of the strongest cue difference. MBON21 did not respond in this result. |
 | **GROUP** | STRICT plus an explicit modelling assumption: glutamatergic MBON01/03/04 are avoidance; MBON08/09 and MBON15–19 are approach. All other labels, including labels absent from the valence table, have zero weight. | 14/33 (STRICT's 5, plus MBON03×1, MBON04×1, MBON09×4, MBON16×1, MBON17×1, MBON18×1) | 3/8 (MBON03, MBON04, MBON11) | Uses more of the measured signal, but treats effects established only for co-activated groups as type-level signs. That is a declared modelling assumption, not an individual-cell experimental result. |
 
-CIRCUIT is the proposed primary readout. STRICT and GROUP are preregistered
-robustness checks. Any result that appears only under CIRCUIT must be reported
-as such. MBON02 is excluded from STRICT and GROUP because the table calls its
+CIRCUIT at 80% is the primary readout. X = 70% and X = 90% are preregistered
+CIRCUIT sensitivity checks; STRICT and GROUP are preregistered robustness
+checks. Any result that appears only under CIRCUIT must be reported as such.
+MBON02 is excluded from STRICT and GROUP because the table calls its
 activation valence conflicted. MBON07, MBON26, and MBON23 are also excluded
 from those checks: MBON07 had no significant effect in the table; MBON26 and
 MBON23 are not in that table.
 
-### CIRCUIT assignment for responding MBONs
+### CIRCUIT assignment at the adopted 80% threshold
 
 | Circuit assignment | Responding types (instance count) |
 |---|---|
-| Avoidance-like (PAM only) | MBON02×2, MBON05×1, MBON06×1, MBON07×2, MBON09×4, MBON10×6 |
-| Approach-like (PPL1 only) | MBON11×2, MBON12×2, MBON13×1, MBON14×2, MBON16×1, MBON17×1, MBON18×1 |
-| Zero: both families | MBON03×1, MBON04×1 (β′2mp has PAM and PPL107 assignments) |
+| Avoidance-like (PAM ≥80%) | MBON02×2, MBON03×1, MBON04×1, MBON05×1, MBON06×1, MBON07×2, MBON09×4, MBON10×6 |
+| Approach-like (PPL1 ≥80%) | MBON11×2, MBON12×2, MBON13×1, MBON14×2, MBON16×1, MBON17×1, MBON18×1 |
+| Zero: below 80% or no direct annotated input | none among responding types |
 | Zero: no clear mapped compartment | MBON24×1, MBON27×1, MBON32×1, MBON33×1, MBON35×1 |
 
-### Validation against the activation-valence table
+### Validation against the activation-valence table at 80%
 
 “Agree” means CIRCUIT produces the same approach/avoidance sign as the stated
 behavioural label. A zero weight is a disagreement for this comparison, rather
@@ -72,9 +73,9 @@ than silently omitted.
 | MBON11 | approach | approach-like (PPL1 γ1/pedc) | yes |
 | MBON12 | approach | approach-like (PPL1 γ2/α′1) | yes |
 | MBON01 | avoidance, group-only | avoidance-like (PAM γ5 and anterior β′2a) | yes |
-| MBON03 | avoidance, group-only | zero (PAM and PPL1 β′2mp) | **no** |
-| MBON04 | avoidance, group-only | zero (PAM and PPL1 β′2mp) | **no** |
-| MBON08 | approach, group-only | avoidance-like (PAM γ3; inferred through the γ3/β′1 MBON09 map) | **no** |
+| MBON03 | avoidance, group-only | avoidance-like (99.9% PAM) | yes |
+| MBON04 | avoidance, group-only | avoidance-like (88.7% PAM) | yes |
+| MBON08 | approach, group-only | zero (no direct annotated dopamine input) | **no** |
 | MBON09 | approach, group-only | avoidance-like (PAM γ3/β′1) | **no** |
 | MBON15 | approach, group-only | approach-like (PPL1 α′1) | yes |
 | MBON16 | approach, group-only | approach-like (PPL1 α′3) | yes |
@@ -82,9 +83,10 @@ than silently omitted.
 | MBON18 | approach, group-only | approach-like (PPL1 α2) | yes |
 | MBON19 | approach, group-only | approach-like (PPL1 posterior α2/α3) | yes |
 
-The explicit disagreements are MBON03, MBON04, MBON08, and MBON09. They are
-retained as validation failures of the declared CIRCUIT assumption; the rule is
-not adjusted to remove them.
+The explicit 80% disagreements are MBON08 and MBON09. γ3 is therefore a
+genuine exception: MBON08 is zero under the direct-connectivity rule, while
+MBON09 is PAM/avoidance-like, although both have a group-level approach label.
+This exception is reported, not corrected.
 
 ### Multi-compartment types and family assignment
 
@@ -93,16 +95,74 @@ not adjusted to remove them.
 | MBON01 | γ5; anterior β′2a | PAM; PAM | avoidance-like |
 | MBON02 | β2; anterior β′2a | PAM (PAM04); PAM (PAM01/02) | avoidance-like |
 | MBON05 | γ4 | PAM | avoidance-like |
-| MBON08 | γ3 | PAM, inferred through MBON09 | avoidance-like |
+| MBON08 | γ3 | no direct annotated PAM/PPL1→MBON08 input | zero |
 | MBON09 | γ3; β′1 | PAM; PAM | avoidance-like |
 | MBON11 | γ1; distal pedunculus core | PPL1; PPL1 | approach-like |
 | MBON12 | γ2; α′1 | PPL1; PPL1 | approach-like |
 | MBON19 | posterior α2; posterior α3 | PPL1; PPL1 | approach-like |
 | MBON21 | γ4; γ5 | PAM; PAM | avoidance-like |
-| MBON03/MBON04 | β′2mp | PAM and PPL1 (PPL107) | zero |
+| MBON03/MBON04 | β′2mp | PAM-dominant despite PPL107 input (99.9% / 88.7% PAM) | avoidance-like at 80%; historical any-connection rule was zero |
 
 All family assignments in this section remain unverified at compartment level,
 for the reasons stated below.
+
+### Dominant-family threshold: adopted at 80%
+
+The dominant-family rule is adopted at **X = 80%** before any learning results
+exist. X = 70% and X = 90% are preregistered sensitivity checks. The original
+CIRCUIT “any mapped connection from both families means zero weight” rule and
+its results are retained below as history. The current rule assigns a sign only
+when one family supplies at least X% of an MBON's annotated dopamine input; a
+type with no direct annotated dopamine input remains zero. The threshold was
+chosen on connectivity grounds: clean compartments show near-total dominance
+(for example, MBON03 is 99.9% PAM and MBON09 is 99.6% PAM), and 80% separates
+stray-synapse contamination from genuinely mixed input. It was **not** chosen
+by maximizing agreement with behavioural labels.
+
+The counts aggregate all v783 `Connectivity` entries from annotated PAM or
+PPL1 root IDs onto each MBON type. They are direct dopamine→MBON synapses, not
+a direct measurement of compartment identity. “PAM types (synapses)” and
+“PPL1 types (synapses)” list every dopamine type with a nonzero total.
+
+| MBON | PAM types (synapses) | PPL1 types (synapses) | PAM / PPL1 total | PAM / PPL1 share |
+|---|---|---|---:|---|
+| MBON01 | PAM01 306; PAM02 64; PAM03 1; PAM04 1; PAM06 3; PAM08 10; PAM12 2; PAM13 2; PAM15 8 | — | 397 / 0 | 100.0% / 0.0% |
+| MBON02 | PAM02 11; PAM03 9; PAM04 399; PAM06 2; PAM09 6; PAM10 4 | — | 431 / 0 | 100.0% / 0.0% |
+| MBON03 | PAM01 1; PAM02 70; PAM03 11; PAM05 333; PAM06 1,376; PAM08 16; PAM12 1; PAM13 1; PAM14 3; PAM15 6 | PPL107 2 | 1,818 / 2 | 99.9% / 0.1% |
+| MBON04 | PAM03 3; PAM05 417; PAM06 380; PAM07 2; PAM08 182; PAM12 2; PAM15 3 | PPL101 2; PPL104 2; PPL107 122 | 989 / 126 | 88.7% / 11.3% |
+| MBON05 | PAM01 11; PAM05 25; PAM07 428; PAM08 910; PAM12 73; PAM13 20; PAM14 1; PAM15 2 | PPL101 12; PPL102 1; PPL103 1; PPL108 1 | 1,470 / 15 | 99.0% / 1.0% |
+| MBON06 | PAM04 10; PAM05 2; PAM06 3; PAM08 1; PAM09 132; PAM10 1,108; PAM11 63; PAM14 10 | PPL105 2; PPL106 17 | 1,329 / 19 | 98.6% / 1.4% |
+| MBON07 | PAM09 26; PAM10 28; PAM11 1,498; PAM14 4 | PPL101 1; PPL105 4 | 1,556 / 5 | 99.7% / 0.3% |
+| MBON08 | — | — | 0 / 0 | no direct annotated input |
+| MBON09 | PAM02 2; PAM05 5; PAM07 2; PAM08 27; PAM12 486; PAM13 155; PAM14 210; PAM15 2 | PPL101 2; PPL103 2 | 889 / 4 | 99.6% / 0.4% |
+| MBON10 | PAM02 1; PAM04 1; PAM05 35; PAM06 2; PAM13 60; PAM14 17 | PPL101 1; PPL102 2; PPL103 1; PPL107 16 | 116 / 20 | 85.3% / 14.7% |
+| MBON11 | PAM04 7; PAM06 2; PAM07 8; PAM08 2; PAM09 3; PAM10 16; PAM11 22; PAM12 1 | PPL101 894; PPL102 51; PPL103 5; PPL105 1; PPL106 3 | 61 / 954 | 6.0% / 94.0% |
+| MBON12 | PAM02 2; PAM05 2; PAM07 3; PAM13 1; PAM14 3 | PPL101 8; PPL103 449; PPL105 11; PPL107 3 | 11 / 471 | 2.3% / 97.7% |
+| MBON13 | — | PPL103 5; PPL104 1; PPL105 286; PPL107 2 | 0 / 294 | 0.0% / 100.0% |
+| MBON14 | PAM11 1 | PPL101 2; PPL104 1; PPL105 1; PPL106 465; PPL107 2 | 1 / 471 | 0.2% / 99.8% |
+| MBON15 | PAM06 1; PAM08 1; PAM12 2; PAM13 2 | PPL103 31; PPL104 1; PPL105 3; PPL107 4 | 6 / 39 | 13.3% / 86.7% |
+| MBON16 | — | PPL104 141 | 0 / 141 | 0.0% / 100.0% |
+| MBON17 | — | PPL104 49 | 0 / 49 | 0.0% / 100.0% |
+| MBON18 | — | PPL104 2; PPL105 133; PPL106 2 | 0 / 137 | 0.0% / 100.0% |
+| MBON19 | — | PPL104 1; PPL105 26 | 0 / 27 | 0.0% / 100.0% |
+| MBON21 | PAM01 35; PAM02 4; PAM05 6; PAM07 112; PAM08 183; PAM12 2; PAM15 8 | PPL102 2; PPL108 1 | 350 / 3 | 99.1% / 0.9% |
+
+MBON03 and MBON04 are the β′2mp cases: the historical any-connection rule set
+both to zero because PPL107 has direct input there. At 80%, both are
+PAM/avoidance-like. MBON08 has no annotated direct PAM/PPL1→MBON edge in this
+extraction and is therefore zero under the direct-connectivity rule. Its earlier
+avoidance-like γ3 assignment arose by carrying MBON09's inferred γ3 PAM mapping
+over to MBON08; that was inconsistent with the direct-connectivity rule and is
+corrected here. MBON09 itself is 99.6% PAM by direct totals.
+
+| X | Status / change relative to historical any-connection CIRCUIT rule | Coverage in the 33 responding instances | Four confident behavioural labels (MBON05, MBON21, MBON11, MBON12) |
+|---:|---|---|---|
+| 70% | Sensitivity check: MBON03 and MBON04 leave zero and become PAM/avoidance-like. No type reverses sign. | 28/33; 6/8 discriminators | All four still agree. |
+| 80% | **Adopted primary:** same sign changes as 70%. | 28/33; 6/8 discriminators | All four still agree. |
+| 90% | Sensitivity check: MBON03 leaves zero and becomes PAM/avoidance-like. MBON04 remains zero (88.7% PAM). MBON10 leaves PAM/avoidance-like and becomes zero (85.3% PAM). Outside the responding set, MBON15 likewise changes from PPL1/approach-like to zero (86.7% PPL1). | 21/33; 5/8 discriminators | All four still agree. |
+
+The historical any-connection rule used 26/33 responding instances and 4/8
+discriminators. It remains recorded as history, not the primary analysis.
 
 ## Compartment-matched plasticity
 

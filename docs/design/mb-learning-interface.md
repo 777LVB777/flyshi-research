@@ -294,14 +294,18 @@ Three terms:
   dopamine teaching neuron and a particular output neuron meet the same
   Kenyon-cell inputs. It is the local piece of circuit we use to decide which
   teaching signal belongs with which output.
-- **CIRCUIT sign:** our proposed primary readout is a modelling assumption based
-  on that circuit layout, not a behavioural measurement. An output neuron whose
-  dendritic compartment(s) receive PAM, the reward-family dopamine neurons,
-  gets an avoidance-like sign. One whose compartment(s) receive PPL1, the
-  punishment-family dopamine neurons, gets an approach-like sign. A neuron
-  spanning both families, or without a clear compartment mapping, gets zero
-  weight and does not affect the score. The compartment map is inferred from
-  the v783 wiring and is **unverified** at compartment level.
+- **CIRCUIT sign:** our primary readout is a modelling assumption based on the
+  direct circuit wiring, not a behavioural measurement. For each output neuron,
+  we add its annotated direct PAM and PPL1 dopamine synapses. It gets an
+  avoidance-like sign if PAM, the reward-family dopamine neurons, supplies at
+  least **80%**; it gets an approach-like sign if PPL1, the punishment-family
+  dopamine neurons, supplies at least 80%. Otherwise it gets zero weight and
+  does not affect the score. We chose 80% before any learning results, on
+  connectivity grounds: clean compartments have near-total dominance, while
+  the margin filters stray synapses without calling genuinely mixed input one
+  family. The map is inferred from v783 wiring and is **unverified** at
+  compartment level. We will report 70% and 90% as preregistered sensitivity
+  checks.
 - **STRICT and GROUP checks:** we will also rerun the analysis with two
   preregistered robustness readouts. STRICT uses only individually supported
   activation-valence labels; GROUP adds explicitly declared group-level labels.
@@ -322,9 +326,12 @@ confidence level. The abstain option keeps the system from acting on noise.
 2. **A circuit-logic assumption that can be wrong.** CIRCUIT does not use a
    behavioural label for every output neuron. It assigns signs from the dopamine
    family mapped to each compartment. That mapping is inferred rather than
-   directly annotated, and it disagrees with several available group-level
-   activation labels. STRICT and GROUP are therefore required robustness checks,
-   and we will not present a CIRCUIT-only effect as a general result.
+   directly annotated, and it disagrees with the group-level approach labels of
+   MBON08/09 in the γ3 pathway: MBON08 has no direct annotated dopamine input
+   and is zero; MBON09 is PAM-dominant and avoidance-like. This genuine
+   exception is reported, not corrected. STRICT and GROUP are therefore required
+   robustness checks, and we will not present a CIRCUIT-only effect as a general
+   result.
 3. **A hidden confound around calibration.** We may pass the raw score through a
    fitted step that converts it into a probability (this is **calibration** —
    adjusting outputs so that, when the system says "70%," the event really
