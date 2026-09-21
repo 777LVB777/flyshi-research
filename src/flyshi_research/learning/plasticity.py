@@ -293,6 +293,17 @@ class PlasticKCMBON:
     def baseline(self) -> np.ndarray:
         return self._baseline
 
+    def load_weights(self, weights: np.ndarray) -> None:
+        """Replace the current weights (e.g. resuming from a checkpoint). The queue,
+        tally and baseline are untouched. Entries whose baseline is 0 (no synapse)
+        must be 0: the rule can never create a synapse, so anything else is corrupt."""
+        w = _check_weights(weights, "weights")
+        if w.shape != self._baseline.shape:
+            raise ValueError(f"weights shape {w.shape} != baseline shape {self._baseline.shape}")
+        if np.any((self._baseline == 0) & (w != 0)):
+            raise ValueError("weights are nonzero where the baseline has no synapse")
+        self._weights = w.copy()
+
     def record_decision(
         self,
         market_id: str,

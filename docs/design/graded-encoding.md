@@ -16,6 +16,10 @@ produced when either revision was made). The earlier wordings are preserved in
 "Revision history" at the bottom, because they were never committed and git
 cannot show them.
 
+**Update, 2026-09-21: the test has since been run and the verdict was ACCEPTED**
+(see "Results" at the bottom). The sentences above and below describe the state at
+the time of the pre-statement; no criterion in this document was changed after the run.
+
 Terms used here (Kenyon cell, MBON, firing rate, cell type, noise floor) are
 explained in [`mb-learning-interface.md`](mb-learning-interface.md) and
 [`mbon-separability.md`](mbon-separability.md).
@@ -284,5 +288,104 @@ including a test that this document states the same numbers as the code).
 
 ## Results
 
-*None yet. Append a new dated section here after the run; do not edit anything
-above.*
+### 2026-09-21: the pre-stated run
+
+Run with the pre-stated settings (all defaults; the verdict file says
+`prestated_test: true`): set A, seed 20260316, 1000 ms × 5 trials, existing upstream
+path. Outputs in `repro/mushroom_body/results/` (`graded_rate_cue_a_*`, about 28 KB in
+all) and the run log `repro/mushroom_body/run_log_graded.txt`.
+
+**Verdict: ACCEPTED.**
+
+| Stimulation rate | CIRCUIT score | Step from previous rate | MBONs active (of 96) | MBON-vector distance from 30 Hz |
+|---:|---:|---:|---:|---:|
+| 30 Hz | −9.6 | | 5 | 0.0 Hz |
+| 60 Hz | −18.5 | −8.9 | 27 | 65.4 Hz |
+| 90 Hz | −33.9 | −15.4 | 32 | 121.6 Hz |
+| 120 Hz | −51.9 | −18.0 | 23 | 176.3 Hz |
+| 150 Hz | −66.8 | −15.0 | 33 | 222.9 Hz |
+
+- **Strictly monotonic across all five rates: yes, and decreasing** (all four steps
+  negative).
+- **Endpoint gate:** the 30-vs-150 Hz distance was 222.88 Hz against the 15.30 Hz
+  threshold (about 14.6 times it). Because the score is monotonic over the whole
+  range, the chosen sub-range is the whole range, so the sub-range gate is the same
+  number.
+- **Validated range: 30–150 Hz.** The encoder's bounds (`min_rate_hz` 30,
+  `max_rate_hz` 150) equal it; `require_encoder_matches(EncoderParams(), result)`
+  passes (checked 2026-09-21 on the real result files).
+- **Diagnostics (not part of the verdict):** the vector distance from 30 Hz never
+  decreases as the rate rises; 22 of the 38 MBONs active at any rate never reverse
+  direction across the five rates. **The 150 Hz run reproduced the earlier set-A run
+  (same seed, same path) to 0.00 Hz**, so the existing path is deterministic per
+  seed.
+
+### What the result shows, and the bias it reveals
+
+The readout **follows the drive rate**, so encoding a value as a rate is viable
+between 30 and 150 Hz. But the score *falls* as the drive rises, and this is a
+property of the *readout*, not of any meaning in the input. Where it comes from,
+computed from the same five files (analysis only):
+
+| Rate | Sum of approach-like type means | Sum of avoidance-like type means |
+|---:|---:|---:|
+| 30 Hz | 1.9 Hz | 11.5 Hz |
+| 60 Hz | 19.3 Hz | 37.8 Hz |
+| 90 Hz | 46.9 Hz | 80.8 Hz |
+| 120 Hz | 73.7 Hz | 125.6 Hz |
+| 150 Hz | 101.2 Hz | 168.0 Hz |
+
+Both kinds of type respond more as the drive rises, but the avoidance-like ones grow
+faster. At 150 Hz the largest single contributors are MBON09 (63.7 Hz), MBON02
+(43.5 Hz) and MBON03 (40.0 Hz); at 30 Hz only MBON09 (11.2), MBON14 (1.9) and MBON03
+(0.3) respond among the weighted types.
+
+**The bias, in one sentence:** under the primary CIRCUIT readout, stronger stimulation
+pushes the score toward avoidance whatever the stimulus means. Under Option B
+([`mb-learning-interface.md`](mb-learning-interface.md), 4b, problem 4), a market
+priced at 0.8 drives the YES framing's price group at a high rate (126 Hz) and the
+NO framing's at a low one (54 Hz), so the circuit innately prefers NO whenever YES is
+the expensive side, before any learning. (Illustration only, unverified: straight
+lines between the five points, price group alone: YES ≈ −55, NO ≈ −17.)
+
+**Qualification found while checking, after seeing the primary result** (exploratory;
+no criterion, and it does not change the verdict): the same files scored under the
+other preregistered sign tables (type-mean aggregation unless noted):
+
+| Sign table | Score at 30 / 60 / 90 / 120 / 150 Hz | Direction |
+|---|---|---|
+| CIRCUIT 80% (primary) | −9.6 / −18.5 / −33.9 / −51.9 / −66.8 | strictly decreasing |
+| CIRCUIT 70% | same as 80% | strictly decreasing |
+| CIRCUIT 90% | −9.6 / −17.9 / −33.4 / −50.1 / −57.9 | strictly decreasing |
+| STRICT | 0.0 / 2.5 / 22.4 / 39.1 / 53.2 | strictly **increasing** |
+| GROUP | 10.8 / 20.4 / 36.5 / 57.6 / 77.6 | strictly **increasing** |
+| CIRCUIT 80%, sum over instances (`instance_sum`) | −37.8 / −58.8 / −98.8 / −153.2 / −202.6 | strictly decreasing |
+
+So the **dependence on intensity is robust, but its direction is not**: under STRICT
+and GROUP more drive means a more approach-like score, and Option B would lean toward
+the *more expensive* side instead. MBON09, the largest contributor, is exactly the type
+where CIRCUIT (avoidance-like) and the group-level label (approach) disagree.
+
+**Two remedies are proposed in the design doc, not chosen:** (a) *total-drive
+balancing*, so the YES and NO framings deliver equal total stimulation (costs: more
+groups of cells, untested with several groups at once, and equal total drive is not
+equal effect, which could leave a smaller, less visible lean); (b) *innate-score
+subtraction* using pre-learning scores (costs: two more runs per market or a fitted
+model of the innate score, more noise, and a learning-off control that would always
+abstain; could hide an intensity-times-learning interaction). Details in the design
+doc. **The first learning test (A vs B, both cues at a constant 150 Hz) is unaffected;
+any market experiment must address this bias first.**
+
+### Limitations that still apply
+
+One seed and no tolerance (a score reversal could have been noise; none occurred);
+`d_AA = 5.10 Hz` was measured at 150 Hz; one group of cells at a uniform rate, so the
+interaction of several groups is untested; the sign table is unverified at compartment
+level.
+
+### Runtime correction
+
+Section 6 estimated about 30 s per run. Observed: 530, 592, 571 and 621 s for the
+30, 60, 90 and 120 Hz runs, and 89 s for the 150 Hz run. This machine's timings
+depend heavily on background load ([`speed-calibration.md`](speed-calibration.md)),
+so these are recorded as observed, not as a benchmark.

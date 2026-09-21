@@ -295,29 +295,28 @@ drove cells at one rate (150 Hz), so we know the circuit tells *which* cells wer
 driven, but not whether its output changes in an orderly way with *how hard* they
 are driven. Encoding a value as a rate depends on exactly that. The test, with its
 acceptance criterion fixed in advance, is in
-[`graded-encoding.md`](graded-encoding.md); **it has not been run.** It has three
-possible outcomes. *Accepted*: the readout changes monotonically across the whole
-tested range (30–150 Hz) by more than the noise. *Usable range*: the change across
-the whole range is large enough, but monotonicity breaks at the top or bottom
-(saturation at high rates is plausible neuron behaviour); provided the longest
-monotonic stretch of at least three rates *itself* changes the readout by more
-than the noise, the encoder's rate bounds must be restricted to that stretch before
-any learning experiment. *Fail*: the whole-range change is within the noise, or no
-monotonic stretch of at least three rates exists, or the chosen stretch's own
-change is within the noise; then value encoding by rate fails and the encoder must
-change before any learning experiment.
+[`graded-encoding.md`](graded-encoding.md). **It has since been run (2026-09-21)
+and the verdict is ACCEPTED**: with one group of 100 cells driven at 30, 60, 90, 120
+and 150 Hz, the CIRCUIT readout score was strictly monotonic — but *decreasing*:
+−9.6, −18.5, −33.9, −51.9, −66.8 — and the difference between the output-neuron
+patterns at 30 and 150 Hz was 222.9 Hz against a threshold of 15.3 Hz (three times
+the same-cue noise floor). So the encoding by rate works in the sense that the
+readout follows the rate. (The other two possible verdicts were *usable range*, a
+monotonic stretch shorter than the whole range, and *fail*.) Caveats: one seed, one
+group of cells at a uniform rate; several groups driven at once have not been
+tested. **The decreasing direction reveals a bias that matters for Option B: see
+4b, problem 4.**
 
 **Encoder rate bounds (decided 2026-09-21).** The encoder maps a feature's lowest
 value to a minimum firing rate and its highest to a maximum. **After the graded
-test runs, that minimum and maximum must equal the validated range**: all five
-tested rates (30 to 150 Hz) if the test is accepted, or the chosen stretch if it is
-a usable range. **Until then the placeholder is 30 to 150 Hz**, the range the test
-will cover: the minimum was changed from 0 to 30 Hz so the encoder cannot emit a
-rate below anything tested. One consequence: no feature's group of cells is ever
-silent, even at that feature's lowest value. These bounds are placeholders (and
-unverified) until the test has been run and checked against them; the code can
-build and check them (`encoder_params_for`, `require_encoder_matches` in
-`graded_check.py`).
+test, that minimum and maximum must equal the validated range** — all five tested
+rates (30 to 150 Hz) if accepted, or the chosen stretch if a usable range. The test
+was accepted, so the bounds are **30 to 150 Hz**, which is what the encoder uses
+(the minimum was changed from 0 to 30 Hz so it cannot emit a rate below anything
+tested; one consequence is that no feature's group of cells is ever silent, even at
+that feature's lowest value). The code checks this
+(`encoder_params_for`, `require_encoder_matches` in `graded_check.py`; the check
+passes with the default bounds). The range is validated for one group of cells only.
 
 Real Kenyon cells do not normally receive input this
 way, so this is an engineered interface, not a biological claim — we are using
@@ -410,10 +409,11 @@ Three terms:
   reported next to every forecast metric.
 
 **Why.** Scoring the two framings separately and taking the difference is a
-simple, symmetric way to turn neural activity into a yes/no lean plus a
-confidence level. The abstain option keeps the system from acting on noise.
+simple way to turn neural activity into a yes/no lean plus a confidence level,
+and it is symmetric *provided the two framings deliver equal drive* (see problem 4
+below: they do not). The abstain option keeps the system from acting on noise.
 
-**What could go wrong — three real problems, stated plainly:**
+**What could go wrong — four real problems, stated plainly:**
 
 1. **Cost.** This readout needs **two simulation runs per decision**, doubling
    the compute for every market. That is a deliberate trade for symmetry, and it
@@ -436,6 +436,80 @@ confidence level. The abstain option keeps the system from acting on noise.
    same calibration step to every baseline** (Section 6), so no method gets a
    free advantage, **and we will always also report an uncalibrated version** of
    the results, so anyone can see how much the calibration step contributed.
+4. **An intensity bias, found by the graded-rate test (2026-09-21).** The score
+   depends strongly on *how hard* the input cells are driven, whatever the input
+   means. When one group of 100 Kenyon cells was driven at 30, 60, 90, 120 and 150 Hz
+   the CIRCUIT score fell steadily (−9.6 → −66.8; one seed; [`graded-encoding.md`](graded-encoding.md)).
+   Both kinds of output neuron respond more as the drive rises, but the
+   avoidance-like ones grow faster: at 150 Hz the summed type means were 168 Hz
+   avoidance-like against 101 Hz approach-like, the largest single contributor being
+   MBON09, then MBON02 and MBON03.
+
+   *Why it matters for Option B.* Except at a price of exactly 0.5, the "YES at
+   *p*" framing and the "NO at 1 − *p*" framing drive the price group at different
+   rates, so they differ in total drive before the circuit has learned anything.
+   Illustration (**unverified**: it draws straight lines between the five tested
+   points for the price group alone and ignores the other features): at a price of
+   0.8 the YES framing drives the price group at 30 + 0.8 × 120 = 126 Hz and the NO
+   framing at 54 Hz. Those give scores of about −55 and −17, so NO scores higher by
+   roughly 38 units *with no learning at all*. Under "choose the higher score," the
+   circuit innately prefers NO whenever YES is the expensive side, and YES whenever
+   it is cheap: a price-dependent, contrarian lean unrelated to anything learned.
+
+   *A qualification that matters: the direction depends on the readout, the
+   dependence itself does not.* The same five files scored under the other sign
+   tables (analysis only, no new simulation): CIRCUIT at 70% and 90% also fall,
+   but **STRICT (0.0 → +53.2) and GROUP (+10.8 → +77.6) rise**. Under those tables
+   more drive means a more approach-like score, and Option B would lean toward the
+   *more expensive* side instead. The biggest contributor, MBON09, is exactly the
+   type where CIRCUIT and the group-level label disagree (problem 2). So "stronger
+   drive pushes toward avoidance" is a statement about the primary CIRCUIT readout,
+   not about the circuit in general, and the bias must be measured under every
+   preregistered table.
+
+   *Why it can mislead.* The lean is a function of price, and price is itself the
+   market's forecast. A lean that costs money against well-calibrated prices could
+   earn something in a market with a favorite–longshot bias, which would look like
+   skill but would not be learning. The **learning-off control (Section 6) is
+   therefore essential in every market experiment**: it shows what the innate lean
+   alone earns.
+
+   *Two ways to remove it. Proposed, not chosen, and neither has been built.*
+
+   **(a) Total-drive balancing:** design the encoding so the YES and NO framings
+   deliver equal total stimulation. For example, give each evidence feature a "for"
+   and an "against" group of cells that swap rates between the framings, or add a
+   filler group that tops the total up.
+   *Costs:* more groups of cells (three extra for the three mirrored features);
+   several groups driven at once is untested, so the encoder change needs its own
+   graded-style test and pre-statement; a filler group carries the total *inversely*,
+   so the intensity information is moved, not removed. *Could hide:* equal total
+   drive is not equal effect, because different groups reach different output
+   neurons (cues A and B differ by about 79 Hz at the readout), so a smaller lean
+   tied to *which* group is driven harder would remain, harder to see because the
+   total looks balanced and so falsely reassuring.
+
+   **(b) Innate-score subtraction:** score each framing before learning, with the
+   original connection strengths, and use *score now − innate score* in the decision,
+   so only what learning changed counts.
+   *Costs:* the innate score is needed for the exact stimulus of every decision:
+   either two more simulation runs per market (four instead of two), or a fitted
+   model of innate score as a function of the input rates — one more fitted
+   component with its own error, open to the confound of problem 3. The difference
+   of two noisy scores is noisier than either, and the noise of these scores is not
+   yet measured. *Could hide:* learning may act multiplicatively (weakening a
+   connection removes more when the drive is high), so the learned change itself
+   scales with intensity and the bias can return as an intensity-times-learning
+   term the subtraction does not remove; it deletes any innate structure that
+   happens to be useful, by construction; and with unchanged weights every
+   subtracted score is zero, so the learning-off control would always abstain and
+   stop measuring the innate lean, so a separate innate-only arm would be needed.
+
+   The two can be combined. **Not decided.** *The first learning test
+   ([`first-learning-test.md`](first-learning-test.md)) is unaffected:* it drives
+   both cues at the same constant 150 Hz and measures a *change* in the difference
+   between them, so any fixed offset cancels. It does not show that learning works
+   when the drive varies. **Any market experiment must address this bias first.**
 
 **The separation score, defined precisely (used in Section 3d).** For two cues,
 take each output neuron's firing rate under cue A and under cue B, forming two
@@ -445,10 +519,13 @@ means they point the same way (identical pattern, not separable), 1 means they
 are at right angles (completely different pattern). We restrict this to output
 neurons that fired under at least one of the two cues.
 
-### 4c. REWARD — stimulate reward or punishment dopamine neurons after the outcome
+### 4c. REWARD — after the outcome, a dopamine-family teaching signal is applied by our learning rule
 
-**What we decided.** After a market resolves (the true yes/no answer becomes
-known), we teach the circuit by directly stimulating its **dopamine neurons**.
+**What we decided (approved 2026-09-21).** After a market resolves (the true
+yes/no answer becomes known), we teach the circuit with a **teaching signal**, and
+we represent dopamine **abstractly**: it is a number saying which dopamine family
+fired and how strongly, applied by our own learning rule (4d), not a set of
+neurons we make fire inside the simulation.
 
 - **Dopamine neuron:** a neuron that releases dopamine, a chemical that, in the
   fly's mushroom body, acts as a teaching signal — it tells the circuit "what
@@ -456,10 +533,37 @@ known), we teach the circuit by directly stimulating its **dopamine neurons**.
   associated with reward (good), and **PPL1** neurons, associated with
   punishment (bad).
 
-We stimulate PAM (reward) or PPL1 (punishment) depending on the outcome. We do
-this by direct stimulation because, in our KC-direct tests, driving Kenyon cells
-alone barely activated these dopamine neurons — so if we want a reliable
-teaching signal, we have to supply it directly.
+How it works, step by step: (1) the outcome decides which family the signal
+belongs to (PAM if the outcome was good, PPL1 if bad) and how strong it is (the
+clipped, normalized size described below); (2) our learning rule (4d) applies
+that signal to the connections **from the Kenyon cells that were active for that
+decision onto the output neurons in the compartments that family innervates**
+(the connectome-derived compartment map). The rule runs outside the simulator, on
+the table of KC→MBON connection strengths, and the new strengths are written back
+into the network before the next run.
+
+**Why not stimulate the dopamine neurons in the simulation?** The Shiu model has
+no dopamine-dependent plasticity — nothing in it changes with experience — so
+making PAM or PPL1 neurons fire there could not teach anything. It would only make
+them send their *fast* signals to their targets, including onto Kenyon cells, and
+that dopamine→Kenyon-cell excitation is one we flagged as biologically suspect
+(the model gives every dopamine-neuron synapse a fast-excitatory sign, whereas in
+a real fly dopamine acts as a slow modulator of Kenyon-cell plasticity; see the
+sign audit in [`mushroom_body_check.md`](../reproduction/mushroom_body_check.md)).
+So we do
+not do it.
+
+**The biological grounding is the compartment map, not simulated dopamine
+neurons.** The map — which output neurons sit in the compartments each dopamine
+type innervates — is inferred from the fly's wiring and is **unverified** at
+compartment level (Section 4d). **We do not simulate dopamine release or dopamine
+neuron activity during learning** (see also Section 10).
+
+One loose end: the reward code still computes a "stimulation rate" (signal
+strength × a placeholder maximum). It is only *recorded* in the results, is
+**unanchored** (dopamine stimulation has never been simulated here), and is never
+given to the network. It is kept so that a later experiment which does stimulate
+dopamine neurons could be compared with these.
 
 The size of each teaching signal is **clipped and normalized**: clipping caps
 extreme values, and normalizing rescales them to a common range, so that a few
@@ -502,9 +606,10 @@ about 0.016, which is 6% of the placeholder scale (0.25) we currently divide by.
 Until that scale is set from training data, the accuracy arm's teaching signal is
 likely to be weak (**unverified**; the placeholder is not a tuned value). The
 accuracy arm also needs a *probability* forecast from us, which comes from the
-calibration step discussed in 4b and is not yet specified. Directly stimulating
-dopamine neurons is, again, an engineered teaching route, not a claim about how
-flies learn.
+calibration step discussed in 4b and is not yet specified. Representing
+dopamine as an abstract teaching signal is, again, an engineered route, not a claim
+about how flies learn or about what the model's dopamine neurons do; and the
+compartment map that grounds it is an unverified inference.
 
 **What tests it.** Running the **profit** and **accuracy** arms on identical
 markets and seeds is itself the control: it isolates how much the *choice of
@@ -522,7 +627,8 @@ in the model stays fixed at its measured values. The rule for changing them:
   change KC→MBON connections elsewhere in the mushroom body. The current
   v783-derived compartment map is an **unverified** inference and ambiguous
   mappings remain disabled unless we explicitly declare an assumption.
-- When the teaching signal (dopamine) arrives, **weaken** the connections coming
+- When the teaching signal (dopamine, represented abstractly; see 4c) arrives,
+  **weaken** the connections coming
   from Kenyon cells that were **recently active** for that decision. ("Gated"
   means the weakening only happens when dopamine is present.)
 - A **floor** stops any connection from being driven below a minimum strength.
@@ -706,17 +812,20 @@ Stated without softening. These are real, and some could stop the project.
   random 100-Kenyon-cell cue sets, **not** for the eventual market-feature
   encoding (Section 4a), whose separability **must be checked separately** once
   that encoding exists.
-- **Graded encoding is untested.** Whether the readout changes monotonically,
-  and by more than the noise, as one cell group is driven at 30, 60, 90, 120 and
-  150 Hz has never been measured; all results so far used 150 Hz. The test and its
-  pre-stated acceptance criterion are in
-  [`graded-encoding.md`](graded-encoding.md); it has **not been run**. Its rule was
-  revised, before the run, to three outcomes: accepted; usable range (the encoder's
-  rate bounds are then set to equal the longest monotonic stretch of at least three
-  rates, which must itself change the readout by more than the noise, before any
-  learning experiment); or fail (value encoding by rate fails and the encoder must
-  change before any learning experiment). Until it runs, the encoder's placeholder
-  rate bounds are 30 to 150 Hz.
+- **Graded encoding: tested and accepted; two things remain open.** The graded-rate
+  test ([`graded-encoding.md`](graded-encoding.md)) was run on 2026-09-21 and the
+  verdict is ACCEPTED: the readout is strictly monotonic (decreasing) across 30–150 Hz
+  and the encoder's bounds equal that range (Section 4a). Still open: (i) it is one
+  seed and one group of cells at a uniform rate, so several groups driven at once are
+  untested; (ii) the intensity bias it revealed (next item).
+- **The intensity bias must be addressed before any market experiment.** The score
+  depends strongly on input intensity, so under Option B the two framings differ
+  innately whenever the price is not 0.5, and the direction of that lean depends on
+  the sign table (CIRCUIT falls with drive; STRICT and GROUP rise) — see 4b, problem
+  4. Two remedies are proposed (total-drive balancing; innate-score subtraction).
+  **The choice is undecided and neither is built or tested.** The bias must also be
+  measured under STRICT, GROUP and the 70/90% variants, and the noise of the scores
+  at the stimuli used in markets is not yet measured.
 - **Which output-neuron instances enter the per-type mean is open.** The mean
   (Section 4b) must be taken over every instance of a type, silent ones included,
   but whether that means both hemispheres (right-hemisphere output neurons do
@@ -789,9 +898,15 @@ Each of these matters, so each is explained:
   brain model, not a working copy of a fly's mind. Claiming otherwise would
   massively overstate what a connectome-derived simulation supports.
 - **We do not claim the simulation feels reward, pleasure, or preference.** When
-  we stimulate "reward" neurons, that is an engineering label for a teaching
+  we call a teaching signal "reward," that is an engineering label for a teaching
   signal. The simulation does not experience anything. Saying it "wants" or
   "likes" would be false and misleading.
+- **We do not simulate dopamine release or dopamine-neuron activity during
+  learning.** Dopamine appears only as an abstract teaching signal that our own
+  learning rule applies, in the compartments each dopamine family innervates (4c).
+  We do not claim that the model's dopamine neurons do anything during learning, or
+  that our rule reproduces what dopamine does biochemically; the compartment map
+  that grounds it is an inference from wiring and is unverified.
 - **The learning rule is ours, not from Shiu et al.** The published model has no
   learning (Section 2). Attributing our added mechanism to the original authors
   would misrepresent their work and ours.
@@ -873,6 +988,17 @@ This document is meant to be argued with and revised.
   bounds: after the graded test they must equal the validated range; meanwhile the
   placeholder minimum rate was changed from 0 to 30 Hz (4a). Neither has been run
   or validated.
+- **2026-09-21 (evening).** (1) *Reward described accurately (4c, 4d, 10).* Approved:
+  dopamine is represented abstractly as a teaching signal applied by our learning
+  rule in the compartments each dopamine family innervates; no dopamine neurons are
+  stimulated in the network; the biological grounding is the connectome-derived
+  compartment map. Text saying reward is delivered by stimulating PAM/PPL1 was
+  removed or corrected, and Section 10 now says we do not simulate dopamine release
+  or dopamine-neuron activity during learning. (2) *Graded-rate test result
+  (ACCEPTED).* Recorded in 4a and Section 8. (3) *Intensity bias.* Recorded in 4b
+  (problem 4) with two proposed remedies, undecided. It was checked against the
+  other sign tables: the dependence on intensity holds in all of them, but the
+  direction flips between CIRCUIT and STRICT/GROUP.
 
 ---
 

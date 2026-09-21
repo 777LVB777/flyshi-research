@@ -159,10 +159,12 @@ class RewardParams:
     # typically much SMALLER, so with 0.25 the accuracy arm's dopamine signal
     # will be weak. Placeholder - set from training data (UNVERIFIED).
     brier_scale: float = 0.25
-    # |normalised reward| <= dead_zone -> no dopamine stimulation at all.
+    # |normalised reward| <= dead_zone -> no teaching signal at all.
     dead_zone: float = 0.0
-    # Dopamine-neuron stimulation rate = |normalised reward| * this. No dopamine
-    # stimulation has been simulated yet, so this number is unanchored.
+    # RECORDED "stimulation rate" = |normalised reward| * this. It is only a number in
+    # the results: dopamine is represented abstractly as a teaching signal, no dopamine
+    # neurons are stimulated in the network, and no dopamine release or neuron activity
+    # is simulated. No dopamine stimulation has ever been simulated, so it is unanchored.
     dopamine_max_rate_hz: float = 150.0
 
     def __post_init__(self) -> None:
@@ -247,8 +249,8 @@ PARAMETER_TABLE: Tuple[Tuple[str, str, str, str], ...] = (
     ("readout", "margin_threshold", PH, "abstain unless score margin > this (Hz, aggregation-specific); set from TRAINING data only"),
     ("reward", "profit_scale", PH, "profit divisor before clipping to [-1, 1]"),
     ("reward", "brier_scale", PH, "Brier-improvement-over-market divisor before clipping to [-1, 1] (likely too large for market baseline)"),
-    ("reward", "dead_zone", PH, "|reward| at or below this gives no dopamine stimulation"),
-    ("reward", "dopamine_max_rate_hz", PH, "PAM/PPL1 stimulation rate at |reward| = 1 (unanchored)"),
+    ("reward", "dead_zone", PH, "|reward| at or below this gives no teaching signal"),
+    ("reward", "dopamine_max_rate_hz", PH, "RECORDED PAM/PPL1 'rate' at |reward| = 1; never given to the network (dopamine is abstract); unanchored"),
     ("plasticity", "learning_rate", PH, "fraction of distance to floor closed per unit gate"),
     ("plasticity", "floor_fraction", PH, "min weight magnitude as a fraction of the connectome weight"),
     ("plasticity", "drift_rate", PH, "fraction of distance back to connectome weight closed per drift step"),

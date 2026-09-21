@@ -1,0 +1,41 @@
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-graded-va33abjz/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   530 s
+30 Hz: 5 nonzero MBONs, runtime 530.3s -> graded_rate_cue_a_stim_hz_30_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-graded-gt1sc5ax/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   591 s
+60 Hz: 27 nonzero MBONs, runtime 591.9s -> graded_rate_cue_a_stim_hz_60_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-graded-ebxxvkl8/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   570 s
+90 Hz: 32 nonzero MBONs, runtime 571.1s -> graded_rate_cue_a_stim_hz_90_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-graded-c4irx8u4/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   620 s
+120 Hz: 23 nonzero MBONs, runtime 620.8s -> graded_rate_cue_a_stim_hz_120_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316.csv
+>>> Experiment:     kc_set_a
+    Output file:    /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/flyshi-mb-graded-et3z_v90/kc_set_a/kc_set_a.parquet
+    Excited neurons: 100
+    Elapsed time:   88 s
+150 Hz: 33 nonzero MBONs, runtime 89.1s -> graded_rate_cue_a_stim_hz_150_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316.csv
+
+=== Graded-rate encoding test ===
+rate_hz  circuit_score  n_nonzero_mbons  dist_from_30Hz
+     30         -9.600                5            0.00
+     60        -18.511               27           65.39
+     90        -33.900               32          121.60
+    120        -51.850               23          176.30
+    150        -66.806               33          222.88
+endpoint gate: |MBON(30 Hz) - MBON(150 Hz)| = 222.88 Hz vs threshold 15.30 Hz (3 x d_AA 5.1): pass
+CIRCUIT score strictly monotonic across all five rates: True (decreasing)
+VERDICT: ACCEPTED
+validated range: 30-150 Hz (the full tested range). The encoder's rate bounds must EQUAL it; rates outside it are untested.
+diagnostic: vector distance from 30 Hz non-decreasing: True
+diagnostic: 22/38 active MBONs never reverse direction across the five rates
+diagnostic: 150 Hz run vs existing cue-A run (same seed/path): 0.00 Hz (same-cue noise floor 5.1 Hz; a much larger value would point to a setup difference, not to the encoding)
+Wrote graded_rate_cue_a_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316_summary.csv and graded_rate_cue_a_duration_ms_1000_trials_5_kc_size_100_kc_seed_20260316_seed_20260316_verdict.json in /Users/luca/Projects/flyshi-research/repro/mushroom_body/results

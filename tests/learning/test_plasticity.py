@@ -574,3 +574,22 @@ def test_readout_to_plasticity_pipeline_only_learns_from_acted_decisions(w0, cma
     assert (net.weights[np.ix_(CUE_A, PPL1_COLS)] < w0[np.ix_(CUE_A, PPL1_COLS)]).all()
     assert np.array_equal(net.weights[CUE_B], w0[CUE_B])
     assert net.tally.abstention_rate == 0.5
+
+
+def test_load_weights_resumes_and_rejects_corrupt_input(w0, cmap):
+    net = make_net(w0, cmap)
+    net.record_decision("m", pattern(CUE_A), "YES")
+    net.resolve("m", {"PPL1": 1.0})
+    saved = net.weights.copy()
+    fresh = make_net(w0, cmap)
+    fresh.load_weights(saved)
+    assert np.array_equal(fresh.weights, saved) and np.array_equal(fresh.baseline, w0)
+    with pytest.raises(ValueError, match="shape"):
+        fresh.load_weights(saved[:, :3])
+    sparse = w0.copy()
+    sparse[0, 0] = 0.0  # "no synapse" in the baseline
+    net2 = make_net(sparse, cmap)
+    bad = sparse.copy()
+    bad[0, 0] = 0.3
+    with pytest.raises(ValueError, match="no synapse"):
+        net2.load_weights(bad)

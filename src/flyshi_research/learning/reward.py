@@ -1,4 +1,4 @@
-"""Market outcome -> dopamine (teaching) stimulation.
+"""Market outcome -> teaching signal (dopamine, represented abstractly).
 
 Pure numpy/stdlib; no Brian2, no simulation. Two preregistered reward arms:
 
@@ -7,10 +7,17 @@ Pure numpy/stdlib; no Brian2, no simulation. Two preregistered reward arms:
     market's own quoted probability (decided baseline).
 
 Each is divided by a scale and CLIPPED to [-1, 1] so no single outcome can
-dominate learning (design doc 4c). Positive reward -> PAM (reward family)
-stimulation; negative -> PPL1 (punishment family); the stimulation rate is
-proportional to |reward|. "Reward"/"punishment" are engineering labels for a
-teaching signal, not claims about experience.
+dominate learning (design doc 4c). Positive reward -> the PAM (reward-family)
+teaching signal; negative -> PPL1 (punishment family); its strength is |reward|.
+The plasticity rule applies that signal, in the compartments the family innervates,
+to the KC->MBON weights.
+
+Dopamine is represented ABSTRACTLY: no dopamine neurons are stimulated in the
+network and no dopamine release or neuron activity is simulated (the Shiu model has
+no dopamine-dependent plasticity, so stimulating them could not change a weight).
+The ``rate_hz`` field is only a RECORDED number (strength x ``dopamine_max_rate_hz``),
+unanchored and never given to the network. "Reward"/"punishment" are engineering
+labels for a teaching signal, not claims about experience.
 """
 
 from __future__ import annotations
@@ -39,12 +46,14 @@ class Reward:
 
 @dataclass(frozen=True)
 class DopamineSignal:
-    """What to stimulate after an outcome. ``family`` is None (and rate 0) when
-    there is nothing to teach (reward within the dead zone)."""
+    """The teaching signal after an outcome: which dopamine family and how strongly
+    (``strengths()`` is what the plasticity rule consumes). ``rate_hz`` is a recorded,
+    unanchored number, NOT a stimulation the network receives. ``family`` is None (and
+    rate 0) when there is nothing to teach (reward within the dead zone)."""
 
     family: Optional[Family]
     magnitude: float  # in [0, 1]; = |reward value|
-    rate_hz: float  # magnitude * dopamine_max_rate_hz
+    rate_hz: float  # magnitude * dopamine_max_rate_hz: recorded only, never simulated
     reward: Reward
 
     def strengths(self) -> Dict[str, float]:
@@ -115,11 +124,12 @@ def brier_improvement_reward(
 
 
 def dopamine_signal(reward: Reward, params: Optional[RewardParams] = None) -> DopamineSignal:
-    """Map a normalised reward to a dopamine-neuron stimulation.
+    """Map a normalised reward to a teaching signal (dopamine family + strength).
 
-    Positive -> PAM, negative -> PPL1, rate = |value| * dopamine_max_rate_hz
-    (so rate is always within [0, dopamine_max_rate_hz]). |value| <= dead_zone
-    (including exactly 0) -> no stimulation.
+    Positive -> PAM, negative -> PPL1, strength = |value|; the recorded (unused by the
+    network) rate = |value| * dopamine_max_rate_hz, always within
+    [0, dopamine_max_rate_hz]. |value| <= dead_zone (including exactly 0) -> no
+    teaching signal.
     """
     p = params or RewardParams()
     mag = abs(reward.value)

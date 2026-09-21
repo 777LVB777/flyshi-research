@@ -1,0 +1,36 @@
+{
+  "prestated_test": true,
+  "verdict": "ACCEPTED",
+  "accepted": true,
+  "validated_range_hz": [
+    30.0,
+    150.0
+  ],
+  "validated_direction": "decreasing",
+  "tied_longest_subranges_hz": [
+    [
+      30.0,
+      150.0
+    ]
+  ],
+  "fail_reasons": [],
+  "monotonic_all_five_rates": true,
+  "direction": "decreasing",
+  "distance_30_150_hz": 222.8833775767049,
+  "distance_threshold_hz": 15.299999999999999,
+  "chosen_subrange_hz": [
+    30.0,
+    150.0
+  ],
+  "chosen_subrange_distance_hz": 222.8833775767049,
+  "chosen_subrange_distance_ok": true,
+  "scores": {
+    "30.0": -9.6,
+    "60.0": -18.51111111111111,
+    "90.0": -33.89999999999999,
+    "120.0": -51.85000000000001,
+    "150.0": -66.80555555555554
+  },
+  "seed": 20260316,
+  "repro_diagnostic_hz": 0.0
+}
