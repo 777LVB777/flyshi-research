@@ -15,5 +15,11 @@
         "MBON15": 1, "MBON16": 1, "MBON17": 1, "MBON18": 1, "MBON19": 1
       }
     }
+  },
+  "circuit_variants": {
+    "no_gamma3": {
+      "description": "Preregistered sensitivity variant (added before any learning run): the CIRCUIT table with the gamma3 types MBON08 and MBON09 set to zero readout weight. MBON09 is the largest contributor to the intensity bias and the type where the circuit rule (PAM-dominant, avoidance-like) contradicts its behavioural group label (approach). MBON08 is already zero under the direct-connectivity rule; it is listed so the variant stays gamma3-wide if the dopamine data change. Readout only: plasticity is unchanged.",
+      "zero": ["MBON08", "MBON09"]
+    }
   }
 }

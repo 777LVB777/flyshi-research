@@ -44,7 +44,8 @@ table.
 | **GROUP** | STRICT plus an explicit modelling assumption: glutamatergic MBON01/03/04 are avoidance; MBON08/09 and MBON15–19 are approach. All other labels, including labels absent from the valence table, have zero weight. | 14/33 (STRICT's 5, plus MBON03×1, MBON04×1, MBON09×4, MBON16×1, MBON17×1, MBON18×1) | 3/8 (MBON03, MBON04, MBON11) | Uses more of the measured signal, but treats effects established only for co-activated groups as type-level signs. That is a declared modelling assumption, not an individual-cell experimental result. |
 
 CIRCUIT at 80% is the primary readout. X = 70% and X = 90% are preregistered
-CIRCUIT sensitivity checks; STRICT and GROUP are preregistered robustness
+CIRCUIT sensitivity checks, and so is CIRCUIT-80 with MBON08 and MBON09 set to
+zero weight (the γ3 variant, below); STRICT and GROUP are preregistered robustness
 checks. Any result that appears only under CIRCUIT must be reported as such.
 MBON02 is excluded from STRICT and GROUP because the table calls its
 activation valence conflicted. MBON07, MBON26, and MBON23 are also excluded
@@ -87,6 +88,34 @@ The explicit 80% disagreements are MBON08 and MBON09. γ3 is therefore a
 genuine exception: MBON08 is zero under the direct-connectivity rule, while
 MBON09 is PAM/avoidance-like, although both have a group-level approach label.
 This exception is reported, not corrected.
+
+### γ3 sensitivity variant: CIRCUIT-80 with MBON08 and MBON09 at zero weight
+
+**Preregistered 2026-09-21, before any learning run,** as an additional
+sensitivity variant (sign table `circuit_80_no_gamma3`; data file
+`src/flyshi_research/learning/data/mbon_sign_tables.json`, `circuit_variants`).
+It is the primary CIRCUIT-80 table with the two γ3 types set to zero readout weight.
+
+Rationale:
+
+- **MBON09 is the largest contributor to the intensity bias.** In the graded-rate
+  test the CIRCUIT score fell as drive rose, and MBON09 was the largest single
+  avoidance-like contributor (63.7 Hz at 150 Hz;
+  [`graded-encoding.md`](graded-encoding.md)).
+- **It is the type where the circuit rule contradicts behavioural data.** CIRCUIT
+  calls MBON09 avoidance-like (99.6% of its direct dopamine input is PAM), while its
+  behavioural label is approach (group-level; table above).
+- MBON08 is already zero under the direct-connectivity rule, so under CIRCUIT-80
+  the variant changes only MBON09. MBON08 is listed so the variant covers γ3 as a
+  whole, whatever the threshold or future dopamine data.
+
+The variant changes the **readout only**; the plasticity compartment map is
+unchanged (MBON09's inputs remain PAM-plastic). It is reported next to the primary
+result and never replaces it. A result that holds under CIRCUIT-80 but not under this
+variant is reported as depending on MBON09. Its use in the first learning test is
+preregistered in [`first-learning-test.md`](first-learning-test.md), Section 5b.
+Tested in `tests/learning/test_readout.py`
+(`test_gamma3_sensitivity_variant_zeroes_only_mbon08_and_mbon09`).
 
 ### Multi-compartment types and family assignment
 

@@ -84,3 +84,70 @@ def test_first_learning_spec_records_both_pre_run_decisions():
     assert "control (c) demoted" in spec and "reported diagnostic" in spec
     assert "Control (c) alone can never produce this verdict" in spec
     assert "The intensity bias found by the graded-rate test does not affect this test" in spec
+
+
+def test_gamma3_variant_is_preregistered_in_both_documents_with_its_rationale():
+    readout = doc("readout-and-plasticity-options.md")
+    g3 = section(readout, "### γ3 sensitivity variant", "### Multi-compartment types")
+    spec = doc("first-learning-test.md")
+    s5b = section(spec, "## 5b. Readout sensitivity variants", "## 6.")
+    for text in (g3, s5b):
+        for needle in ("MBON08 and MBON09", "largest", "intensity bias", "contradicts",
+                       "readout only", "circuit_80_no_gamma3", "before any"):
+            assert needle.lower() in text.lower(), needle
+    assert "**None of them can change the primary verdict.**" in s5b
+    assert "readout sensitivity variants preregistered" in spec  # revision history
+
+
+def test_parallel_split_is_in_the_spec_and_changes_no_criterion():
+    spec = doc("first-learning-test.md")
+    s10 = section(spec, "## 10. Parallel execution", "## Revision history")
+    for needle in ("35 independent **jobs**", "**strictly sequential**", "byte-identical",
+                   "Control (a) tests it directly", "not measured on the server"):
+        assert needle in s10, needle
+    assert "split into parallel jobs" in spec and "No criterion, seed, parameter or run count changed" in spec
+
+
+CLOUD = REPO / "docs" / "cloud"
+SETUP = REPO / "scripts" / "cloud" / "setup.sh"
+
+
+def test_server_guide_covers_every_required_step_and_separates_roles():
+    g = " ".join((CLOUD / "server-setup.md").read_text().split())
+    for needle in ("## Who does what", "You must do these personally", "An AI agent can do these",
+                   "ssh-keygen -t ed25519", "Add SSH Key", "ssh flyshi", "ufw allow OpenSSH",
+                   "ufw --force enable", "PasswordAuthentication no", "setup.sh", "tmux new -s fly",
+                   "Ctrl-b", "tmux attach -t fly", "rsync", "git", "## Step 12 — DELETE the server",
+                   "Powering the server off does NOT stop billing", "Never give an AI agent"):
+        assert needle in g, needle
+
+
+def test_cost_estimate_matches_the_launcher_schedule():
+    c = " ".join((CLOUD / "cost-estimate.md").read_text().split())
+    for needle in ("| **CCX33** | 5 | 52 | **26 min** | **8.7 h** |",
+                   "| **CCX43** | 11 | 46 | **23 min** | **7.7 h** |",
+                   "| 1 | 260 | 2.2 h | 43.3 h |", "42 runs back to back",
+                   "unverified", "Nothing here has been measured on a server"):
+        assert needle in c, needle
+
+
+def test_setup_script_pins_match_the_reproduction_records():
+    s = SETUP.read_text()
+    shiu = (REPO / "docs" / "reproduction" / "shiu2024.md").read_text()
+    mb = (REPO / "docs" / "reproduction" / "mushroom_body_check.md").read_text()
+    lock = (REPO / "repro" / "shiu2024" / "requirements-lock.txt").read_text().split()
+    up = re.search(r'UPSTREAM_COMMIT="([0-9a-f]{40})"', s).group(1)
+    ann = re.search(r'ANNOT_COMMIT="([0-9a-f]{40})"', s).group(1)
+    assert up == "91bdd1e7dcf193f3e7ca5a8933497fcef63b7960" and up in shiu
+    assert ann in mb and 'ANNOT_TAG="v3.1.0"' in s
+    assert "cython==0.29.33" in lock and "setuptools==67.8.0" in lock
+    assert "-r \"$LOCK\"" in s and "--no-deps -e ." in s  # the package cannot move a pin
+    assert s.startswith("#!/usr/bin/env bash") and "set -Eeuo pipefail" in s
+    assert "trap " in s and "SETUP FAILED" in s
+    for needle in ("pytest tests/ -q", "fast_runner.py --self-test", 'prefs.codegen.target = "cython"'):
+        assert needle in s, needle
+
+
+def test_setup_script_parses():
+    import subprocess
+    subprocess.run(["bash", "-n", str(SETUP)], check=True)

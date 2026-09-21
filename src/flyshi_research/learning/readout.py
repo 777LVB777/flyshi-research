@@ -29,6 +29,8 @@ Sign tables come from data files (``data/``), never from code:
     supplies >= X% -> approach-like (+1); otherwise (mixed, or no annotated
     dopamine input) 0. ``circuit_80`` is the preregistered primary;
     ``circuit_70`` / ``circuit_90`` are preregistered sensitivity checks.
+    ``circuit_80_no_gamma3`` (MBON08 and MBON09 zeroed; listed in the data
+    file) is a further preregistered sensitivity check.
   * ``strict`` / ``group``: explicit label lists (preregistered robustness checks).
 
 Option B decision
@@ -152,25 +154,41 @@ def circuit_sign_table(
     )
 
 
-_CIRCUIT_NAME = re.compile(r"^circuit_(\d+(?:\.\d+)?)$")
+_CIRCUIT_NAME = re.compile(r"^circuit_(\d+(?:\.\d+)?)(?:_([a-z][a-z0-9_]*))?$")
 
 
 def load_sign_table(name: str, data_dir: Optional[Union[str, Path]] = None) -> SignTable:
     """Load a preregistered sign table by name.
 
     ``"circuit_80"`` (primary), ``"circuit_70"``, ``"circuit_90"`` (any
-    ``circuit_<pct>``), ``"strict"``, ``"group"``.
+    ``circuit_<pct>``), ``"strict"``, ``"group"``, and CIRCUIT variants
+    ``"circuit_<pct>_<variant>"`` whose zeroed labels are listed under
+    ``circuit_variants`` in the sign-tables data file (e.g.
+    ``"circuit_80_no_gamma3"``: MBON08 and MBON09 set to zero weight).
     """
     base = Path(data_dir) if data_dir else DATA_DIR
     m = _CIRCUIT_NAME.match(name)
     if m:
         counts = load_dopamine_counts(base / DOPAMINE_INPUT_FILE)
-        return circuit_sign_table(counts, float(m.group(1)), name=name)
+        table = circuit_sign_table(counts, float(m.group(1)), name=name)
+        if m.group(2) is None:
+            return table
+        with open(base / SIGN_TABLES_FILE) as fh:
+            variant = json.load(fh).get("circuit_variants", {}).get(m.group(2))
+        if variant is None:
+            raise ValueError(f"unknown sign table {name!r}: no CIRCUIT variant {m.group(2)!r}")
+        zero = {str(k) for k in variant["zero"]}
+        return SignTable(
+            name=name,
+            weights={k: (0 if k in zero else v) for k, v in table.weights.items()},
+            description=f"{table.description}; variant {m.group(2)}: {variant.get('description', '')}",
+        )
     try:
         return SignTable.from_json(base / SIGN_TABLES_FILE, table=name)
     except KeyError:
         raise ValueError(
-            f"unknown sign table {name!r}; expected 'circuit_<pct>', 'strict' or 'group'"
+            f"unknown sign table {name!r}; expected 'circuit_<pct>', "
+            "'circuit_<pct>_<variant>', 'strict' or 'group'"
         ) from None
 
 

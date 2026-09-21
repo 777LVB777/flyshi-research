@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Optional, Protocol, Sequence, Tuple
@@ -119,6 +120,15 @@ class ExperimentConfig:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, d: Mapping) -> "ExperimentConfig":
+        """Inverse of to_dict (reads a results directory's config.json)."""
+        d = dict(d)
+        d["test_seeds"] = tuple(d["test_seeds"])
+        d["plasticity"] = PlasticityParams(**d["plasticity"])
+        d["reward"] = RewardParams(**d["reward"])
+        return cls(**d)
+
     def config_hash(self) -> str:
         blob = json.dumps(self.to_dict(), sort_keys=True).encode()
         return hashlib.sha256(blob).hexdigest()[:10]
@@ -187,10 +197,11 @@ def run_count(cfg: ExperimentConfig, conditions: Sequence[Condition] = CONDITION
 
 # ---- measurement ----------------------------------------------------------------- #
 class Readout:
-    def __init__(self, labels: Sequence[str], cfg: ExperimentConfig) -> None:
+    def __init__(self, labels: Sequence[str], cfg: ExperimentConfig,
+                 table: Optional[str] = None, aggregation: Optional[str] = None) -> None:
         self.labels = list(labels)
-        self.table = load_sign_table(cfg.sign_table)
-        self.aggregation = cfg.aggregation
+        self.table = load_sign_table(table or cfg.sign_table)
+        self.aggregation = aggregation or cfg.aggregation
 
     def score(self, mbon_rates: np.ndarray) -> float:
         return circuit_score(mbon_rates, self.labels, self.table, self.aggregation).score
@@ -240,7 +251,39 @@ def _weight_summary(W: np.ndarray, W0: np.ndarray, rows: Mapping[str, np.ndarray
     return out
 
 
-# ---- the experiment (restartable) ------------------------------------------------ #
+# ---- jobs: the unit of parallel execution --------------------------------------- #
+# The protocol splits into independent jobs (spec section 10). Dependencies:
+#   pretest:<seed>          none              (2 runs: A then B, baseline weights)
+#   train:<condition>       none              (N runs, strictly sequential: each
+#                                              presentation sees the weights learned so far)
+#   posttest:<cond>:<seed>  train:<cond>      (2 runs, frozen trained weights)
+# Every job writes its own file under parts/; assemble() merges them into the same
+# pretest.json / condition_<name>.json the sequential run writes, so the verdict code
+# never knows how the work was scheduled.
+@dataclass(frozen=True)
+class Job:
+    id: str
+    kind: str  # "pretest" | "train" | "posttest"
+    condition: Optional[str]
+    seed: Optional[int]
+    deps: Tuple[str, ...]
+    n_runs: int
+
+
+def plan_jobs(cfg: ExperimentConfig, conditions: Sequence[Condition] = CONDITIONS) -> List[Job]:
+    """All jobs of the protocol, longest first within each dependency level."""
+    jobs = [Job(f"train:{c.name}", "train", c.name, None, (), cfg.n_training) for c in conditions]
+    jobs += [Job(f"pretest:{s}", "pretest", None, s, (), 2) for s in cfg.test_seeds]
+    jobs += [Job(f"posttest:{c.name}:{s}", "posttest", c.name, s, (f"train:{c.name}",), 2)
+             for c in conditions for s in cfg.test_seeds]
+    return jobs
+
+
+def critical_path_runs(cfg: ExperimentConfig) -> int:
+    """Runs on the longest dependency chain: one condition's training + one post-test job."""
+    return cfg.n_training + 2
+
+
 def _write_json(path: Path, obj: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".partial")
     tmp.write_text(json.dumps(obj, separators=(",", ":")))
@@ -251,18 +294,104 @@ def results_dir_for(base: Path, cfg: ExperimentConfig) -> Path:
     return Path(base) / f"first_learning_{cfg.config_hash()}"
 
 
+class ResultPaths:
+    """Where every stage and job writes. Needs no simulator."""
+
+    def __init__(self, results_dir: Path) -> None:
+        self.dir = Path(results_dir)
+        self.parts = self.dir / "parts"
+
+    def pretest(self) -> Path:
+        return self.dir / "pretest.json"
+
+    def condition(self, name: str) -> Path:
+        return self.dir / f"condition_{name}.json"
+
+    def checkpoint(self, name: str) -> Path:
+        return self.dir / f"checkpoint_{name}.npz"
+
+    def labels(self) -> Path:
+        return self.dir / "mbon_labels.json"
+
+    def pretest_part(self, seed: int) -> Path:
+        return self.parts / f"pretest_seed_{seed}.json"
+
+    def trained_part(self, name: str) -> Path:
+        return self.parts / f"trained_{name}.npz"
+
+    def posttest_part(self, name: str, seed: int) -> Path:
+        return self.parts / f"posttest_{name}_seed_{seed}.json"
+
+    def job_output(self, job: Job) -> Path:
+        if job.kind == "pretest":
+            return self.pretest_part(job.seed)
+        if job.kind == "train":
+            return self.trained_part(job.condition)
+        return self.posttest_part(job.condition, job.seed)
+
+    def job_done(self, job: Job) -> bool:
+        """A job is done when its own output exists, or when the merged file that
+        contains its result exists (so a finished experiment is never redone)."""
+        merged = self.pretest() if job.kind == "pretest" else self.condition(job.condition)
+        return merged.exists() or self.job_output(job).exists()
+
+
+def _save_trained(path: Path, W: np.ndarray, W0: np.ndarray, curve: List[dict],
+                  summary: dict) -> None:
+    rows = np.flatnonzero(np.any(W != W0, axis=1))
+    tmp = path.with_name(path.name + ".partial.npz")
+    np.savez_compressed(tmp, rows=rows, values=W[rows], curve=json.dumps(curve),
+                        weight_summary=json.dumps(summary))
+    tmp.replace(path)
+
+
+def _load_trained(path: Path, W0: np.ndarray) -> np.ndarray:
+    data = np.load(path, allow_pickle=False)
+    W = W0.copy()
+    W[data["rows"]] = data["values"]
+    return W
+
+
+def assemble(results_dir: Path, cfg: ExperimentConfig,
+             conditions: Sequence[Condition] = CONDITIONS) -> List[str]:
+    """Merge finished job files into pretest.json / condition_<name>.json (pure file
+    work, no simulator). Returns the names of the files written."""
+    P = ResultPaths(results_dir)
+    written = []
+    if not P.pretest().exists() and all(P.pretest_part(s).exists() for s in cfg.test_seeds):
+        rows = [json.loads(P.pretest_part(s).read_text()) for s in cfg.test_seeds]
+        _write_json(P.pretest(), {"per_seed": rows})
+        written.append(P.pretest().name)
+    for c in conditions:
+        if P.condition(c.name).exists() or not P.trained_part(c.name).exists():
+            continue
+        if not all(P.posttest_part(c.name, s).exists() for s in cfg.test_seeds):
+            continue
+        data = np.load(P.trained_part(c.name), allow_pickle=False)
+        rows = [json.loads(P.posttest_part(c.name, s).read_text()) for s in cfg.test_seeds]
+        out = {"condition": asdict(c), "posttest": {"per_seed": rows},
+               "training_curve": json.loads(str(data["curve"])),
+               "weight_summary": json.loads(str(data["weight_summary"]))}
+        _write_json(P.condition(c.name), out)
+        written.append(P.condition(c.name).name)
+    return written
+
+
+# ---- the experiment (restartable) ------------------------------------------------ #
 class Experiment:
     def __init__(self, sim: Simulator, cfg: ExperimentConfig, results_base: Path,
                  conditions: Sequence[Condition] = CONDITIONS,
                  log: Callable[[str], None] = print) -> None:
         self.sim, self.cfg, self.conditions, self.log = sim, cfg, tuple(conditions), log
         self.dir = results_dir_for(results_base, cfg)
-        self.dir.mkdir(parents=True, exist_ok=True)
-        cfg_path = self.dir / "config.json"
-        cfg_json = json.dumps(cfg.to_dict(), sort_keys=True, indent=1)
-        if cfg_path.exists() and cfg_path.read_text() != cfg_json:
-            raise RuntimeError(f"{cfg_path} does not match this configuration")
-        cfg_path.write_text(cfg_json)
+        self.paths = ResultPaths(self.dir)
+        self.paths.parts.mkdir(parents=True, exist_ok=True)
+        # config.json and mbon_labels.json: several parallel jobs may write them at once,
+        # so each write is atomic and each existing copy must match exactly.
+        _write_or_check(self.dir / "config.json", json.dumps(cfg.to_dict(), sort_keys=True, indent=1),
+                        "this configuration")
+        _write_or_check(self.paths.labels(), json.dumps(list(sim.mbon_labels)),
+                        "this simulator's MBON labels")
         self.readout = Readout(sim.mbon_labels, cfg)
         self.W0 = np.array(sim.baseline_weights(), dtype=np.float64)
         n_kc, n_mbon = self.W0.shape
@@ -274,34 +403,80 @@ class Experiment:
         self.cue_rows = {c: np.array([index[int(k)] for k in sim.cue_sets[c]]) for c in (CUE_A, CUE_B)}
         if set(self.cue_rows[CUE_A]) & set(self.cue_rows[CUE_B]):
             raise ValueError("cue sets overlap")
+        self._by_name = {c.name: c for c in self.conditions}
 
-    # -- stages --
+    # -- paths (kept for callers of the sequential API) --
     def pretest_path(self) -> Path:
-        return self.dir / "pretest.json"
+        return self.paths.pretest()
 
     def condition_path(self, c: Condition) -> Path:
-        return self.dir / f"condition_{c.name}.json"
+        return self.paths.condition(c.name)
 
     def checkpoint_path(self, c: Condition) -> Path:
-        return self.dir / f"checkpoint_{c.name}.npz"
+        return self.paths.checkpoint(c.name)
 
+    # -- sequential run: every job in dependency order, in this one process --
     def run(self) -> dict:
-        if self.pretest_path().exists():
-            self.log("pre-training test: already done (restartable)")
-        else:
-            self.log("pre-training test ...")
-            res = run_test_stage(self.sim, self.W0, self.readout, self.cfg)
-            _write_json(self.pretest_path(), res)
+        for s in self.cfg.test_seeds:
+            self.run_pretest_seed(s)
         for c in self.conditions:
             if self.condition_path(c).exists():
                 self.log(f"condition {c.name}: already done (restartable)")
                 continue
-            self._run_condition(c)
-        verdict = self.evaluate()
-        _write_json(self.dir / "verdict.json", verdict)
-        return verdict
+            self.train(c)
+            for s in self.cfg.test_seeds:
+                self.run_posttest_seed(c, s)
+        assemble(self.dir, self.cfg, self.conditions)
+        return self.finish()
 
-    def _run_condition(self, c: Condition) -> None:
+    def finish(self) -> dict:
+        return finish(self.dir, self.cfg, self.conditions)
+
+    # -- one job (the parallel launcher runs each in its own process) --
+    def run_job(self, job_id: str) -> None:
+        job = {j.id: j for j in plan_jobs(self.cfg, self.conditions)}.get(job_id)
+        if job is None:
+            raise ValueError(f"unknown job {job_id!r}")
+        if job.kind == "pretest":
+            self.run_pretest_seed(job.seed)
+        elif job.kind == "train":
+            self.train(self._by_name[job.condition])
+        else:
+            self.run_posttest_seed(self._by_name[job.condition], job.seed)
+
+    def _test_row(self, weights: np.ndarray, seed: int) -> dict:
+        self.sim.set_weights(weights)
+        row = {"seed": seed}
+        for cue in (CUE_A, CUE_B):
+            _, mbon = self.sim.present(stimulus(self.sim, cue, self.cfg), seed,
+                                       self.cfg.test_duration_ms, self.cfg.test_trials)
+            row[f"score_{cue}"] = self.readout.score(mbon)
+            row[f"mbon_{cue}"] = [round(float(x), 4) for x in mbon]
+        return row
+
+    def run_pretest_seed(self, seed: int) -> None:
+        if self.paths.pretest().exists() or self.paths.pretest_part(seed).exists():
+            self.log(f"pre-training test seed {seed}: already done (restartable)")
+            return
+        self.log(f"pre-training test seed {seed} ...")
+        _write_json(self.paths.pretest_part(seed), self._test_row(self.W0, seed))
+
+    def run_posttest_seed(self, c: Condition, seed: int) -> None:
+        P = self.paths
+        if P.condition(c.name).exists() or P.posttest_part(c.name, seed).exists():
+            self.log(f"post-test {c.name} seed {seed}: already done (restartable)")
+            return
+        if not P.trained_part(c.name).exists():
+            raise RuntimeError(f"post-test {c.name} needs train:{c.name} to finish first")
+        self.log(f"post-test {c.name} seed {seed} ...")
+        W = _load_trained(P.trained_part(c.name), self.W0)
+        _write_json(P.posttest_part(c.name, seed), self._test_row(W, seed))
+
+    def train(self, c: Condition) -> None:
+        P = self.paths
+        if P.condition(c.name).exists() or P.trained_part(c.name).exists():
+            self.log(f"training {c.name}: already done (restartable)")
+            return
         cfg = self.cfg
         net = PlasticKCMBON(self.W0, self.cmap, cfg.plasticity)
         order = training_order(cfg)
@@ -316,9 +491,9 @@ class Experiment:
             net.load_weights(W)
             start = int(data["next_k"])
             curve = json.loads(str(data["curve"]))
-            self.log(f"condition {c.name}: resuming at presentation {start}/{cfg.n_training}")
+            self.log(f"training {c.name}: resuming at presentation {start}/{cfg.n_training}")
         else:
-            self.log(f"condition {c.name}: training {cfg.n_training} presentations ...")
+            self.log(f"training {c.name}: {cfg.n_training} presentations ...")
         for k in range(start, cfg.n_training):
             cue = order[k]
             self.sim.set_weights(net.weights)
@@ -334,10 +509,9 @@ class Experiment:
                           "dopamine_rate_hz_unanchored": rate if c.plastic else 0.0,
                           "n_eligible_kc": int(np.sum(kc > cfg.plasticity.kc_active_threshold_hz))})
             self._checkpoint(c, net.weights, k + 1, curve)
-        post = run_test_stage(self.sim, net.weights, self.readout, cfg)
-        out = {"condition": asdict(c), "posttest": post, "training_curve": curve,
-               "weight_summary": _weight_summary(np.asarray(net.weights), self.W0, self.cue_rows, self.cmap)}
-        _write_json(self.condition_path(c), out)
+        W = np.asarray(net.weights)
+        _save_trained(P.trained_part(c.name), W, self.W0, curve,
+                      _weight_summary(W, self.W0, self.cue_rows, self.cmap))
         if ck.exists():
             ck.unlink()
 
@@ -351,22 +525,54 @@ class Experiment:
 
     # -- verdict --
     def evaluate(self) -> dict:
-        pre = json.loads(self.pretest_path().read_text())["per_seed"]
-        posts = {}
-        for c in self.conditions:
-            p = self.condition_path(c)
-            if not p.exists():
-                if c.gating:
-                    return {"verdict": INCONCLUSIVE, "reason": f"missing condition {c.name}"}
-                continue  # a diagnostic that was not run is simply absent from the report
-            posts[c.name] = json.loads(p.read_text())["posttest"]["per_seed"]
-        out = evaluate_scores(pre, posts, self.cfg)
-        # MBON-vector diagnostic for cue B in the smells-bad condition (not a criterion)
-        if "d_punish_a" in posts:
-            dist = [float(np.linalg.norm(np.array(a["mbon_B"]) - np.array(b["mbon_B"])))
-                    for a, b in zip(pre, posts["d_punish_a"])]
-            out["diagnostics"]["d_punish_a_cue_B_mbon_vector_change_hz_per_seed"] = dist
-        return out
+        return evaluate_results(self.dir, self.cfg, self.conditions)
+
+
+def _write_or_check(path: Path, text: str, what: str) -> None:
+    if path.exists():
+        if path.read_text() != text:
+            raise RuntimeError(f"{path} does not match {what}")
+        return
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.partial")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
+def finish(results_dir: Path, cfg: ExperimentConfig,
+           conditions: Sequence[Condition] = CONDITIONS) -> dict:
+    """Merge finished job files, evaluate, write verdict.json. No simulator needed, so the
+    parallel launcher calls this once every job is done."""
+    assemble(results_dir, cfg, conditions)
+    verdict = evaluate_results(results_dir, cfg, conditions)
+    _write_json(Path(results_dir) / "verdict.json", verdict)
+    return verdict
+
+
+def evaluate_results(results_dir: Path, cfg: ExperimentConfig,
+                     conditions: Sequence[Condition] = CONDITIONS) -> dict:
+    """Verdict from the merged result files alone (no simulator)."""
+    P = ResultPaths(results_dir)
+    if not P.pretest().exists():
+        return {"verdict": INCONCLUSIVE, "reason": "missing pre-training test"}
+    pre = json.loads(P.pretest().read_text())["per_seed"]
+    posts = {}
+    for c in conditions:
+        p = P.condition(c.name)
+        if not p.exists():
+            if c.gating:
+                return {"verdict": INCONCLUSIVE, "reason": f"missing condition {c.name}"}
+            continue  # a diagnostic that was not run is simply absent from the report
+        posts[c.name] = json.loads(p.read_text())["posttest"]["per_seed"]
+    out = evaluate_scores(pre, posts, cfg)
+    # MBON-vector diagnostic for cue B in the smells-bad condition (not a criterion)
+    if "d_punish_a" in posts:
+        dist = [float(np.linalg.norm(np.array(a["mbon_B"]) - np.array(b["mbon_B"])))
+                for a, b in zip(pre, posts["d_punish_a"])]
+        out.setdefault("diagnostics", {})["d_punish_a_cue_B_mbon_vector_change_hz_per_seed"] = dist
+    if P.labels().exists():
+        labels = json.loads(P.labels().read_text())
+        out["readout_sensitivity"] = readout_sensitivity(pre, posts, labels, cfg)
+    return out
 
 
 # ---- verdict logic (pure; pre-stated in spec sections 4-5) ----------------------- #
@@ -436,6 +642,48 @@ def evaluate_scores(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping
     return {**base, "verdict": verdict, "failed_controls": failed_controls}
 
 
+# ---- readout sensitivity variants (pre-stated in spec section 5b; REPORTED, never gating) ---- #
+# Learning itself does not depend on the readout (the rule uses KC rates and the teaching
+# signal only), so every variant is computed by re-scoring the MBON rates already saved
+# for each test presentation: no extra simulation.
+READOUT_VARIANTS: Tuple[Tuple[str, str], ...] = (
+    ("circuit_70", "type_mean"),            # CIRCUIT threshold sensitivity
+    ("circuit_90", "type_mean"),            # CIRCUIT threshold sensitivity
+    ("circuit_80_no_gamma3", "type_mean"),  # MBON08 and MBON09 set to zero weight
+    ("strict", "type_mean"),                # robustness: confident behavioural labels only
+    ("group", "type_mean"),                 # robustness: group-level behavioural labels
+    ("circuit_80", "instance_sum"),         # aggregation variant
+)
+
+
+def variant_key(table: str, aggregation: str) -> str:
+    return table if aggregation == "type_mean" else f"{table}|{aggregation}"
+
+
+def _rescore(rows: Sequence[Mapping], readout: Readout) -> List[dict]:
+    return [{"seed": r["seed"], "score_A": readout.score(np.asarray(r["mbon_A"])),
+             "score_B": readout.score(np.asarray(r["mbon_B"]))} for r in rows]
+
+
+def readout_sensitivity(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping]],
+                        labels: Sequence[str], cfg: ExperimentConfig,
+                        variants: Sequence[Tuple[str, str]] = READOUT_VARIANTS) -> dict:
+    """The same pre-stated verdict rules, applied with each variant readout. Reported
+    alongside the primary (CIRCUIT-80, type mean) verdict; they never change it."""
+    out = {}
+    for table, agg in variants:
+        ro = Readout(labels, cfg, table=table, aggregation=agg)
+        v = evaluate_scores(_rescore(pre, ro), {n: _rescore(r, ro) for n, r in posts.items()}, cfg)
+        cd = (v.get("reported_diagnostics") or {}).get("c_reward_both")
+        out[variant_key(table, agg)] = {
+            "verdict": v["verdict"], "reason": v.get("reason"),
+            "sigma": v.get("sigma"), "threshold": v.get("threshold"),
+            "conditions": v.get("conditions", {}), "failed_controls": v.get("failed_controls", []),
+            "c_reward_both_delta": cd["delta"] if cd else None,
+        }
+    return out
+
+
 def summary_lines(v: dict) -> List[str]:
     lines = []
     if not v.get("prestated_test", True):
@@ -455,4 +703,11 @@ def summary_lines(v: dict) -> List[str]:
         lines.append(f"failed controls: {', '.join(v['failed_controls'])}")
     if v.get("reason"):
         lines.append(f"reason: {v['reason']}")
+    sens = v.get("readout_sensitivity") or {}
+    if sens:
+        lines.append("readout sensitivity variants (REPORTED ONLY; the verdict above is CIRCUIT-80, type mean):")
+        for name, sv in sens.items():
+            main = sv["conditions"].get("main", {}).get("delta")
+            lines.append(f"  {name:28s} {sv['verdict']}"
+                         + (f"  (main delta {main:+.3f}, threshold {sv['threshold']:.3f})" if main is not None else ""))
     return lines

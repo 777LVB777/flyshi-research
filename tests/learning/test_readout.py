@@ -79,9 +79,40 @@ def test_strict_and_group_tables():
     assert strict.weight("MBON03") == 0  # group-only label not in STRICT
 
 
+def test_gamma3_sensitivity_variant_zeroes_only_mbon08_and_mbon09():
+    """Preregistered: CIRCUIT-80 with the gamma3 types MBON08 and MBON09 at zero weight."""
+    t80, g3 = load_sign_table("circuit_80"), load_sign_table("circuit_80_no_gamma3")
+    assert g3.name == "circuit_80_no_gamma3"
+    assert (g3.weight("MBON08"), g3.weight("MBON09")) == (0, 0)
+    assert t80.weight("MBON09") == -1  # so the variant really changes MBON09
+    changed = {l for l in t80.weights if t80.weight(l) != g3.weight(l)}
+    assert changed == {"MBON09"}  # MBON08 is already zero under the direct-connectivity rule
+    assert set(g3.weights) == set(t80.weights)
+    # the variant composes with any threshold
+    g90 = load_sign_table("circuit_90_no_gamma3")
+    assert g90.weight("MBON09") == 0 and g90.weight("MBON04") == 0
+    # it changes a score exactly by removing MBON09's contribution
+    labels, rates = ["MBON09", "MBON11", "MBON05"], [60.0, 20.0, 10.0]
+    assert circuit_score(rates, labels, t80).score == pytest.approx(20.0 - 60.0 - 10.0)
+    assert circuit_score(rates, labels, g3).score == pytest.approx(20.0 - 10.0)
+
+
+def test_circuit_variants_come_from_the_data_file(tmp_path):
+    (tmp_path / "mbon_dopamine_input.json").write_text(json.dumps(
+        {"counts": {"MBON01": {"pam": 99, "ppl1": 1}, "MBON02": {"pam": 99, "ppl1": 1}}}))
+    (tmp_path / "mbon_sign_tables.json").write_text(json.dumps(
+        {"tables": {}, "circuit_variants": {"no_x": {"zero": ["MBON02"]}}}))
+    t = load_sign_table("circuit_80_no_x", data_dir=tmp_path)
+    assert (t.weight("MBON01"), t.weight("MBON02")) == (-1, 0)
+    with pytest.raises(ValueError, match="unknown sign table"):
+        load_sign_table("circuit_80_no_gamma3", data_dir=tmp_path)  # not in this data file
+
+
 def test_unknown_table_name_raises():
     with pytest.raises(ValueError, match="unknown sign table"):
         load_sign_table("bogus")
+    with pytest.raises(ValueError, match="unknown sign table"):
+        load_sign_table("circuit_80_bogus")
 
 
 def test_tables_are_loaded_from_data_files_not_hardcoded(tmp_path):

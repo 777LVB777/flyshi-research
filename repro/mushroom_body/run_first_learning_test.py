@@ -13,6 +13,11 @@ real net.run (docs/design/fast-runner.md).
 
 Restartable: completed stages are skipped; an interrupted training stage resumes
 from its per-presentation checkpoint.
+
+Two ways to run the same protocol, producing the same result files:
+  * no flags: every job in this one process, in order (sequential);
+  * --job ID: one job (see --list-jobs); launch_first_learning_parallel.py runs many
+    at once, then --finish merges the job files and writes the verdict (no Brian2).
 """
 
 from __future__ import annotations
@@ -129,8 +134,12 @@ def plan_lines(cfg: fl.ExperimentConfig, results_base: Path) -> list:
         f"    pre-training test (shared): {rc.pretest}",
         f"    per condition: {rc.per_condition_training} training + {rc.per_condition_posttest} post-test",
         f"    total: {rc.pretest} + {rc.n_conditions} x {rc.per_condition_training + rc.per_condition_posttest}"
-        f" = {rc.total} runs ({rc.simulated_trial_seconds(cfg):g} simulated trial-seconds) + 1 network build",
-        "  Wall-clock time: unknown (local timings unusable).",
+        f" = {rc.total} runs ({rc.simulated_trial_seconds(cfg):g} simulated trial-seconds)"
+        " + 1 network build per process (1 sequential; 1 per job in parallel)",
+        f"  PARALLEL JOBS: {len(fl.plan_jobs(cfg))} (see --list-jobs); longest dependency chain "
+        f"{fl.critical_path_runs(cfg)} runs (one condition's {cfg.n_training} sequential training "
+        "presentations + one post-test seed)",
+        "  Wall-clock time: unknown (local timings unusable; see docs/cloud/cost-estimate.md).",
         "  DEPENDS ON the fast runner, whose equivalence test has NOT been run.",
     ]
     return lines
@@ -147,7 +156,23 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="Print the plan and run-count estimate; simulate nothing.")
     p.add_argument("--smoke", action="store_true", help="Tiny pipeline check (NOT the pre-stated test).")
     p.add_argument("--results-base", type=Path, default=RESULTS_BASE)
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--job", metavar="ID", help="Run ONE job (e.g. train:main, pretest:20260317, "
+                   "posttest:main:20260317) in this process. Brian2.")
+    g.add_argument("--list-jobs", action="store_true", help="List jobs and whether each is done; simulate nothing.")
+    g.add_argument("--finish", action="store_true",
+                   help="Merge finished job files and write the verdict; simulate nothing (no Brian2).")
     return p
+
+
+def job_lines(cfg: fl.ExperimentConfig, results_base: Path) -> list:
+    paths = fl.ResultPaths(fl.results_dir_for(results_base, cfg))
+    lines = []
+    for j in fl.plan_jobs(cfg):
+        state = "done" if paths.job_done(j) else "todo"
+        deps = f"  after {', '.join(j.deps)}" if j.deps else ""
+        lines.append(f"{j.id:34s} {j.n_runs:3d} runs  {state}{deps}")
+    return lines
 
 
 def main(argv=None) -> None:
@@ -156,8 +181,25 @@ def main(argv=None) -> None:
     if args.dry_run:
         print("\n".join(plan_lines(cfg, args.results_base)))
         return
+    if args.list_jobs:
+        print("\n".join(job_lines(cfg, args.results_base)))
+        return
+    if args.finish:
+        d = fl.results_dir_for(args.results_base, cfg)
+        if not (d / "config.json").exists():
+            raise SystemExit(f"no results at {d}")
+        verdict = fl.finish(d, cfg)
+        print("\n".join(fl.summary_lines(verdict)))
+        return
+    if args.job and args.job not in {j.id for j in fl.plan_jobs(cfg)}:
+        raise SystemExit(f"unknown job {args.job!r}; see --list-jobs")  # before the costly build
     sim = FastRunnerSimulator(cfg)
-    verdict = fl.Experiment(sim, cfg, args.results_base).run()
+    exp = fl.Experiment(sim, cfg, args.results_base)
+    if args.job:
+        exp.run_job(args.job)
+        print(f"job {args.job}: done")
+        return
+    verdict = exp.run()
     print("\n".join(fl.summary_lines(verdict)))
 
 

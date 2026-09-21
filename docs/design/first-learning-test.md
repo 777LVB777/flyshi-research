@@ -6,10 +6,13 @@ change, write a new dated revision at the bottom *before* running, never after
 seeing data. Results go in a new section at the very end, without editing anything
 above it.
 
-**Revision notice (both changes made before any run; see "Revision history"):** the
-reward mechanism was approved as described in Section 2, and control (c), rewarding
+**Revision notice (all changes made before any run; see "Revision history"):** the
+reward mechanism was approved as described in Section 2; control (c), rewarding
 both cues equally, was demoted from a pass/fail gate to a reported diagnostic
-(Section 5).
+(Section 5); readout sensitivity variants, including CIRCUIT-80 with the γ3 types
+MBON08 and MBON09 at zero weight, were preregistered as reported checks (Section 5b);
+and the protocol was split into independent jobs so it can run in parallel on a
+rented server (Section 10). No criterion of the primary verdict changed.
 
 Terms (Kenyon cell (KC), MBON, CIRCUIT readout, per-type mean, compartment, PAM,
 PPL1) are explained in [`mb-learning-interface.md`](mb-learning-interface.md) and
@@ -191,6 +194,45 @@ Notes:
   can never produce this verdict.**
 - **LEARNING DEMONSTRATED** — the main condition and the three gating controls pass.
 
+## 5b. Readout sensitivity variants (preregistered before any run; reported, never gating)
+
+The verdict above uses the primary readout only: CIRCUIT, 80% threshold, per-type
+mean. The same Sections 4–5 rules (same σ definition, same thresholds, same verdict
+logic) are **also** applied with each alternative readout below, and every result is
+reported next to the primary verdict. **None of them can change the primary verdict.**
+
+| Variant | What changes | Why |
+|---|---|---|
+| `circuit_70` | CIRCUIT threshold 70% | preregistered threshold sensitivity check |
+| `circuit_90` | CIRCUIT threshold 90% (MBON04, MBON10, MBON15 drop to zero) | preregistered threshold sensitivity check |
+| **`circuit_80_no_gamma3`** | CIRCUIT-80 with **MBON08 and MBON09 set to zero weight** | see below |
+| `strict` | only confidently labelled types (MBON05, MBON21, MBON11, MBON12) | preregistered robustness check |
+| `group` | STRICT plus group-level behavioural labels | preregistered robustness check |
+| `circuit_80` summed per instance | `instance_sum` instead of per-type mean | the named aggregation variant |
+
+**The γ3 variant.** MBON08 and MBON09 are the γ3 output neurons. **MBON09 is the
+largest single contributor to the intensity bias** found by the graded-rate test
+(63.7 Hz at 150 Hz; [`graded-encoding.md`](graded-encoding.md)), and it is **the type
+where the circuit rule contradicts behavioural data**: CIRCUIT calls it avoidance-like
+(99.6% of its dopamine input is PAM), while its behavioural label is approach
+(group-level; [`readout-and-plasticity-options.md`](readout-and-plasticity-options.md)).
+MBON09 is also in the PAM compartment, so reward depresses its cue-A inputs; much of
+the main condition's score change could come from it. Under CIRCUIT-80, MBON08
+already has zero weight (no direct annotated dopamine input); it is included so the
+variant covers γ3 as a whole. **The variant changes the readout only:** MBON09's
+synapses still learn, and its effect on other neurons through the network remains.
+
+**Interpretation, fixed now.** If the primary verdict is LEARNING DEMONSTRATED but the
+γ3 variant is not, the result is reported as **depending on MBON09**, a type whose
+CIRCUIT sign contradicts its behavioural label. More generally, any variant with a
+different verdict is named, and the result is reported as depending on the readout.
+A variant can differ simply because it gives weight to fewer MBONs (STRICT uses four
+types), which would mean a weaker signal, not a failed control.
+
+**Cost: none.** Learning does not depend on the readout (the rule uses KC rates and
+the teaching signal only), so every variant is computed by re-scoring the MBON rates
+already saved for each test presentation. No extra simulation is run.
+
 ## 6. Parameters: explicit placeholders, fixed before the run
 
 **Every value in this table is a placeholder. It must be fixed before the run and
@@ -242,6 +284,11 @@ no such evidence yet for the fast path.) **Run the fast-runner equivalence test
 first.** Note that 50 of the 260 runs are control (c), which is now only a reported
 diagnostic; dropping it would reduce the total to 210.
 
+Run in parallel (Section 10), the wall-clock time is set by the longest chain: one
+condition's 40 sequential training runs plus one 2-run test job, **42 runs**, however
+many processes are available. Time and cost for the planned servers are estimated in
+[`../cloud/cost-estimate.md`](../cloud/cost-estimate.md) (unmeasured).
+
 ## 8. Other limitations, stated in advance
 
 - **Five seeds** give a rough estimate of σ; the 3σ threshold is conservative
@@ -280,15 +327,21 @@ caffeinate -i uv run --python .venv-shiu/bin/python --no-project -- \
   .venv-shiu/bin/python repro/mushroom_body/run_first_learning_test.py
 ```
 
-- **Restartable.** Each stage writes its own small JSON on completion. An
-  interrupted training stage resumes from a checkpoint written after every
-  presentation. Presentation seeds depend only on the presentation index, so a
+- **Restartable.** Each job (Section 10) writes its own small file on completion;
+  finished jobs are never redone. An interrupted training job resumes from a
+  checkpoint written after every presentation. Presentation seeds depend only on the presentation index, so a
   resumed run is identical to an uninterrupted one (assuming the simulator is
   deterministic per seed, which control (a) checks). The checkpoint is deleted when
   the stage completes.
 - **Compact output** in `repro/mushroom_body/results/first_learning_<config hash>/`.
   Total is well under 1 MB: scores, 96-value MBON vectors, per-trial learning curve,
   weight summaries, verdict.
+- **In parallel (on the server):** `repro/mushroom_body/launch_first_learning_parallel.py`
+  (`--dry-run` first). It runs each job in its own process and writes the verdict
+  when all are done. `run_first_learning_test.py --list-jobs` shows what is done, and
+  `--finish` writes the verdict from the job files without simulating.
+- **Plain-language summary for collaborators:**
+  `repro/mushroom_body/report_first_learning.py` (reads the results, simulates nothing).
 - `--smoke` runs a tiny version (N = 2, two test seeds, 100 ms) to check the
   pipeline end-to-end. Its verdict is labelled **NOT THE PRE-STATED TEST**, and it
   writes to a different directory.
@@ -297,6 +350,42 @@ The experiment logic lives in `src/flyshi_research/learning/first_learning.py` (
 numpy, simulator passed in). `tests/learning/test_first_learning.py` exercises it
 on fake simulators: one where learning should be detected, and several where it
 must not be. The tests never call the real simulator.
+
+## 10. Parallel execution: what can run at the same time
+
+Added before any run. **It changes how the work is scheduled, not what is computed.**
+The criteria in Sections 4–5b are unchanged.
+
+The protocol is split into 35 independent **jobs**. Each job runs in its own process,
+with its own copy of the network, and writes its own file:
+
+| Job | Count | Runs each | Must wait for |
+|---|---|---|---|
+| `train:<condition>` | 5 | 40, **strictly sequential** | nothing |
+| `pretest:<seed>` (cue A then cue B, connectome weights) | 5 | 2 | nothing |
+| `posttest:<condition>:<seed>` (A then B, trained weights frozen) | 25 | 2 | that condition's training |
+
+- **Parallel:** the five conditions (all start from the connectome weights and share
+  nothing); every test seed (each test presentation depends only on the weights, the
+  cue and its seed); and the pre-training test, which can run at any time.
+- **Not parallel:** the 40 training presentations inside one condition. Each one
+  must see the weights learned from all earlier ones (the learning curve checks this
+  on fake simulators), so one condition's training is a single sequential job. This
+  40-run chain, plus one 2-run test job, sets the minimum wall-clock time.
+- **Same result files.** When every job is done, the job files are merged into the
+  same `pretest.json` and `condition_<name>.json` a single sequential run writes,
+  and the verdict is computed from those. The tests check that running the jobs
+  in separate fresh simulators, in any valid order, gives byte-identical results to
+  the sequential run (on fake simulators).
+- **Assumption (unverified for the real fast path):** one presentation's result
+  depends only on the weights, the cue and the seed, not on what the same process
+  simulated before. The sequential design already relied on this for restarts.
+  Control (a) tests it directly: its post-test and the pre-training test run in
+  different processes with identical weights and seeds, so any Δ other than zero
+  exposes a violation.
+- **Concurrency** is limited by memory: `floor((available RAM − headroom) / 5 GB)`
+  processes, capped at the core count. The 5 GB per process is the working figure
+  (4–5 GB), **not measured on the server**.
 
 ---
 
@@ -319,6 +408,17 @@ must not be. The tests never call the real simulator.
   cue-specific learning; control (b) is the clean specificity test. The verdict now
   depends on the main condition and gates (a), (b), (d). The additive-prediction
   diagnostic was added with it. Nothing else changed; no result existed.
+- **2026-09-21, before any run: readout sensitivity variants preregistered.** Section
+  5b lists them (CIRCUIT 70% and 90%, STRICT, GROUP, instance sum) and adds a new one:
+  **CIRCUIT-80 with MBON08 and MBON09 (γ3) at zero weight**. Rationale: MBON09 is the
+  largest contributor to the intensity bias and the type where the circuit rule
+  contradicts its behavioural label. All are reported next to the primary verdict and
+  can never change it; they are computed from saved MBON rates, so no run is added.
+- **2026-09-21, before any run: split into parallel jobs.** Section 10. Each test
+  seed and each condition's training is now its own job with its own file, so the
+  protocol can run as parallel processes on a rented server. This changes scheduling
+  only. It also makes restarts finer: a finished test seed is no longer redone after
+  an interruption. No criterion, seed, parameter or run count changed.
 
 ---
 

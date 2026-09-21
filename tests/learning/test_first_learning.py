@@ -354,14 +354,14 @@ def all_results(d):
     return {p.name: p.read_text() for p in sorted(d.glob("*.json"))}
 
 
-# (crash point in simulator calls, calls the resumed run must make). Saved work:
-# pre-test is not checkpointed (redone if interrupted); each training presentation is;
-# a partly done post-test is redone.
+# (crash point in simulator calls, calls the resumed run must make). Saved work: each
+# finished test seed (A and B) is its own job file; each training presentation is
+# checkpointed; only a half-done test seed (A without B) is redone.
 @pytest.mark.parametrize("crash_at,resumed_calls", [
-    (5, 260),                  # inside the pre-training test
-    (10 + 25, 260 - 10 - 25),  # main condition, after training presentation 25
-    (10 + 45, 260 - 10 - 40),  # main condition, inside its post-test
-    (10 + 50 + 43, 260 - 10 - 50 - 40),  # control (a), inside its post-test
+    (5, 260 - 4),                          # pre-test: seeds 1-2 saved, seed 3 half done
+    (10 + 25, 260 - 10 - 25),              # main condition, after training presentation 25
+    (10 + 45, 260 - 10 - 40 - 4),          # main post-test: seeds 1-2 saved
+    (10 + 50 + 43, 260 - 10 - 50 - 40 - 2),  # control (a) post-test: seed 1 saved
 ])
 def test_interrupted_run_resumes_to_identical_results(tmp_path, crash_at, resumed_calls):
     cfg = fl.ExperimentConfig()
