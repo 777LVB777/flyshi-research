@@ -12,6 +12,7 @@ from flyshi_research.learning.readout import (  # noqa: E402
     circuit_score,
     decide,
     dominant_family,
+    DecisionTally,
     load_dopamine_counts,
     load_sign_table,
 )
@@ -120,9 +121,79 @@ def test_score_is_sign_weighted_sum():
     assert r.unlisted_labels == ("?",) and r.n_weighted == 2
 
 
-def test_score_counts_every_instance():
+def test_default_aggregation_is_per_type_mean():
     r = circuit_score([5.0, 5.0, 5.0], ["A", "A", "A"], TABLE)
-    assert r.score == 15.0  # sum over instances, not a per-type mean
+    assert r.aggregation == "type_mean"
+    assert r.score == 5.0  # three instances of one type = ONE vote at the mean rate
+    assert r.type_rates == {"A": 5.0} and r.n_instances == 3 and r.n_approach == 1
+
+
+def test_instance_sum_is_available_as_a_named_variant():
+    r = circuit_score([5.0, 5.0, 5.0], ["A", "A", "A"], TABLE, aggregation="instance_sum")
+    assert r.aggregation == "instance_sum" and r.score == 15.0
+    assert r.type_rates == {} and r.n_approach == 3  # units are instances here
+
+
+def test_type_mean_averages_within_type_before_signing():
+    # A: instances 10, 30 -> mean 20 (+1); B: instances 2, 4, 6 -> mean 4 (-1)
+    r = circuit_score([10.0, 30.0, 2.0, 4.0, 6.0], ["A", "A", "B", "B", "B"], TABLE)
+    assert r.type_rates == {"A": 20.0, "B": 4.0}
+    assert r.score == pytest.approx(16.0)
+    assert (r.n_approach, r.n_avoidance) == (1, 1)
+
+
+def test_many_instance_type_cannot_dominate_under_type_mean():
+    """The MBON10 concern: 9 instances of an atypical PAM-dominant type at 10 Hz
+    against ONE instance of an approach-like type at 30 Hz."""
+    t = load_sign_table("circuit_80")
+    labels = ["MBON10"] * 9 + ["MBON11"]
+    rates = [10.0] * 9 + [30.0]
+    mean = circuit_score(rates, labels, t)  # default
+    total = circuit_score(rates, labels, t, aggregation="instance_sum")
+    assert mean.score == pytest.approx(30.0 - 10.0)  # one vote each: approach wins
+    assert total.score == pytest.approx(30.0 - 90.0)  # sum: MBON10 swamps it
+    assert mean.score > 0 > total.score
+
+
+def test_type_mean_includes_silent_instances_so_callers_must_pass_all_of_them():
+    """Documented contract: averaging responders only would inflate the type."""
+    full = circuit_score([40.0, 0.0], ["A", "A"], TABLE)  # one responder, one silent
+    responders_only = circuit_score([40.0], ["A"], TABLE)
+    assert full.score == 20.0 and responders_only.score == 40.0
+
+
+def test_type_mean_is_independent_of_instance_order():
+    labels = ["A", "B", "A", "B", "A"]
+    rates = [1.0, 2.0, 30.0, 4.0, 5.0]
+    perm = [4, 2, 0, 3, 1]
+    a = circuit_score(rates, labels, TABLE)
+    b = circuit_score([rates[i] for i in perm], [labels[i] for i in perm], TABLE)
+    assert a.score == pytest.approx(b.score)
+
+
+def test_unlisted_types_are_counted_once_per_type_and_listed():
+    r = circuit_score([1.0, 2.0, 3.0], ["?", "?", "A"], TABLE)
+    assert r.n_unlisted == 1 and r.unlisted_labels == ("?",)  # one unit, not two
+    assert r.score == 3.0
+
+
+def test_unknown_aggregation_rejected():
+    with pytest.raises(ValueError, match="aggregation"):
+        circuit_score([1.0], ["A"], TABLE, aggregation="median")
+    with pytest.raises(ValueError, match="aggregation"):
+        decide([1.0, 1.0], [1.0, 1.0], LABELS, TABLE, aggregation="median")
+
+
+def test_aggregation_can_flip_a_decision():
+    """Same rates, same table: the two aggregations can disagree, so the choice matters."""
+    t = load_sign_table("circuit_80")
+    labels = ["MBON10"] * 9 + ["MBON11"]
+    yes = [10.0] * 9 + [30.0]  # YES run: MBON10 moderate, MBON11 strong
+    no = [0.0] * 9 + [0.0]
+    by_mean = decide(yes, no, labels, t, 0.0)  # default type_mean: 30 - 10 = +20 -> YES
+    by_sum = decide(yes, no, labels, t, 0.0, aggregation="instance_sum")  # 30 - 90 = -60 -> NO
+    assert by_mean.choice == Choice.YES and by_mean.aggregation == "type_mean"
+    assert by_sum.choice == Choice.NO and by_sum.aggregation == "instance_sum"
 
 
 def test_score_input_validation():
@@ -210,3 +281,40 @@ def test_circuit_variants_can_disagree_at_90():
     yes, no = [30.0, 10.0], [0.0, 10.0]
     assert decide(yes, no, labels, load_sign_table("circuit_80"), 0.0).choice == Choice.NO
     assert decide(yes, no, labels, load_sign_table("circuit_90"), 0.0).choice == Choice.ABSTAIN
+
+
+# ---- abstention tally ------------------------------------------------------- #
+def test_tally_tracks_abstention_rate():
+    t = DecisionTally()
+    assert t.n_decisions == 0 and t.abstention_rate != t.abstention_rate  # NaN before any
+    for c in (Choice.YES, "NO", Choice.ABSTAIN, "ABSTAIN"):
+        t.record(c)
+    assert (t.n_yes, t.n_no, t.n_abstain) == (1, 1, 2)
+    assert t.n_decisions == 4 and t.n_acted == 2
+    assert t.abstention_rate == 0.5
+    assert t.summary() == {"n_decisions": 4, "n_yes": 1, "n_no": 1, "n_abstain": 2,
+                           "abstention_rate": 0.5}
+
+
+def test_tally_accepts_readout_decisions_directly():
+    t = DecisionTally()
+    t.record(decide([50.0, 0.0], [0.0, 0.0], LABELS, TABLE, 0.0))  # YES
+    t.record(decide([9.0, 0.0], [9.0, 0.0], LABELS, TABLE, 0.0))  # tie -> ABSTAIN
+    assert (t.n_yes, t.n_abstain) == (1, 1) and t.abstention_rate == 0.5
+
+
+def test_tally_rejects_unknown_choice():
+    with pytest.raises(ValueError):
+        DecisionTally().record("MAYBE")
+
+
+def test_raising_the_threshold_raises_the_abstention_rate():
+    rng = np.random.default_rng(1)
+    pairs = [(rng.uniform(0, 100, 2), rng.uniform(0, 100, 2)) for _ in range(200)]
+    rates = []
+    for thr in (0.0, 20.0, 60.0):
+        t = DecisionTally()
+        for y, n in pairs:
+            t.record(decide(y, n, LABELS, TABLE, margin_threshold=thr))
+        rates.append(t.abstention_rate)
+    assert rates[0] < rates[1] < rates[2]

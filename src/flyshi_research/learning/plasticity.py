@@ -25,18 +25,25 @@ Rule (multiplicative depression toward a floor, plus drift toward baseline)::
 The compartment map is inferred from v783 dopamine->MBON wiring and is
 UNVERIFIED (design docs); ambiguous/zero-sign MBONs belong to no compartment.
 Cues that SHARE KCs will interfere on the shared KC rows; disjoint pools do not.
+
+Abstentions (decided): a decision whose readout was ABSTAIN causes NO learning
+update - no depression and no drift; its market resolving later leaves the
+weights bit-identical. Only acted (YES/NO) decisions enter the queue. Consequence
+to keep in mind: drift advances only on resolutions of acted decisions (call
+``advance`` for time passing), and an abstained market's outcome teaches nothing.
+The abstention rate is tracked in ``PlasticKCMBON.tally``.
 """
 
 from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from .params import PlasticityParams
-from .readout import dominant_family
+from .readout import Choice, DecisionTally, dominant_family
 
 
 # --------------------------------------------------------------------------- #
@@ -270,6 +277,10 @@ class PlasticKCMBON:
         if self.n_mbon != compartments.n_mbon:
             raise ValueError("compartment map size does not match weight matrix")
         self.queue = DecisionQueue(self.n_kc)
+        self.tally = DecisionTally()  # YES/NO/ABSTAIN counts -> abstention rate
+        self._abstained: set = set()  # markets we abstained on, awaiting resolution
+        self.n_updates_applied = 0  # resolutions that changed learning state
+        self.n_abstained_resolved = 0  # resolutions skipped because we abstained
 
     @property
     def weights(self) -> np.ndarray:
@@ -282,18 +293,49 @@ class PlasticKCMBON:
     def baseline(self) -> np.ndarray:
         return self._baseline
 
-    def record_decision(self, market_id: str, kc_pattern: Sequence[float], **meta: Any) -> None:
-        """Save the KC activity pattern of the framing acted on, at decision time."""
-        self.queue.record(market_id, kc_pattern, **meta)
+    def record_decision(
+        self,
+        market_id: str,
+        kc_pattern: Optional[Sequence[float]],
+        choice: Union[Choice, str],
+        **meta: Any,
+    ) -> bool:
+        """Register a decision at decision time. ``choice`` is the readout outcome
+        (``Choice`` or "YES"/"NO"/"ABSTAIN") and is REQUIRED so an abstention cannot
+        be mistaken for an action.
+
+        YES/NO: save the KC activity pattern of the framing acted on; returns True.
+        ABSTAIN: nothing is queued and ``kc_pattern`` is ignored (may be None);
+        the market is remembered so its later ``resolve`` is a recognised no-op;
+        returns False. Every call is counted in ``self.tally``.
+        A market id may be registered only once (until resolved/discarded/reset).
+        """
+        choice = Choice(choice)
+        if market_id in self.queue or market_id in self._abstained:
+            raise DuplicateMarketError(f"market {market_id!r} already has a pending decision")
+        if choice == Choice.ABSTAIN:
+            self._abstained.add(market_id)
+            self.tally.record(choice)
+            return False
+        if kc_pattern is None:
+            raise ValueError("kc_pattern is required for YES/NO decisions")
+        self.queue.record(market_id, kc_pattern, choice=choice.value, **meta)
+        self.tally.record(choice)  # only after the queue accepted it
+        return True
 
     def resolve(self, market_id: str, dopamine: Mapping[str, float]) -> np.ndarray:
         """Apply the update for ``market_id`` using ITS saved pattern.
 
         Order: depression (dopamine gate), then ``drift_steps_per_resolution``
         drift steps. ``dopamine={}`` (nothing to teach) applies drift only.
-        Unknown market -> UnknownMarketError; the queue is left unchanged on any
-        error raised before application (validation happens before mutation).
+        A market whose decision was ABSTAIN is dequeued with NO update at all
+        (weights bit-identical). Unknown market -> UnknownMarketError. Validation
+        happens before mutation, so a failed call leaves the market pending.
         """
+        if market_id in self._abstained:
+            self._abstained.discard(market_id)
+            self.n_abstained_resolved += 1
+            return self.weights
         pending = self.queue.peek(market_id)  # raises UnknownMarketError; no mutation yet
         new = depress(
             self._weights, self._baseline, pending.kc_pattern, dopamine,
@@ -302,7 +344,13 @@ class PlasticKCMBON:
         new = drift(new, self._baseline, self.params, self.params.drift_steps_per_resolution)
         self._weights = new
         self.queue.pop(market_id)
+        self.n_updates_applied += 1
         return self.weights
+
+    def discard(self, market_id: str) -> None:
+        """Forget a pending or abstained market without teaching (e.g. voided)."""
+        self._abstained.discard(market_id)
+        self.queue.discard(market_id)
 
     def advance(self, n_steps: int = 1) -> np.ndarray:
         """Extra drift with no dopamine (time passing without resolutions)."""
@@ -310,6 +358,10 @@ class PlasticKCMBON:
         return self.weights
 
     def reset(self) -> None:
-        """Restore connectome weights and clear the queue."""
+        """Restore connectome weights; clear the queue, abstained set and counters."""
         self._weights = self._baseline.copy()
         self.queue = DecisionQueue(self.n_kc)
+        self.tally = DecisionTally()
+        self._abstained = set()
+        self.n_updates_applied = 0
+        self.n_abstained_resolved = 0

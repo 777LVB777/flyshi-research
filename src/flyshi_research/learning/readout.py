@@ -4,11 +4,24 @@ Pure numpy; no Brian2, no simulation.
 
 Score
 -----
-``score = sum over MBON instances of (sign weight) x (firing rate, Hz)`` with
-weight +1 for approach-like MBONs, -1 for avoidance-like MBONs, 0 otherwise. It
-is a plain SUM over instances (not a per-type mean), so a type with several
-responding instances (e.g. MBON10 x6) counts several times. A higher score
-means more approach-like activity.
+Weight +1 = approach-like MBON type, -1 = avoidance-like, 0 = neither. A higher
+score means more approach-like activity. Two aggregations (``params.AGGREGATIONS``):
+
+``type_mean`` (DEFAULT, decided): average the rates of the instances of each cell
+type FIRST, then ``score = sum over types of (sign weight) x (type mean rate)``.
+Each type gets exactly one vote, whatever its instance count. Reason: the raw
+sum would let a type with many instances dominate for an anatomical reason -
+MBON10 has 9 instances in the v783 model (6 responded in the KC-direct data) and
+is an atypical MBON whose dendrites lie largely outside the lobes.
+
+``instance_sum`` (named variant, NOT the default): ``score = sum over instances of
+(sign weight) x (rate)``. A type with several instances counts several times.
+
+The type mean is only as good as the instance list it is given: pass EVERY
+instance of each type (silent ones at 0 Hz), not just the ones that fired.
+Averaging responders only inflates each type's mean by a different, arbitrary
+factor. Which instances count (both hemispheres? left only?) is the caller's
+choice and an OPEN design question (see docs/design/mb-learning-interface.md).
 
 Sign tables come from data files (``data/``), never from code:
   * ``circuit_<X>``: derived from direct PAM/PPL1->MBON synapse totals with the
@@ -22,8 +35,9 @@ Option B decision
 -----------------
 Two runs per market ("YES at p", "NO at 1-p"); each is scored; pick the framing
 with the higher score, but ABSTAIN unless the margin exceeds ``margin_threshold``
-(which must be set from training data only). Abstaining is a valid zero-stake
-action.
+(which must be set from training data only; its units depend on the aggregation).
+Abstaining is a valid zero-stake action, and it triggers NO learning update
+(see plasticity.py). ``DecisionTally`` tracks the abstention rate.
 
 All sign assignments are UNVERIFIED at compartment level (see the design docs);
 CIRCUIT signs are a circuit-logic modelling assumption, not behavioural results.
@@ -36,9 +50,13 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
+
+from .params import AGG_TYPE_MEAN, AGGREGATIONS
+
+DEFAULT_AGGREGATION = AGG_TYPE_MEAN
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DOPAMINE_INPUT_FILE = "mbon_dopamine_input.json"
@@ -158,12 +176,18 @@ def load_sign_table(name: str, data_dir: Optional[Union[str, Path]] = None) -> S
 
 @dataclass(frozen=True)
 class ScoreResult:
+    """Score plus bookkeeping. The ``n_*`` counts are in VOTING UNITS: cell types
+    under ``type_mean``, individual instances under ``instance_sum``."""
+
     score: float
-    n_approach: int  # instances with weight +1
-    n_avoidance: int  # instances with weight -1
-    n_zero: int  # instances listed in the table with weight 0
-    n_unlisted: int  # instances whose label is not in the table (weight 0)
+    aggregation: str
+    n_approach: int  # units with weight +1
+    n_avoidance: int  # units with weight -1
+    n_zero: int  # units listed in the table with weight 0
+    n_unlisted: int  # units whose label is not in the table (weight 0)
     unlisted_labels: Tuple[str, ...]
+    n_instances: int  # MBON instances that were supplied
+    type_rates: Mapping[str, float]  # per-type mean rate (type_mean only; {} otherwise)
 
     @property
     def n_weighted(self) -> int:
@@ -181,21 +205,44 @@ def _as_rates(rates: Sequence[float], n: int) -> np.ndarray:
     return r
 
 
-def circuit_score(rates: Sequence[float], labels: Sequence[str], table: SignTable) -> ScoreResult:
-    """Sign-weighted sum of MBON rates. ``labels[i]`` is the cell-type label of
-    the MBON instance whose rate is ``rates[i]``."""
+def circuit_score(
+    rates: Sequence[float],
+    labels: Sequence[str],
+    table: SignTable,
+    aggregation: str = DEFAULT_AGGREGATION,
+) -> ScoreResult:
+    """Sign-weighted CIRCUIT score. ``labels[i]`` is the cell-type label of the MBON
+    instance whose rate is ``rates[i]``. Default aggregation is the per-type mean
+    (see module docstring); pass ``aggregation="instance_sum"`` for the variant."""
+    if aggregation not in AGGREGATIONS:
+        raise ValueError(f"aggregation must be one of {AGGREGATIONS}, got {aggregation!r}")
     labels = list(labels)
     r = _as_rates(rates, len(labels))
-    w = np.array([table.weight(l) for l in labels], dtype=np.float64)
-    unlisted = sorted({l for l in labels if not table.is_listed(l)})
-    n_unlisted = sum(1 for l in labels if not table.is_listed(l))
+
+    if aggregation == AGG_TYPE_MEAN:
+        by_type: Dict[str, List[float]] = {}
+        for label, rate in zip(labels, r.tolist()):
+            by_type.setdefault(label, []).append(rate)
+        type_rates = {t: float(np.mean(v)) for t, v in by_type.items()}
+        units = sorted(type_rates)  # fixed summation order: independent of input order
+        unit_rates = [type_rates[t] for t in units]
+    else:
+        type_rates = {}
+        units = labels
+        unit_rates = r.tolist()
+
+    w = np.array([table.weight(u) for u in units], dtype=np.float64)
+    unlisted = [u for u in units if not table.is_listed(u)]
     return ScoreResult(
-        score=float(np.dot(w, r)),
+        score=float(np.dot(w, np.array(unit_rates, dtype=np.float64))) if units else 0.0,
+        aggregation=aggregation,
         n_approach=int(np.sum(w > 0)),
         n_avoidance=int(np.sum(w < 0)),
-        n_zero=int(sum(1 for l in labels if table.is_listed(l) and table.weight(l) == 0)),
-        n_unlisted=n_unlisted,
-        unlisted_labels=tuple(unlisted),
+        n_zero=int(sum(1 for u in units if table.is_listed(u) and table.weight(u) == 0)),
+        n_unlisted=len(unlisted),
+        unlisted_labels=tuple(sorted(set(unlisted))),
+        n_instances=len(labels),
+        type_rates=type_rates,
     )
 
 
@@ -207,7 +254,8 @@ class ReadoutDecision:
     margin: float  # |score_yes - score_no|
     margin_threshold: float
     table_name: str
-    n_weighted: int  # MBON instances carrying nonzero weight in the table
+    n_weighted: int  # voting units (types, or instances) carrying nonzero weight
+    aggregation: str = DEFAULT_AGGREGATION
 
 
 def decide(
@@ -216,18 +264,19 @@ def decide(
     labels: Sequence[str],
     table: SignTable,
     margin_threshold: float = 0.0,
+    aggregation: str = DEFAULT_AGGREGATION,
 ) -> ReadoutDecision:
     """Option B: score both framings, take the higher, ABSTAIN unless the margin
     exceeds ``margin_threshold``.
 
-    Raises ValueError if NO label in ``labels`` carries nonzero weight in
+    Raises ValueError if NO voting unit in ``labels`` carries nonzero weight in
     ``table`` - that is a labelling/config mismatch (e.g. wrong label format),
     and silently abstaining forever would hide it.
     """
     if not margin_threshold >= 0.0:
         raise ValueError("margin_threshold must be >= 0")
-    yes = circuit_score(rates_yes, labels, table)
-    no = circuit_score(rates_no, labels, table)
+    yes = circuit_score(rates_yes, labels, table, aggregation)
+    no = circuit_score(rates_no, labels, table, aggregation)
     if yes.n_weighted == 0:
         raise ValueError(
             f"no MBON label has nonzero weight in sign table {table.name!r} "
@@ -247,4 +296,51 @@ def decide(
         margin_threshold=float(margin_threshold),
         table_name=table.name,
         n_weighted=yes.n_weighted,
+        aggregation=aggregation,
     )
+
+
+class DecisionTally:
+    """Running count of readout choices; tracks the ABSTENTION RATE.
+
+    ``record`` accepts a ``Choice``, its string value, or a ``ReadoutDecision``.
+    Abstention rate = abstained / all decisions recorded (NaN before any).
+    Report it next to the forecast metrics: a system that abstains on most
+    markets can look accurate on the few it acts on.
+    """
+
+    def __init__(self) -> None:
+        self.n_yes = 0
+        self.n_no = 0
+        self.n_abstain = 0
+
+    def record(self, decision: Union[Choice, str, "ReadoutDecision"]) -> Choice:
+        choice = decision.choice if isinstance(decision, ReadoutDecision) else Choice(decision)
+        if choice == Choice.YES:
+            self.n_yes += 1
+        elif choice == Choice.NO:
+            self.n_no += 1
+        else:
+            self.n_abstain += 1
+        return choice
+
+    @property
+    def n_decisions(self) -> int:
+        return self.n_yes + self.n_no + self.n_abstain
+
+    @property
+    def n_acted(self) -> int:
+        return self.n_yes + self.n_no
+
+    @property
+    def abstention_rate(self) -> float:
+        return self.n_abstain / self.n_decisions if self.n_decisions else float("nan")
+
+    def summary(self) -> Dict[str, float]:
+        return {
+            "n_decisions": self.n_decisions,
+            "n_yes": self.n_yes,
+            "n_no": self.n_no,
+            "n_abstain": self.n_abstain,
+            "abstention_rate": self.abstention_rate,
+        }

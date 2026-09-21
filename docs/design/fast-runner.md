@@ -203,3 +203,57 @@ needed. Each fast run writes one small CSV
 (`fast_mbon_cue_a_duration_ms_1000_trials_5_..._seed_S.csv`). Step (3) prints the
 mean old-vs-new distance against the 5.10 Hz bound, the 8-MBON sign check, and
 the ACCEPTED / NOT-ACCEPTED verdict.
+
+## 6. Per-neuron-rate variant (added 2026-09-21; not yet run on the real model)
+
+**Why.** `run_cue` gives every stimulated neuron the *same* rate. The learning
+encoder ([`mb-learning-interface.md`](mb-learning-interface.md), 4a) drives
+several feature pools at *different* rates in one run, so it needs a rate per
+neuron. `fast_runner.py` now has `run_cue_rates(bundle, rates_by_flyid, n_trials,
+base_seed, exp_name)`, where `rates_by_flyid` is `{FlyWire root ID: Hz}` (the
+encoder's `Stimulus.rates_by_kc_id()` produces exactly this).
+
+**The scalar path is unchanged.** `run_cue` is byte-for-byte the code it was
+(checked by diffing its source against the previous version); only the module
+docstring, `--self-test` help text and `main()`'s self-test call were touched.
+`run_cue_rates` is added beside it and does the same things in the same order:
+seed once before the trial loop, `store()`/`restore()` between trials,
+save-then-reapply of synaptic weights across each restore (so learned weights
+persist), the same spike collection and return values. The one intended
+difference is that `pin.rates` receives a per-neuron vector instead of a scalar
+broadcast. The per-trial set-up (everything up to `net.run`) lives in a small
+helper, `_apply_trial_state`, used only by the new function, so it can be tested
+without running a simulation. (The trial loop is therefore duplicated between the
+two functions; `run_cue` was deliberately not refactored so that the path the
+existing results came from stays exactly as it was.)
+
+**Stricter input handling than `run_cue`.** `run_cue` silently skips a root ID it
+cannot find. `run_cue_rates` raises on an unknown ID, on a non-integer ID key
+(float64 cannot hold a 64-bit root ID exactly: neighbouring IDs collapse), and on
+a negative or non-finite rate, because a silently dropped stimulus would corrupt
+an experiment. Neurons at exactly 0 Hz are not treated as stimulated (their
+refractory period is not cleared).
+
+**Self-test (no model, no `net.run`).** `--self-test` now also runs
+`self_test_rates()`, on tiny four-neuron networks. It checks: the rate vector and
+driven indices; that 64-bit IDs stay exact; that bad input raises; that a
+distinct rate lands on each neuron of a `PoissonGroup`; that the refractory
+period is cleared only on driven neurons; that `restore()` resets state; that
+learned weights survive it; and that a second stimulus *replaces* the first
+rather than adding to it. All pass (run 2026-09-21). Each check was confirmed
+able to fail by deliberately breaking the code in a scratch copy (skipping the
+weight re-apply, using a scalar rate, clearing the refractory period on all
+neurons). What this does **not** cover: `run_cue_rates` itself, which needs
+`net.run`.
+
+**Unverified.** With every rate equal, `run_cue_rates` performs the same
+operations as `run_cue`, so for the same seed it is *expected* to give the same
+spikes. That has not been checked; it needs one paired real run. Also unchanged
+and still unverified: the fast path's equivalence to the existing path
+(section 4), which has never been run.
+
+```bash
+# no-model checks (the original weight-persistence check plus the new one)
+uv run --python .venv-shiu/bin/python --no-project -- \
+  .venv-shiu/bin/python repro/mushroom_body/fast_runner.py --self-test
+```

@@ -167,11 +167,11 @@ def test_stimulus_kcs_belong_to_the_right_pool_at_the_right_rate():
         pool = set(enc.pools[name].tolist())
         rates = {r for i, r in zip(st.kc_ids.tolist(), st.rates_hz.tolist()) if i in pool}
         assert rates == {st.feature_rates_hz[name]}
-    assert st.feature_rates_hz["price"] == pytest.approx(0.7 * 150.0)
+    assert st.feature_rates_hz["price"] == pytest.approx(30.0 + 0.7 * (150.0 - 30.0))  # 114 Hz
 
 
 def test_driven_drops_zero_rate_kcs():
-    enc = make_encoder()
+    enc = make_encoder(min_rate_hz=0.0)  # explicit override: the default (30 Hz) has no zero-rate pool
     st = enc.encode({**FEATURES, "price": 0.0}, "YES")  # price pool at 0 Hz
     ids, rates = st.driven()
     assert (rates > 0).all()
@@ -185,8 +185,8 @@ def test_option_b_no_price_is_one_minus_p():
     assert pair.yes.side == "YES" and pair.no.side == "NO"
     assert pair.yes.feature_values["price"] == pytest.approx(0.7)
     assert pair.no.feature_values["price"] == pytest.approx(0.3)
-    assert pair.yes.feature_rates_hz["price"] == pytest.approx(105.0)
-    assert pair.no.feature_rates_hz["price"] == pytest.approx(45.0)
+    assert pair.yes.feature_rates_hz["price"] == pytest.approx(30.0 + 0.7 * 120.0)  # 114 Hz
+    assert pair.no.feature_rates_hz["price"] == pytest.approx(30.0 + 0.3 * 120.0)  # 66 Hz
 
 
 def test_option_b_stimuli_differ_only_where_intended():
@@ -236,3 +236,69 @@ def test_mirroring_applies_after_clipping():
     assert pair.yes.feature_values["price"] == 1.0
     assert pair.no.feature_values["price"] == 0.0
     assert pair.no.feature_rates_hz["price"] == enc.params.min_rate_hz
+
+
+# ---- runner hand-off -------------------------------------------------------- #
+def test_rates_by_kc_id_is_the_runner_mapping_with_exact_python_int_ids():
+    enc = make_encoder()
+    st = enc.encode(FEATURES, "YES")
+    m = st.rates_by_kc_id()
+    assert len(m) == st.kc_ids.size
+    assert all(type(k) is int and type(v) is float for k, v in m.items())
+    assert set(m) <= set(KC_IDS)  # exact 64-bit IDs survive
+    for name in FEATURES:  # per-feature rate lands on that feature's pool
+        assert {m[int(i)] for i in enc.pools[name]} == {st.feature_rates_hz[name]}
+
+
+def test_rates_by_kc_id_driven_only_drops_zero_rate_kcs():
+    enc = make_encoder(min_rate_hz=0.0)  # explicit override: the default (30 Hz) has no zero-rate pool
+    st = enc.encode({**FEATURES, "price": 0.0}, "YES")  # price pool at 0 Hz
+    assert set(enc.pools["price"].tolist()) <= set(st.rates_by_kc_id())
+    driven = st.rates_by_kc_id(driven_only=True)
+    assert all(v > 0 for v in driven.values())
+    assert not set(enc.pools["price"].tolist()) & set(driven)
+
+
+# ---- the decided NO-framing mirroring rule --------------------------------- #
+def test_decided_mirroring_rule_evidence_features_mirror_neutral_ones_do_not():
+    """DECIDED (design doc 4a): price, recent_change and signal are evidence for or
+    against YES, so they flip under NO. time_to_resolution and liquidity mean the
+    same thing for both framings, so they do not."""
+    specs = {f.name: f for f in EncoderParams().features}
+    assert {n for n, f in specs.items() if f.mirror_for_no} == {"price", "recent_change", "signal"}
+    assert {n for n, f in specs.items() if not f.mirror_for_no} == {"time_to_resolution", "liquidity"}
+    enc = make_encoder()
+    pair = enc.option_b_stimuli({**FEATURES, "signal": 0.9})
+    for name in ("price", "recent_change", "signal"):
+        assert pair.yes.feature_values[name] != pair.no.feature_values[name], name
+    assert pair.yes.feature_values["signal"] == pytest.approx(0.9)
+    assert pair.no.feature_values["signal"] == pytest.approx(0.1)
+    for name in ("time_to_resolution", "liquidity"):
+        assert pair.yes.feature_values[name] == pair.no.feature_values[name], name
+
+
+# ---- default rate bounds: nothing below the graded test's lowest rate --------- #
+def test_default_encoder_never_emits_a_rate_below_the_lowest_tested_rate():
+    """The placeholder bounds are 30-150 Hz, the range the graded-rate test covers, so the
+    encoder cannot emit a rate outside anything tested - whatever the inputs, either
+    framing, in or out of range."""
+    enc = KCEncoder(KC_IDS, seed=1)
+    assert (enc.params.min_rate_hz, enc.params.max_rate_hz) == (30.0, 150.0)
+    for price in (-9.0, 0.0, 0.5, 1.0, 9.0):
+        for change in (-5.0, 0.0, 5.0):
+            for tt in (-1.0, 0.0, 400.0):
+                for side in ("YES", "NO"):
+                    st = enc.encode({"price": price, "recent_change": change,
+                                     "time_to_resolution": tt, "liquidity": 0.0, "signal": 0.0},
+                                    side)
+                    assert st.rates_hz.min() >= 30.0 and st.rates_hz.max() <= 150.0
+
+
+def test_at_the_default_minimum_value_a_pool_fires_at_30_hz_not_zero():
+    """Consequence of the 30 Hz floor: no feature pool is silent, even at its minimum value."""
+    enc = KCEncoder(KC_IDS, seed=1)
+    st = enc.encode({"price": 0.0, "recent_change": -0.2, "time_to_resolution": 0.0,
+                     "liquidity": 0.0, "signal": 0.0})
+    assert set(st.feature_rates_hz.values()) == {30.0}
+    ids, rates = st.driven()
+    assert ids.size == st.kc_ids.size  # every pool KC is driven

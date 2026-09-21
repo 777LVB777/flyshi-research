@@ -3,7 +3,8 @@
 Pure numpy/stdlib; no Brian2, no simulation. Two preregistered reward arms:
 
   * profit-based (headline): how much money the decision made or lost;
-  * accuracy-based (comparison): Brier-score improvement of the forecast.
+  * accuracy-based (comparison): Brier-score improvement of the forecast over the
+    market's own quoted probability (decided baseline).
 
 Each is divided by a scale and CLIPPED to [-1, 1] so no single outcome can
 dominate learning (design doc 4c). Positive reward -> PAM (reward family)
@@ -85,18 +86,30 @@ def brier(forecast_prob: float, outcome: int) -> float:
 def brier_improvement_reward(
     forecast_prob: float,
     outcome: int,
+    market_price: float,
     params: Optional[RewardParams] = None,
+    *,
     baseline_prob: Optional[float] = None,
 ) -> Reward:
-    """Accuracy-based reward: ``Brier(baseline) - Brier(forecast)`` (positive when
-    the forecast beat the baseline), scaled and clipped.
+    """Accuracy-based reward: improvement over the MARKET'S OWN forecast.
 
-    ``baseline_prob`` defaults to ``params.brier_baseline_prob`` (0.5). Which
-    baseline is right (0.5 / market price / running base rate) is an OPEN
-    design question; pass the market price here to reward "beat the market".
+    ``Brier(market_price) - Brier(forecast_prob)``: positive when our forecast was
+    closer to the outcome than the market's quoted probability, zero when we
+    simply echoed the market, negative when we did worse. Scaled by
+    ``params.brier_scale`` and clipped to [-1, 1]. (DECIDED baseline; the market
+    price is the demanding baseline of design doc 6.)
+
+    ``market_price`` is required so the baseline cannot be forgotten. Pass
+    ``baseline_prob`` to override it (e.g. 0.5 for an uninformative baseline) -
+    a named variant, not the default. Improvements over a market price are
+    typically small, so the placeholder ``brier_scale`` (0.25) likely makes this
+    arm's dopamine signal weak until it is set from training data (UNVERIFIED).
     """
     p = params or RewardParams()
-    base = p.brier_baseline_prob if baseline_prob is None else baseline_prob
+    price = _finite(market_price, "market_price")
+    if not 0.0 <= price <= 1.0:
+        raise ValueError(f"market_price must be in [0, 1], got {market_price!r}")
+    base = price if baseline_prob is None else baseline_prob
     improvement = brier(base, outcome) - brier(forecast_prob, outcome)
     return _normalise("brier", improvement, p.brier_scale)
 

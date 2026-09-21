@@ -16,7 +16,9 @@ from flyshi_research.learning.plasticity import (  # noqa: E402
     kc_eligibility,
 )
 from flyshi_research.learning.readout import (  # noqa: E402
+    Choice,
     circuit_score,
+    decide,
     load_dopamine_counts,
     load_sign_table,
 )
@@ -251,8 +253,8 @@ def make_net(w0, cmap, params=P):
 
 def test_queue_applies_update_to_the_right_decision(w0, cmap):
     net = make_net(w0, cmap)
-    net.record_decision("mA", pattern(CUE_A))
-    net.record_decision("mB", pattern(CUE_B))
+    net.record_decision("mA", pattern(CUE_A), "YES")
+    net.record_decision("mB", pattern(CUE_B), "YES")
     net.resolve("mA", {"PPL1": 1.0})
     W = net.weights
     assert (W[np.ix_(CUE_A, PPL1_COLS)] < w0[np.ix_(CUE_A, PPL1_COLS)]).all()
@@ -264,7 +266,7 @@ def test_out_of_order_resolution_with_multiple_pending_markets(w0, cmap):
     net = make_net(w0, cmap)
     cue_c = np.arange(20, 30)
     for mid, cue in (("m1", CUE_A), ("m2", CUE_B), ("m3", cue_c)):
-        net.record_decision(mid, pattern(cue))
+        net.record_decision(mid, pattern(cue), "YES")
     assert net.queue.pending_ids() == ["m1", "m2", "m3"]
 
     net.resolve("m3", {"PAM": 0.6})  # last decision resolves first
@@ -291,7 +293,7 @@ def test_resolution_order_does_not_change_result_without_drift(w0, cmap):
     for order in (["m1", "m2", "m3"], ["m3", "m1", "m2"], ["m2", "m3", "m1"]):
         net = make_net(w0, cmap)
         for mid, cue in cues.items():
-            net.record_decision(mid, pattern(cue))
+            net.record_decision(mid, pattern(cue), "YES")
         for mid in order:
             net.resolve(mid, outcomes[mid])
         results.append(net.weights.copy())
@@ -300,7 +302,7 @@ def test_resolution_order_does_not_change_result_without_drift(w0, cmap):
 
 def test_resolve_unknown_market_raises_and_changes_nothing(w0, cmap):
     net = make_net(w0, cmap)
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m1", pattern(CUE_A), "YES")
     with pytest.raises(UnknownMarketError):
         net.resolve("ghost", {"PPL1": 1.0})
     assert np.array_equal(net.weights, w0) and len(net.queue) == 1
@@ -308,7 +310,7 @@ def test_resolve_unknown_market_raises_and_changes_nothing(w0, cmap):
 
 def test_failed_resolution_keeps_market_pending(w0, cmap):
     net = make_net(w0, cmap)
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m1", pattern(CUE_A), "YES")
     with pytest.raises(ValueError, match="not in compartment map"):
         net.resolve("m1", {"PPL2": 1.0})  # typo'd dopamine type
     assert "m1" in net.queue and np.array_equal(net.weights, w0)
@@ -320,7 +322,7 @@ def test_resolve_applies_drift_after_depression(w0, cmap):
     p = PlasticityParams(learning_rate=0.5, floor_fraction=0.2, drift_rate=0.1,
                          drift_steps_per_resolution=2, kc_rate_ref_hz=100.0)
     net = make_net(w0, cmap, p)
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m1", pattern(CUE_A), "YES")
     W = net.resolve("m1", {"PPL1": 1.0})
     expected = drift(depress(w0, w0, pattern(CUE_A), {"PPL1": 1.0}, cmap, p), w0, p, 2)
     assert np.allclose(W, expected)
@@ -330,8 +332,8 @@ def test_no_dopamine_resolution_only_drifts_and_dequeues(w0, cmap):
     p = PlasticityParams(learning_rate=0.5, floor_fraction=0.2, drift_rate=0.1,
                          drift_steps_per_resolution=1, kc_rate_ref_hz=100.0)
     net = make_net(w0, cmap, p)
-    net.record_decision("m0", pattern(CUE_A))
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m0", pattern(CUE_A), "YES")
+    net.record_decision("m1", pattern(CUE_A), "YES")
     net.resolve("m0", {"PPL1": 1.0})
     before = net.weights.copy()
     net.resolve("m1", {})  # e.g. reward exactly 0 -> reward.dopamine_signal(...).strengths() == {}
@@ -343,17 +345,17 @@ def test_weights_view_is_read_only_and_reset_restores(w0, cmap):
     net = make_net(w0, cmap)
     with pytest.raises(ValueError):
         net.weights[0, 0] = 9.0
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m1", pattern(CUE_A), "YES")
     net.resolve("m1", {"PPL1": 1.0})
-    net.record_decision("m2", pattern(CUE_B))
+    net.record_decision("m2", pattern(CUE_B), "YES")
     net.reset()
     assert np.array_equal(net.weights, w0) and len(net.queue) == 0
-    net.record_decision("m2", pattern(CUE_B))  # id is free again after reset
+    net.record_decision("m2", pattern(CUE_B), "YES")  # id is free again after reset
 
 
 def test_advance_is_drift_only(w0, cmap):
     net = make_net(w0, cmap)
-    net.record_decision("m1", pattern(CUE_A))
+    net.record_decision("m1", pattern(CUE_A), "YES")
     net.resolve("m1", {"PPL1": 1.0})
     dev = np.abs(net.weights - w0).sum()
     net.advance(20)
@@ -402,7 +404,7 @@ def test_repeated_punishment_on_one_cue_leaves_the_other_cue_untouched(w0, cmap)
     for params in (P, PlasticityParams()):
         net = make_net(w0, cmap, params)
         for i in range(200):
-            net.record_decision(f"m{i}", pattern(CUE_A))
+            net.record_decision(f"m{i}", pattern(CUE_A), "YES")
             net.resolve(f"m{i}", {"PPL1": 1.0})  # punish cue A every time
         W = net.weights
 
@@ -427,7 +429,7 @@ def test_punishment_lowers_only_the_punished_cues_circuit_score(w0, cmap):
     base_a, base_b = score(w0, CUE_A), score(w0, CUE_B)
     net = make_net(w0, cmap)
     for i in range(50):
-        net.record_decision(f"m{i}", pattern(CUE_A))
+        net.record_decision(f"m{i}", pattern(CUE_A), "YES")
         net.resolve(f"m{i}", {"PPL1": 1.0})
     assert score(net.weights, CUE_A) < base_a  # punished cue: weaker approach drive
     assert score(net.weights, CUE_B) == base_b  # other cue: unchanged
@@ -449,7 +451,7 @@ def test_reward_raises_and_punishment_lowers_a_cues_score(w0, cmap):
     base = score(w0)
     for outcome, direction in ((-0.8, -1), (+0.8, +1)):
         net = make_net(w0, cmap)
-        net.record_decision("m", pattern(CUE_A))
+        net.record_decision("m", pattern(CUE_A), "YES")
         sig = dopamine_signal(profit_reward(outcome))
         net.resolve("m", sig.strengths())
         assert direction * (score(net.weights) - base) > 0, outcome
@@ -459,7 +461,7 @@ def test_cues_that_share_kcs_do_interfere_on_the_shared_rows(w0, cmap):
     """Documents the limit of the guarantee: it is per-KC. Overlapping pools share rows."""
     overlap_b = np.concatenate([CUE_B, CUE_A[:2]])  # shares KCs 0 and 1 with cue A
     net = make_net(w0, cmap)
-    net.record_decision("m", pattern(CUE_A))
+    net.record_decision("m", pattern(CUE_A), "YES")
     net.resolve("m", {"PPL1": 1.0})
     W = net.weights
     assert (W[np.ix_(CUE_A[:2], PPL1_COLS)] < w0[np.ix_(CUE_A[:2], PPL1_COLS)]).all()
@@ -467,3 +469,108 @@ def test_cues_that_share_kcs_do_interfere_on_the_shared_rows(w0, cmap):
     rates_before = toy_rates(w0, pattern(overlap_b))
     rates_after = toy_rates(W, pattern(overlap_b))
     assert not np.array_equal(rates_before, rates_after)
+
+
+# ---- abstention: no learning update ---------------------------------------- #
+DRIFTY = PlasticityParams(learning_rate=0.5, floor_fraction=0.2, drift_rate=0.1,
+                          drift_steps_per_resolution=3, kc_rate_ref_hz=100.0)
+
+
+def test_abstain_queues_nothing_and_is_counted(w0, cmap):
+    net = make_net(w0, cmap)
+    assert net.record_decision("m1", pattern(CUE_A), Choice.ABSTAIN) is False
+    assert len(net.queue) == 0 and "m1" not in net.queue
+    assert net.tally.n_abstain == 1 and net.tally.abstention_rate == 1.0
+    assert net.record_decision("m2", pattern(CUE_A), "YES") is True  # acted -> queued
+    assert len(net.queue) == 1 and net.tally.n_yes == 1
+    assert net.tally.abstention_rate == 0.5
+
+
+def test_resolving_an_abstained_market_changes_nothing_at_all(w0, cmap):
+    """No learning update on ABSTAIN: no depression AND no drift, even with drift on
+    and weights that are currently away from baseline."""
+    net = make_net(w0, cmap, DRIFTY)
+    net.record_decision("learn", pattern(CUE_A), "YES")
+    net.resolve("learn", {"PPL1": 1.0})
+    before = net.weights.copy()
+    assert not np.array_equal(before, w0)  # weights are away from baseline
+    net.record_decision("skip", pattern(CUE_B), "ABSTAIN")
+    after = net.resolve("skip", {"PPL1": 1.0, "PAM": 1.0})  # even if a reward was supplied
+    assert np.array_equal(after, before)  # bit-identical: neither depressed nor drifted
+    assert net.n_abstained_resolved == 1 and net.n_updates_applied == 1
+    assert "skip" not in net._abstained  # forgotten once resolved
+
+
+def test_acted_resolution_still_drifts_so_the_abstain_no_op_is_meaningful(w0, cmap):
+    net = make_net(w0, cmap, DRIFTY)
+    net.record_decision("learn", pattern(CUE_A), "YES")
+    net.resolve("learn", {"PPL1": 1.0})
+    dev = np.abs(net.weights - w0).sum()
+    net.record_decision("acted", pattern(CUE_B), "NO")
+    net.resolve("acted", {})  # acted but nothing to teach -> drift only
+    assert np.abs(net.weights - w0).sum() < dev
+
+
+def test_abstention_rate_is_tracked_across_a_run(w0, cmap):
+    net = make_net(w0, cmap)
+    choices = ["YES", "ABSTAIN", "NO", "ABSTAIN", "ABSTAIN", "YES", "ABSTAIN", "NO"]
+    for i, c in enumerate(choices):
+        net.record_decision(f"m{i}", pattern(CUE_A), c)
+    assert net.tally.summary() == {"n_decisions": 8, "n_yes": 2, "n_no": 2, "n_abstain": 4,
+                                   "abstention_rate": 0.5}
+    assert len(net.queue) == 4  # only the four acted decisions are pending
+
+
+def test_choice_is_required_and_validated(w0, cmap):
+    net = make_net(w0, cmap)
+    with pytest.raises(TypeError):
+        net.record_decision("m1", pattern(CUE_A))  # type: ignore[call-arg]
+    with pytest.raises(ValueError):
+        net.record_decision("m1", pattern(CUE_A), "MAYBE")
+    assert net.tally.n_decisions == 0  # failed registrations are not counted
+    with pytest.raises(ValueError, match="kc_pattern is required"):
+        net.record_decision("m1", None, "YES")
+    assert net.tally.n_decisions == 0 and len(net.queue) == 0
+    net.record_decision("m1", None, "ABSTAIN")  # pattern is ignored for ABSTAIN
+
+
+def test_duplicate_market_ids_rejected_across_acted_and_abstained(w0, cmap):
+    net = make_net(w0, cmap)
+    net.record_decision("a", pattern(CUE_A), "YES")
+    net.record_decision("b", pattern(CUE_A), "ABSTAIN")
+    with pytest.raises(DuplicateMarketError):
+        net.record_decision("a", pattern(CUE_B), "ABSTAIN")
+    with pytest.raises(DuplicateMarketError):
+        net.record_decision("b", pattern(CUE_B), "YES")
+    assert net.tally.n_decisions == 2  # the rejected calls were not counted
+
+
+def test_discard_and_reset_clear_abstained_markets_and_tally(w0, cmap):
+    net = make_net(w0, cmap)
+    net.record_decision("b", None, "ABSTAIN")
+    net.discard("b")
+    net.record_decision("b", None, "ABSTAIN")  # id is free again
+    net.reset()
+    assert net.tally.n_decisions == 0 and net._abstained == set()
+    with pytest.raises(UnknownMarketError):
+        net.resolve("b", {})  # reset forgot it
+
+
+def test_readout_to_plasticity_pipeline_only_learns_from_acted_decisions(w0, cmap):
+    """decide() -> record_decision(choice) -> resolve(): abstained markets teach nothing."""
+    table = load_sign_table("circuit_80")
+    weak = [0.0] * len(LABELS)
+    strong = [0.0] * len(LABELS)
+    strong[0] = 50.0  # MBON11 (approach-like) fires in the YES framing only
+    net = make_net(w0, cmap)
+    acted = decide(strong, weak, LABELS, table, margin_threshold=10.0)  # margin 50 -> YES
+    tie = decide(weak, weak, LABELS, table, margin_threshold=10.0)  # -> ABSTAIN
+    assert acted.choice == Choice.YES and tie.choice == Choice.ABSTAIN
+    net.record_decision("acted", pattern(CUE_A), acted.choice)
+    net.record_decision("skipped", pattern(CUE_B), tie.choice)
+    net.resolve("skipped", {"PPL1": 1.0})
+    assert np.array_equal(net.weights, w0)  # abstained market: nothing learned
+    net.resolve("acted", {"PPL1": 1.0})
+    assert (net.weights[np.ix_(CUE_A, PPL1_COLS)] < w0[np.ix_(CUE_A, PPL1_COLS)]).all()
+    assert np.array_equal(net.weights[CUE_B], w0[CUE_B])
+    assert net.tally.abstention_rate == 0.5

@@ -10,9 +10,9 @@ Design (docs/design/mb-learning-interface.md, 4a):
   * Option B (4b) needs two stimuli per decision: "YES at price p" and
     "NO at price 1 - p".
 
-Note for whoever wires this to the runner: ``repro/mushroom_body/fast_runner.run_cue``
-currently takes ONE scalar rate for the whole stimulated set. A ``Stimulus`` has a
-per-KC rate array, so the runner will need a per-neuron-rate variant.
+Runner hand-off: ``Stimulus.rates_by_kc_id()`` gives the ``{root_id: Hz}`` mapping
+that ``repro/mushroom_body/fast_runner.run_cue_rates`` consumes (the scalar-rate
+``run_cue`` cannot express per-feature rates).
 """
 
 from __future__ import annotations
@@ -63,6 +63,13 @@ class Stimulus:
         """(kc_ids, rates_hz) restricted to KCs with rate > 0."""
         keep = self.rates_hz > 0
         return self.kc_ids[keep], self.rates_hz[keep]
+
+    def rates_by_kc_id(self, driven_only: bool = False) -> Dict[int, float]:
+        """``{kc_root_id: rate_hz}`` - the plain mapping the per-neuron-rate runner
+        (``fast_runner.run_cue_rates``) takes. Root IDs come out as Python ints, so
+        no precision is lost. ``driven_only`` drops KCs at 0 Hz."""
+        ids, rates = self.driven() if driven_only else (self.kc_ids, self.rates_hz)
+        return {int(i): float(r) for i, r in zip(ids.tolist(), rates.tolist())}
 
 
 @dataclass(frozen=True, eq=False)

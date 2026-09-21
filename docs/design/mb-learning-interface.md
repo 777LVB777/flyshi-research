@@ -1,9 +1,14 @@
 # Mushroom-body learning interface: design record and preregistration
 
-**Status: design record, written before implementation.** No learning code
-exists yet. This document says what we decided, why, what is still unknown, and
-what we will not claim. It is meant to be revised; see "How to give feedback"
-at the end.
+**Status: design record, written before implementation and revised since.** The
+"pure logic" parts (the input encoder, the readout, the reward signal and the
+learning rule) now exist as tested code that works on plain arrays of numbers.
+**None of it has been run against the brain model**, and one thing it depends on
+— whether the circuit's output follows *how hard* a cell group is driven — has
+never been tested (Section 8; the test is written down in advance in
+[`graded-encoding.md`](graded-encoding.md)). This document says what we decided,
+why, what is still unknown, and what we will not claim. It is meant to be
+revised; see "How to give feedback" at the end. Revision history: Section 13.
 
 A note on who this is for: this document is written to be read by people with
 no background in neuroscience, machine learning, or finance. Every special term
@@ -252,12 +257,69 @@ The **value** of each feature is turned into a **firing rate**: a bigger value
 makes that feature's pool of Kenyon cells fire faster. The pools are chosen once
 with a fixed random seed, so they never change and never overlap.
 
+**How the "NO" framing treats each feature (decided 2026-09-21).** Section 4b
+presents every market twice: as "YES at price *p*" and as "NO at price 1 − *p*".
+For the NO presentation, a feature's value is **mirrored** — replaced by its
+opposite within its allowed range, so a price of 0.7 becomes 0.3 — if it is
+*evidence for or against YES*, and left alone if it *means the same thing for
+both framings*:
+
+| Feature | Under NO | Why |
+|---|---|---|
+| Price | mirrored (*p* → 1 − *p*) | It is the market's probability of YES; seen from the NO side the same fact reads 1 − *p*. |
+| Recent price change | mirrored (up ↔ down) | A rising price is good news for YES and bad news for NO. |
+| Signal (synthetic markets only) | mirrored | It is built to carry evidence about the outcome, so it points the opposite way from the NO side. |
+| Time to resolution | not mirrored | Days left is a fact about the market, not about a side. |
+| Liquidity | not mirrored | How thin the market is is likewise the same from either side. |
+
+The rationale: "YES at *p*" and "NO at 1 − *p*" are the *same* bet seen from two
+sides, so evidence must flip and market facts must not. If we mirrored the
+side-neutral features we would invent a difference between the two framings that
+the market does not contain; if we failed to mirror the evidence features, both
+framings would show the circuit the same evidence and it could not tell them
+apart. A consequence we want: at price 0.5 with a flat price history and a
+neutral signal, the two framings are identical, the two scores tie, and the
+system abstains. **Unverified:** only the price rule (*p* → 1 − *p*) was fixed
+before the code was written; mirroring recent change and the signal is our
+extension of it, and we have no evidence yet that the circuit responds to the
+mirrored inputs usefully. The signal feature also assumes the synthetic signal
+points toward YES; if it is defined differently it must be re-examined.
+
 **Why.** Direct Kenyon-cell stimulation is the only input route we have shown to
 be clean (no spread, fully separable). Giving each feature its own dedicated,
 non-overlapping pool means the circuit can, in principle, tell the features
 apart. Using a fixed seed makes the whole thing reproducible.
 
-**What could go wrong.** Real Kenyon cells do not normally receive input this
+**What could go wrong.** *Graded rates are untested.* Every simulation so far
+drove cells at one rate (150 Hz), so we know the circuit tells *which* cells were
+driven, but not whether its output changes in an orderly way with *how hard* they
+are driven. Encoding a value as a rate depends on exactly that. The test, with its
+acceptance criterion fixed in advance, is in
+[`graded-encoding.md`](graded-encoding.md); **it has not been run.** It has three
+possible outcomes. *Accepted*: the readout changes monotonically across the whole
+tested range (30–150 Hz) by more than the noise. *Usable range*: the change across
+the whole range is large enough, but monotonicity breaks at the top or bottom
+(saturation at high rates is plausible neuron behaviour); provided the longest
+monotonic stretch of at least three rates *itself* changes the readout by more
+than the noise, the encoder's rate bounds must be restricted to that stretch before
+any learning experiment. *Fail*: the whole-range change is within the noise, or no
+monotonic stretch of at least three rates exists, or the chosen stretch's own
+change is within the noise; then value encoding by rate fails and the encoder must
+change before any learning experiment.
+
+**Encoder rate bounds (decided 2026-09-21).** The encoder maps a feature's lowest
+value to a minimum firing rate and its highest to a maximum. **After the graded
+test runs, that minimum and maximum must equal the validated range**: all five
+tested rates (30 to 150 Hz) if the test is accepted, or the chosen stretch if it is
+a usable range. **Until then the placeholder is 30 to 150 Hz**, the range the test
+will cover: the minimum was changed from 0 to 30 Hz so the encoder cannot emit a
+rate below anything tested. One consequence: no feature's group of cells is ever
+silent, even at that feature's lowest value. These bounds are placeholders (and
+unverified) until the test has been run and checked against them; the code can
+build and check them (`encoder_params_for`, `require_encoder_matches` in
+`graded_check.py`).
+
+Real Kenyon cells do not normally receive input this
 way, so this is an engineered interface, not a biological claim — we are using
 the circuit as a substrate, not modeling how a fly actually senses markets.
 Also, hand-assigning one pool per feature builds in a structure we chose; if the
@@ -280,13 +342,17 @@ presenting two separate framings of the same market:
 - once as **"NO at price 1 − p"**
 
 (if the market prices "yes" at 0.6, then "no" is priced at 0.4). We score each
-run on its own. The **score** is the activity of output neurons assigned an
-**approach-like** sign minus the activity of output neurons assigned an
-**avoidance-like** sign by the CIRCUIT rule — explained just below. We then pick whichever framing (YES or NO) scored higher,
+run on its own. The **score** adds up the activity of output neurons assigned an
+**approach-like** sign and subtracts the activity of output neurons assigned an
+**avoidance-like** sign by the CIRCUIT rule — explained just below — with one
+detail, decided 2026-09-21, about how neurons of the same kind are combined
+(the **per-type mean**, also explained below). We then pick whichever framing
+(YES or NO) scored higher,
 **but only if the gap between the two scores clears a threshold**. The threshold
 is set using training data only (never the final test data). If the gap is too
 small, the system **abstains** — it declines to decide, which is a valid,
-zero-stake action in our setup.
+zero-stake action in our setup. An abstention also **teaches the circuit
+nothing** (Section 4d), and we always report the **abstention rate** (Section 5).
 
 Three terms:
 
@@ -310,9 +376,38 @@ Three terms:
   preregistered robustness readouts. STRICT uses only individually supported
   activation-valence labels; GROUP adds explicitly declared group-level labels.
   Any result that appears only under CIRCUIT will be reported as CIRCUIT-only.
-- **Threshold:** a minimum confidence gap required before we act.
+- **Cell type and instance:** the model has 96 output neurons, but they come in
+  a few dozen *types* (MBON01, MBON02, …), each type having one or more
+  individual neurons — its *instances*, typically one or two per brain hemisphere
+  (MBON10 has nine: four on the left, five on the right).
+- **Per-type mean (the default aggregation, decided 2026-09-21):** first
+  **average the firing rates of the instances within each type**, then apply the
+  sign (+1, −1 or 0) and add the types up, so **each type gets one vote,
+  regardless of how many instances it has.** The alternative — adding up every
+  instance — would let a type with many instances dominate for a purely
+  anatomical reason. The concrete case is MBON10: it has nine instances (six
+  responded in our data) and is an "atypical" output neuron whose input branches
+  lie largely outside the mushroom-body lobes, so a raw sum would give it the
+  loudest voice in the score for a reason unrelated to what the circuit computes.
+  **Sum-over-instances remains available in the code as a named variant
+  (`instance_sum`), not as the default**; it is *not* one of the preregistered
+  robustness checks unless we add it. Two consequences: (i) the threshold below
+  is measured in different units under the two aggregations, so a threshold set
+  under one is not valid under the other; (ii) **the mean is only as good as the
+  list of instances it is given** — it must include the silent instances (rate
+  0) of every type, in whichever hemispheres we decide to count, because
+  averaging only the neurons that fired would inflate each type by a different,
+  arbitrary factor. Which instances to count (both hemispheres, or left only) is
+  **not settled by this document**; the graded-encoding test fixes a choice (all
+  instances in both hemispheres) for its own purposes, and it is listed as open
+  in Section 8.
+- **Threshold:** a minimum confidence gap required before we act. Its units
+  depend on the aggregation above.
 - **Abstain:** choosing not to bet. In our markets, abstaining costs and earns
-  nothing.
+  nothing, and (decided 2026-09-21) it causes **no learning update** — see 4d.
+  Because a system that abstains often could look accurate on the few decisions
+  it does make, the **abstention rate** is a tracked output of the readout and is
+  reported next to every forecast metric.
 
 **Why.** Scoring the two framings separately and taking the difference is a
 simple, symmetric way to turn neural activity into a yes/no lean plus a
@@ -378,7 +473,14 @@ seeds:
   the decision made or lost.
 - **Accuracy-based reward (comparison arm):** the teaching signal is how much
   the *forecast* improved, measured by the improvement in **Brier score** (a
-  forecast-accuracy measure defined in Section 5).
+  forecast-accuracy measure defined in Section 5). **Improvement over what?**
+  Decided 2026-09-21: **over the market's own quoted probability.** The reward is
+  the market's Brier error minus our Brier error on that market: zero if we
+  merely echoed the market's price, positive if our forecast landed closer to what
+  happened than the market's did, negative if the market's was closer. So this arm
+  rewards *beating the market*, not merely being better than a coin flip. (An
+  alternative baseline of 0.5, "no opinion", is available in the code as a named
+  variant, not the default.)
 
 **Why two reward types, and why profit alone is a noisy teacher.** Profit is a
 *noisy* signal because you can be right and still lose (a good forecast can lose
@@ -392,7 +494,15 @@ by us; we include it as motivation, not as established fact). Teaching also from
 accuracy gives a cleaner, less luck-driven signal to compare against.
 
 **What could go wrong.** The clip-and-normalize details are not yet settled
-(Section 8), and different choices could change results. Directly stimulating
+(Section 8), and different choices could change results. One consequence of the
+market-price baseline is already visible: market prices are good forecasts, so
+our improvement over them will usually be *small* — a forecast two percentage
+points better than the market on a YES outcome improves the Brier error by only
+about 0.016, which is 6% of the placeholder scale (0.25) we currently divide by.
+Until that scale is set from training data, the accuracy arm's teaching signal is
+likely to be weak (**unverified**; the placeholder is not a tuned value). The
+accuracy arm also needs a *probability* forecast from us, which comes from the
+calibration step discussed in 4b and is not yet specified. Directly stimulating
 dopamine neurons is, again, an engineered teaching route, not a claim about how
 flies learn.
 
@@ -437,6 +547,17 @@ specific market finally resolves, we pull its saved pattern off the queue and
 apply the learning update then. This lets a delayed outcome teach the circuit
 about the decision it actually caused.
 
+**Abstentions teach nothing (decided 2026-09-21).** Only decisions we actually
+*acted on* (chose YES or NO) go into the queue. If the readout abstained on a
+market, nothing is saved, and when that market resolves **no learning update
+happens at all** — neither the weakening of connections nor the slow drift back
+toward the original values. The weights are left exactly as they were. Two
+consequences to keep in mind: the slow drift only advances when an acted-on
+market resolves (time passing with no resolutions can be advanced separately);
+and an abstained market's outcome carries no lesson for the circuit, so a system
+that abstains a lot learns slowly. This is why the abstention rate is tracked
+and reported.
+
 **What could go wrong.** The learning could still collapse or saturate despite
 the floor and drift; the "recently active" window and the drift speed are
 tuning choices that could dominate results. (The earlier worry that the built-in
@@ -477,6 +598,11 @@ being right or wrong. Reporting only profit would hide most of them.
   crash along the way may be unusable in practice.
 - **Turnover** — how much trading the strategy does. High turnover means high
   cost exposure and is a warning sign.
+- **Abstention rate** — the fraction of markets on which the system chose not to
+  decide. It matters because abstaining is free: a system can look accurate simply
+  by acting only when it is nearly certain. It also controls how much the circuit
+  gets to learn (abstentions teach nothing, 4d). Reported alongside every other
+  number, for every arm.
 - **Performance across multiple seeds** — we rerun everything with many
   different random seeds and report the spread of results, not one lucky run.
 - **Bootstrap intervals** — a way of estimating uncertainty by repeatedly
@@ -546,10 +672,23 @@ forecasts are the honesty check.
 
 Stated without softening. These are real, and some could stop the project.
 
-- **MBON valence labels are missing.** We do not yet have citations telling us
-  which output neurons are "approach" and which are "avoidance." The Section 4b
-  readout **cannot be built** until we do, and we will not invent them. This is
-  the single most immediate blocker.
+- **MBON valence labels: the table exists; three key claims still need
+  spot-checking.** The table of which output neurons are "approach-like" and
+  which "avoidance-like" is in [`mbon-valence.md`](mbon-valence.md) (22 output-
+  neuron types, each with the strength of its evidence). It was compiled with an AI
+  research assistant, and its three key claims are **still to be spot-checked
+  against the original papers**: MBON11 approach (Aso et al. 2014b, *eLife*
+  3:e04580, Fig. 2C); MBON21 avoidance (Rubin & Aso 2023, *eLife* RP90523,
+  Fig. 3H–I); MBON02 attraction (Mohammad et al. 2024, *PLOS Biology*). **The
+  adopted readout is CIRCUIT at the 80% threshold** (Section 4b), with 70% and 90%
+  as preregistered sensitivity checks. CIRCUIT's signs come from each output
+  neuron's direct dopamine wiring, not from these behavioural labels, so the
+  readout can be built and does not wait on the labels. The labels are used by the
+  STRICT and GROUP robustness checks and to judge where CIRCUIT agrees with
+  behaviour (it disagrees for MBON08 and MBON09, which is reported, not
+  corrected), so the spot-check must be done before those results are reported.
+  CIRCUIT's compartment map is itself an inference from wiring and is
+  **unverified** at compartment level.
 - **Cue separation at the readout — RESOLVED (was flagged "could be fatal").**
   We originally worried that the two cues' output patterns differed by a cosine
   distance of only **about 0.05** (Section 3d), and that this might be too small
@@ -567,9 +706,40 @@ Stated without softening. These are real, and some could stop the project.
   random 100-Kenyon-cell cue sets, **not** for the eventual market-feature
   encoding (Section 4a), whose separability **must be checked separately** once
   that encoding exists.
+- **Graded encoding is untested.** Whether the readout changes monotonically,
+  and by more than the noise, as one cell group is driven at 30, 60, 90, 120 and
+  150 Hz has never been measured; all results so far used 150 Hz. The test and its
+  pre-stated acceptance criterion are in
+  [`graded-encoding.md`](graded-encoding.md); it has **not been run**. Its rule was
+  revised, before the run, to three outcomes: accepted; usable range (the encoder's
+  rate bounds are then set to equal the longest monotonic stretch of at least three
+  rates, which must itself change the readout by more than the noise, before any
+  learning experiment); or fail (value encoding by rate fails and the encoder must
+  change before any learning experiment). Until it runs, the encoder's placeholder
+  rate bounds are 30 to 150 Hz.
+- **Which output-neuron instances enter the per-type mean is open.** The mean
+  (Section 4b) must be taken over every instance of a type, silent ones included,
+  but whether that means both hemispheres (right-hemisphere output neurons do
+  respond, sometimes strongly, even though we only stimulate left-hemisphere
+  Kenyon cells) or only the left has not been decided. The choice changes each
+  type's mean by an instance-count-dependent factor. The graded-encoding test
+  uses all instances in both hemispheres; that is a choice for that test, not a
+  settled design decision.
 - **Reward normalization is unsettled.** The exact clip-and-normalize scheme for
   the teaching signal (Section 4c) is not decided, and different choices could
-  change the outcome.
+  change the outcome. (The accuracy arm's scale is a separate open item, next.)
+- **The accuracy-arm reward scale must be set before the preregistered
+  experiment.** The accuracy arm divides its Brier improvement over the market
+  price by a scale before clipping (Section 4c). The placeholder is 0.25, the
+  largest improvement possible over a 0.5 baseline, but improvements over a market
+  price are much smaller: a 2-point edge over the market (forecast 0.62 against a
+  price of 0.60, and YES happens) improves the Brier error by 0.0156, which is
+  currently only about 6% of the placeholder scale, so the teaching signal is weak.
+  No tuned value exists (**unverified**); the scale must be set from training data
+  only and frozen before the preregistered experiment, never tuned on its results.
+- **The pace of the slow drift is unsettled.** It advances only when an acted-on
+  market resolves (Section 4d); whether one "step" should instead mean one
+  resolution, one trading day, or something else is open.
 - **The market data source is not chosen.** We have not selected which real
   prediction-market dataset to use.
 - **Speed is unmeasurable locally.** On the 8-gigabyte Mac, run timings are
@@ -676,7 +846,37 @@ This document is meant to be argued with and revised.
 
 ---
 
+## 13. Revision log
+
+- **2026-09-21.** Decisions recorded: (1) the NO-framing mirroring rule for each
+  feature and its rationale (4a); (2) the readout averages MBON instances within
+  each cell type first and gives each type one vote, with sum-over-instances kept
+  as a named variant (4b); (3) accuracy reward is Brier improvement over the
+  market's own price (4c); (4) abstentions trigger no learning update, and the
+  abstention rate is tracked and reported (4b, 4d, 5). Also: the graded-rate
+  encoding test and its pre-stated criterion were written down, unrun
+  ([`graded-encoding.md`](graded-encoding.md)); the status line was updated now
+  that the pure-logic code exists. Nothing here has been validated against the
+  brain model.
+- **2026-09-21 (later).** (1) The graded-rate test's verdict rule was revised,
+  before any run, from two outcomes to three (accepted / usable range / fail); 4a
+  and Section 8 describe the new consequences. (2) Section 8's stale claim that the
+  MBON valence labels are missing and the readout cannot be built was replaced with
+  the current status: the table exists ([`mbon-valence.md`](mbon-valence.md)), its
+  three key claims still await spot-checking, and CIRCUIT at 80% is the adopted
+  readout; the closing note had the same stale wording and was corrected too.
+  (3) Added an open item: the accuracy-arm reward scale must be set before the
+  preregistered experiment.
+- **2026-09-21 (later still).** (1) The graded-rate test's rule gained a *sub-range
+  gate*, added before any run: a usable range must also have its own endpoint
+  distance clear 3 × the noise floor, or the verdict is fail. (2) Encoder rate
+  bounds: after the graded test they must equal the validated range; meanwhile the
+  placeholder minimum rate was changed from 0 to 30 Hz (4a). Neither has been run
+  or validated.
+
+---
+
 *Unverified items are marked "unverified" inline throughout. No citations were
-invented; where a citation is required but not yet in hand (most importantly the
-approach/avoidance neuron labels of Section 4b), that gap is stated as a gap
-rather than filled.*
+invented; where a citation is required but not yet in hand (most importantly the three key
+claims of the MBON valence table, which still need spot-checking against the
+original papers), that gap is stated as a gap rather than filled.*

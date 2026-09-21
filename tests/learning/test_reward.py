@@ -58,41 +58,80 @@ def test_brier_values():
     assert brier(0.7, 0) == pytest.approx(0.49)
 
 
-def test_brier_improvement_sign_follows_forecast_quality():
-    good = brier_improvement_reward(0.9, 1, P)  # better than 0.5 baseline
-    bad = brier_improvement_reward(0.1, 1, P)  # worse than baseline
-    assert good.value > 0 and bad.value < 0
-    assert good.kind == "brier"
-    assert brier_improvement_reward(0.5, 1, P).value == 0.0  # same as baseline
+def test_brier_improvement_is_measured_against_the_market_price():
+    """DECIDED baseline: accuracy reward = improvement over the market's own forecast."""
+    # market says 0.6, YES happens. Forecast 0.9 is closer than 0.6 -> reward.
+    better = brier_improvement_reward(0.9, 1, market_price=0.6, params=P)
+    assert better.raw == pytest.approx((0.6 - 1) ** 2 - (0.9 - 1) ** 2)  # 0.16 - 0.01
+    assert better.value > 0 and better.kind == "brier"
+    # Forecast 0.5 is worse than the market's 0.6 -> punishment (it would have BEATEN a 0.5 baseline).
+    worse = brier_improvement_reward(0.5, 1, market_price=0.6, params=P)
+    assert worse.value < 0
+
+
+def test_echoing_the_market_earns_exactly_zero_whatever_happens():
+    for price in (0.05, 0.6, 0.97):
+        for outcome in (0, 1):
+            r = brier_improvement_reward(price, outcome, price, P)
+            assert r.raw == 0.0 and r.value == 0.0
+            assert dopamine_signal(r, P).family is None  # nothing to teach
+
+
+def test_brier_improvement_sign_follows_who_was_closer():
+    assert brier_improvement_reward(0.9, 1, 0.7, P).value > 0  # we were closer
+    assert brier_improvement_reward(0.4, 1, 0.7, P).value < 0  # market was closer
+    assert brier_improvement_reward(0.1, 0, 0.3, P).value > 0  # closer on a NO outcome
 
 
 def test_brier_improvement_is_symmetric_across_outcomes():
-    assert brier_improvement_reward(0.8, 1, P).value == \
-        pytest.approx(brier_improvement_reward(0.2, 0, P).value)
+    assert brier_improvement_reward(0.8, 1, 0.6, P).value == \
+        pytest.approx(brier_improvement_reward(0.2, 0, 0.4, P).value)
 
 
 def test_brier_improvement_scaling_and_clipping():
-    perfect = brier_improvement_reward(1.0, 1, P)  # 0.25 improvement / 0.25 scale
+    perfect = brier_improvement_reward(1.0, 1, market_price=0.5, params=P)  # 0.25 / 0.25
     assert perfect.value == pytest.approx(1.0) and not perfect.clipped
-    worst = brier_improvement_reward(0.0, 1, P)  # -0.25
+    worst = brier_improvement_reward(0.0, 1, market_price=0.5, params=P)  # -0.25
     assert worst.value == pytest.approx(-1.0)
-    # vs a strong baseline the same forecast can improve by more than the scale -> clipped
-    r = brier_improvement_reward(1.0, 1, P, baseline_prob=0.0)  # improvement 1.0 / 0.25
+    # against a confident-and-wrong market the same forecast beats it by more than the scale
+    r = brier_improvement_reward(1.0, 1, market_price=0.0, params=P)  # improvement 1.0 / 0.25
     assert r.clipped and r.value == 1.0
 
 
-def test_brier_baseline_can_be_market_price():
-    r = brier_improvement_reward(0.6, 1, P, baseline_prob=0.6)
-    assert r.value == 0.0  # "same as the market" earns nothing
+def test_brier_reward_against_market_is_small_for_small_edges():
+    """Documents why the placeholder brier_scale (0.25) is probably too big here."""
+    # a 2-point edge over the market (0.62 vs 0.60, YES happens): improvement
+    # 0.16 - 0.1444 = 0.0156, i.e. only ~6% of the 0.25 scale.
+    r = brier_improvement_reward(0.62, 1, market_price=0.60, params=P)
+    assert r.raw == pytest.approx(0.0156)
+    assert 0 < r.value < 0.1
+    assert dopamine_signal(r, P).rate_hz < 0.1 * P.dopamine_max_rate_hz
+
+
+def test_baseline_override_is_a_named_variant_not_the_default():
+    """baseline_prob=0.5 recovers the old uninformative-baseline behaviour."""
+    default = brier_improvement_reward(0.9, 1, market_price=0.6, params=P)
+    variant = brier_improvement_reward(0.9, 1, market_price=0.6, params=P, baseline_prob=0.5)
+    assert variant.raw == pytest.approx(0.25 - 0.01)
+    assert variant.raw != default.raw
+
+
+def test_market_price_is_required():
+    with pytest.raises(TypeError):
+        brier_improvement_reward(0.9, 1)  # type: ignore[call-arg]
 
 
 def test_brier_rejects_bad_inputs():
     with pytest.raises(ValueError):
-        brier_improvement_reward(1.2, 1, P)
+        brier_improvement_reward(1.2, 1, 0.5, P)
     with pytest.raises(ValueError):
-        brier_improvement_reward(0.5, 2, P)
+        brier_improvement_reward(0.5, 2, 0.5, P)
     with pytest.raises(ValueError):
-        brier_improvement_reward(float("nan"), 1, P)
+        brier_improvement_reward(float("nan"), 1, 0.5, P)
+    with pytest.raises(ValueError):
+        brier_improvement_reward(0.5, 1, 1.5, P)  # market price outside [0, 1]
+    with pytest.raises(ValueError):
+        brier_improvement_reward(0.5, 1, float("nan"), P)
 
 
 # ---- dopamine mapping ------------------------------------------------------ #
@@ -129,6 +168,6 @@ def test_zero_reward_and_dead_zone_give_no_stimulation():
 
 def test_profit_and_accuracy_arms_can_disagree_on_the_same_market():
     """Right forecast that still lost money: accuracy rewards, profit punishes."""
-    accuracy = dopamine_signal(brier_improvement_reward(0.6, 1, P), P)
+    accuracy = dopamine_signal(brier_improvement_reward(0.7, 1, market_price=0.5, params=P), P)
     profit = dopamine_signal(profit_reward(-0.3, P), P)  # e.g. lost to spread/fees
     assert accuracy.family == Family.PAM and profit.family == Family.PPL1
