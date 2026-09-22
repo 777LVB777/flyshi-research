@@ -1,11 +1,12 @@
 # Fast runner: build the network once, reset between trials
 
-**Status: prepared and unit-tested; the real model runs have NOT been executed
-here (you run them).** This documents the reusable-network fast path
-(`repro/mushroom_body/fast_runner.py`), why it should be faster, how synaptic
-weights are handled across resets (critical for the future learning design), and
-the pre-stated equivalence criteria and commands — written **before** the
-equivalence run.
+**Status: the equivalence test has been run and PASSED** (git commit `6a00cdd`;
+see "Results" at the end of Section 4). This documents the reusable-network fast
+path (`repro/mushroom_body/fast_runner.py`), why it should be faster, how
+synaptic weights are handled across resets (critical for the future learning
+design), and the pre-stated equivalence criteria and commands, written **before**
+the equivalence run. The per-neuron-rate variant (`run_cue_rates`, Section 6) has
+still NOT been executed against the real model.
 
 ## 1. What happens per trial today, and what dominates
 
@@ -166,6 +167,31 @@ The comparison itself is analysis-only: `repro/mushroom_body/compare_equivalence
 reads the old and new CSVs and prints both criteria and the verdict. It does not
 run any simulation.
 
+### Results (run 2026-09-21; git commit `6a00cdd`)
+
+The full equivalence test was run: cue A, 1000 ms / 5 trials, `--kc-set-seed
+20260316`, `--pn-rate 150`, seeds 20260317–20260321, fast path, compared against
+the existing-path reference CSVs from the noise-floor experiment (outputs and log
+in `repro/mushroom_body/run_log_fast_full.txt`).
+
+**Verdict: ACCEPTED.**
+
+- **Criterion 1 (mean distance ≤ 5.10 Hz):** per-seed old-vs-new distances were
+  5.463, 3.231, 6.053, 3.904, and 4.382 Hz; **mean = 4.606 Hz** — PASS.
+- **Criterion 2 (all 8 discriminator signs match):** **8/8** — PASS (MBON03,
+  MBON02, MBON07·90134, MBON07·02365, MBON04, MBON26, MBON11, MBON23 all kept
+  their established sign under the new path).
+- **Speedup observed:** `build_seconds` was 4.6 s on the first run and 1.3–1.5 s
+  on subsequent runs in the same process; `sim_seconds_total` was 44–48 s per
+  5-trial run, against the existing path's ≈28 s per single-cue run (rebuild
+  every trial) — the amortised comparison in the design above.
+
+This satisfies the dependency that `docs/design/first-learning-test.md` and
+`docs/design/synthetic-market-experiment.md` name as a prerequisite for those
+experiments; those documents' own text was written before this run and is
+updated separately to record it. This result does **not** cover `run_cue_rates`
+(Section 6), which has not been run against the real model.
+
 ## 5. Commands to run yourself
 
 Run in a normal terminal; each real run is a Brian2 simulation, so use
@@ -248,9 +274,59 @@ neurons). What this does **not** cover: `run_cue_rates` itself, which needs
 
 **Unverified.** With every rate equal, `run_cue_rates` performs the same
 operations as `run_cue`, so for the same seed it is *expected* to give the same
-spikes. That has not been checked; it needs one paired real run. Also unchanged
-and still unverified: the fast path's equivalence to the existing path
-(section 4), which has never been run.
+spikes. That has not been checked; it needs one paired real run. **Section 4's
+equivalence test, by contrast, has since been run and PASSED** (git commit
+`6a00cdd`; see the Results at the end of Section 4) — but that test exercised
+`run_cue` (a scalar rate), not `run_cue_rates`, so it does not by itself verify
+`run_cue_rates`.
+
+### Pre-stated check: `run_cue_rates`, uniform-rate case (prepared; NOT yet run)
+
+**Question.** Our learning code calls `run_cue_rates`, not `run_cue`, and
+`run_cue_rates` has never executed a real `net.run`. This checks the smallest
+case where the two are expected to agree exactly: every stimulated neuron given
+the *same* rate.
+
+**Design (fixed).** Stimulate cue A's full 100-KC pool (`--kc-set-seed
+20260316`) through `run_cue_rates`, giving **every** one of those 100 KCs the
+identical **150 Hz** rate (via an explicit per-neuron rate map, not a scalar
+argument) — mathematically the same stimulus `run_cue`'s scalar path already
+delivers. Same seeds, duration, and trial count as the Section 4 equivalence
+test: **1000 ms / 5 trials, seeds 20260317–20260321**.
+
+**Pre-stated criteria (identical to Section 4, applied to `run_cue_rates`
+instead of `run_cue`):**
+
+1. Mean Euclidean distance between the `run_cue_rates` output and the existing
+   old-path cue-A reference (`mbon_noise_floor_cue_a_..._seed_S.csv`), averaged
+   over the 5 seeds, **≤ 5.10 Hz** (the same measured same-cue noise floor).
+2. All 8 consistent discriminating MBONs (the same set as Section 4) keep the
+   same established sign of the cue-A − cue-B difference.
+
+A bonus, non-gating diagnostic also compares the `run_cue_rates` output
+directly against the already-ACCEPTED `run_cue` output at the same seeds and
+rate (expected distance ≈ 0 Hz if `run_cue_rates` truly reduces to `run_cue`
+when every rate is equal); it cannot by itself change the verdict.
+
+**Implementation, not yet run:** `repro/mushroom_body/run_rates_uniform_check.py`
+(the simulation; writes `fast_rates_mbon_cue_a_..._seed_S.csv`) and
+`repro/mushroom_body/compare_rates_equivalence.py` (analysis only, no
+simulation; reads the CSVs and prints both criteria, the verdict, and the bonus
+diagnostic).
+
+```bash
+# (1) SIMULATION — one seed at a time, all 5 needed; on macOS use caffeinate -i
+for S in 20260317 20260318 20260319 20260320 20260321; do
+  caffeinate -i uv run --python .venv-shiu/bin/python --no-project -- \
+    .venv-shiu/bin/python repro/mushroom_body/run_rates_uniform_check.py --seed "$S"
+done
+
+# (2) COMPARE against the existing-path reference (analysis only, no simulation)
+uv run --python .venv-shiu/bin/python --no-project -- \
+  .venv-shiu/bin/python repro/mushroom_body/compare_rates_equivalence.py
+```
+
+Neither script has been executed as part of preparing this section.
 
 ```bash
 # no-model checks (the original weight-persistence check plus the new one)

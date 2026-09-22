@@ -180,8 +180,11 @@ risk**). Each process owns one network.
 
 Each run is 1000 ms × 5 trials, so these are 75,000 or 100,000 simulated
 trial-seconds respectively, plus network builds. Wall-clock time and memory on the
-server are **unverified**. The fast runner equivalence test and a real
-`run_cue_rates` execution remain prerequisites.
+server are **unverified**. The fast runner equivalence test has since been run
+and PASSED (git commit `6a00cdd`; mean old-vs-new distance 4.61 Hz against the
+5.10 Hz tolerance; all 8 discriminator signs correct —
+[`fast-runner.md`](fast-runner.md), section 4). A real `run_cue_rates` execution
+remains a prerequisite.
 
 The runner's `--dry-run` path imports no Brian2 backend, builds no network, and writes
 nothing. The parallel launcher follows the first-learning launcher pattern and limits

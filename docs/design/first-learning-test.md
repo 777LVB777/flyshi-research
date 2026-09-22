@@ -270,19 +270,22 @@ trial-seconds in total, plus one network build per process. **Wall-clock time is
 unknown.** Timings on this 8-GB machine are unusable
 ([`speed-calibration.md`](speed-calibration.md)).
 
-**This estimate, and the whole test, depends on the fast runner, whose equivalence
-test against the existing path has not been run**
-([`fast-runner.md`](fast-runner.md), section 4). In addition, `run_cue_rates` has
+**This estimate, and the whole test, depends on the fast runner. Its equivalence
+test against the existing path has since been run and PASSED**
+(git commit `6a00cdd`; mean old-vs-new distance 4.61 Hz against the 5.10 Hz
+tolerance; all 8 discriminator signs correct —
+[`fast-runner.md`](fast-runner.md), section 4). In addition, `run_cue_rates` has
 never executed a real `net.run` (only its no-simulation self-test). The criteria
 above do not rely on the fast runner matching the old path, because the noise is
 measured within this test on the same path. But a broken fast path (for example,
 state leaking between presentations) would invalidate everything. Control (a)
 would expose some but not all such problems. (One relevant fact in the other
 direction: in the graded-rate test, the 150 Hz run reproduced the earlier set-A run at
-the same seed to 0.00 Hz, so the *existing* path is deterministic per seed. There is
-no such evidence yet for the fast path.) **Run the fast-runner equivalence test
-first.** Note that 50 of the 260 runs are control (c), which is now only a reported
-diagnostic; dropping it would reduce the total to 210.
+the same seed to 0.00 Hz, so the *existing* path is deterministic per seed. The
+fast-runner equivalence test now provides the analogous evidence for the fast
+path.) **The fast-runner equivalence test's dependency is satisfied.** Note that
+50 of the 260 runs are control (c), which is now only a reported diagnostic;
+dropping it would reduce the total to 210.
 
 Run in parallel (Section 10), the wall-clock time is set by the longest chain: one
 condition's 40 sequential training runs plus one 2-run test job, **42 runs**, however
