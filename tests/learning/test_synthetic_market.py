@@ -147,7 +147,7 @@ def test_parallel_launcher_dry_run_starts_no_process(tmp_path, capsys) -> None:
     assert not any(tmp_path.iterdir())
 
 
-# ---- drift-off condition and the left-only recompute (decided 2026-09-22) ---- #
+# ---- drift-off condition and the left-only post-hoc rescoring (2026-09-22) ---- #
 def test_drift_off_is_its_own_condition_and_runs_with_drift_disabled() -> None:
     cfg = replace(small_config(), plasticity=PlasticityParams(learning_rate=0.3, drift_rate=0.25))
     out = sm.run_dataset(FakeMarketSimulator(True), cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT_DRIFT_OFF)
@@ -186,14 +186,17 @@ def test_runs_save_per_mbon_rates_and_the_instance_labels() -> None:
 
 
 def test_left_only_rescoring_adds_no_simulation_and_keeps_the_run_untouched() -> None:
+    """Post-hoc rescoring of the runs as they happened. Unlike the first learning test
+    this is NOT exact: the loop here is closed (score -> action -> teaching), so the
+    decision loop is not replayed and the saved run must be left untouched."""
     cfg = small_config()
     sim = FakeMarketSimulator(True)
     out = sm.run_dataset(sim, cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT)
     sides = {int(i): ("left" if n == 0 else "right") for n, i in enumerate(sim.mbon_ids)}
     calls_before = sim.present_calls
-    left = sm.left_only_scores(out, cfg, sides=sides)
+    left = sm.left_only_rescore(out, cfg, sides=sides)
     assert sim.present_calls == calls_before  # nothing was simulated
     assert left["n_instances"] == 1 and left["side"] == "left"
     assert len(left["test"]) == len(out["test"])
     assert all(0.0 <= row["raw_probability"] <= 1.0 for row in left["test"])
-    assert left["note"].startswith("re-scored from saved rates")
+    assert left["note"].startswith("post-hoc rescoring")

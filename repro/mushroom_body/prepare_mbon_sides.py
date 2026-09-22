@@ -4,9 +4,9 @@
 Reads the pinned FlyWire annotation TSV and Completeness_783.csv only (no
 connectivity parquet, no simulation) and writes
 ``src/flyshi_research/learning/data/mbon_sides_783.json``, which
-``flyshi_research.learning.mbon_sides`` loads. The left-only readout
-(a preregistered sensitivity check, decided 2026-09-22) is computed from saved
-per-MBON rates using this table.
+``flyshi_research.learning.mbon_sides`` loads. The left-only POST-HOC RESCORING
+(preregistered 2026-09-22; never an arm or condition) uses this table on saved
+per-MBON rates.
 
     .venv-shiu/bin/python repro/mushroom_body/prepare_mbon_sides.py [--check]
 """
@@ -54,8 +54,13 @@ def build() -> tuple[dict, str]:
         "decision": "docs/design/open-decisions.md item 2, resolved 2026-09-22",
         "description": (
             "Frozen side label per modelled MBON instance. The PRIMARY readout uses all "
-            "instances in both hemispheres; the left-only readout is a preregistered "
-            "sensitivity check and is recomputed from saved per-MBON rates."
+            "instances in both hemispheres. Left-hemisphere-only is a preregistered "
+            "POST-HOC RESCORING of saved per-MBON rates, never an arm or condition. It is "
+            "exact in the first learning test, whose teaching signal comes from the "
+            "condition and not the readout, so a left-only system would have run identical "
+            "simulations; it is not exact in the closed-loop synthetic market "
+            "(score -> action -> teaching), where it rescores the runs as they actually "
+            "happened and cannot show what a left-only system would have done."
         ),
         "annotation_source": dict(ANNOTATION_SOURCE),
         "completeness_source": {"path": COMPLETENESS_SOURCE},

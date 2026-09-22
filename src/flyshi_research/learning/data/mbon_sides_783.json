@@ -15,7 +15,7 @@
     "right": 48
   },
   "decision": "docs/design/open-decisions.md item 2, resolved 2026-09-22",
-  "description": "Frozen side label per modelled MBON instance. The PRIMARY readout uses all instances in both hemispheres; the left-only readout is a preregistered sensitivity check and is recomputed from saved per-MBON rates.",
+  "description": "Frozen side label per modelled MBON instance. The PRIMARY readout uses all instances in both hemispheres. Left-hemisphere-only is a preregistered POST-HOC RESCORING of saved per-MBON rates, never an arm or condition. It is exact in the first learning test, whose teaching signal comes from the condition and not the readout, so a left-only system would have run identical simulations; it is not exact in the closed-loop synthetic market (score -> action -> teaching), where it rescores the runs as they actually happened and cannot show what a left-only system would have done.",
   "expected_mbon_count": 96,
   "flywire_version": "783",
   "records": [

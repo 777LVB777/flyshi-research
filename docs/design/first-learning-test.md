@@ -293,16 +293,23 @@ plan unchanged: **260 runs, 35 jobs, 5 conditions.** The drift-off condition is
 carried by the synthetic-market experiment instead
 ([`synthetic-market-experiment.md`](synthetic-market-experiment.md), Section 3).
 
-**The left-only readout adds no runs (decided 2026-09-22).** Like every other
-readout variant in Section 5b, it is recomputed from the per-MBON rates already
-saved for each test presentation. The results directory also stores
-`mbon_ids.json` (MBON root IDs in rate-vector order) so those rates can be matched
-to the frozen side table in
-`src/flyshi_research/learning/data/mbon_sides_783.json`. Because this test's
-teaching signal is fixed by the condition and not by the readout, the
-recomputation is exact. If the simulator reports MBON IDs that are absent from
-the frozen table, the check is reported as NOT COMPUTED; it never blocks a
-verdict.
+**Left-only is a POST-HOC RESCORING and adds no runs (decided 2026-09-22).** It
+is never an arm or a condition. Like every other readout variant in Section 5b, it
+is computed from the per-MBON rates already saved for each test presentation; the
+results directory also stores `mbon_ids.json` (MBON root IDs in rate-vector order)
+so those rates can be matched to the frozen side table in
+`src/flyshi_research/learning/data/mbon_sides_783.json`.
+
+**In this test the rescoring is EXACT.** The teaching signal here comes from the
+condition, not from the readout, so a left-only system would have run identical
+simulations and the rescoring coincides with what it would have done. **This does
+not carry over to the synthetic-market experiment**, whose loop is closed (score →
+action → teaching): there the rescoring only reads the runs as they actually
+happened and cannot show what a left-only system would have done
+([`synthetic-market-experiment.md`](synthetic-market-experiment.md), Section 3).
+
+If the simulator reports MBON IDs absent from the frozen table, the rescoring is
+reported as NOT COMPUTED; it never blocks a verdict.
 
 Run in parallel (Section 10), the wall-clock time is set by the longest chain: one
 condition's 40 sequential training runs plus one 2-run test job, **42 runs**, however
@@ -442,8 +449,12 @@ with its own copy of the network, and writes its own file:
 - **2026-09-22, before any run: sensitivity checks placed.** Drift-disabled is
   **not** added to this test (its 260-run plan, 35 jobs and 5 conditions are
   unchanged); it is a training condition of the synthetic-market experiment. The
-  left-only readout is recomputed from saved per-MBON rates, so it adds no runs;
-  `mbon_ids.json` is now written next to `mbon_labels.json` to make that possible.
+  left-only readout is a post-hoc rescoring of saved per-MBON rates — never an arm
+  or condition — so it adds no runs; `mbon_ids.json` is now written next to
+  `mbon_labels.json` to make that possible. In this test the rescoring is exact
+  (the teaching signal comes from the condition, not the readout, so a left-only
+  system would have run identical simulations); in the closed-loop synthetic
+  market it is not.
   No criterion, seed, parameter or run count of this test changed.
 - **2026-09-22, before any run: project-owner decisions recorded**
   ([`open-decisions.md`](open-decisions.md)). The drift clock (one step per acted

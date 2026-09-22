@@ -42,7 +42,7 @@ from .reward import dopamine_signal, profit_reward
 
 CUE_A, CUE_B = "A", "B"
 NOISE_MARGIN = 3.0
-LEFT_ONLY_KEY = "circuit_80|left_only"
+LEFT_ONLY_KEY = "circuit_80|left_only_rescored"
 
 # ---- verdicts ------------------------------------------------------------------ #
 DEMONSTRATED = "LEARNING DEMONSTRATED"
@@ -316,7 +316,7 @@ class ResultPaths:
         return self.dir / "mbon_labels.json"
 
     def mbon_ids(self) -> Path:
-        """MBON root IDs in rate-vector order; needed by the left-only check."""
+        """MBON root IDs in rate-vector order; needed by the left-only rescoring."""
         return self.dir / "mbon_ids.json"
 
     def pretest_part(self, seed: int) -> Path:
@@ -398,8 +398,8 @@ class Experiment:
                         "this configuration")
         _write_or_check(self.paths.labels(), json.dumps(list(sim.mbon_labels)),
                         "this simulator's MBON labels")
-        # Saved so the preregistered left-only readout can be recomputed from the
-        # per-MBON rates in the test rows without rerunning anything.
+        # Saved so the preregistered left-only POST-HOC RESCORING can be computed
+        # from the per-MBON rates in the test rows without rerunning anything.
         _write_or_check(self.paths.mbon_ids(), json.dumps([int(i) for i in sim.mbon_ids]),
                         "this simulator's MBON ids")
         self.readout = Readout(sim.mbon_labels, cfg)
@@ -585,7 +585,7 @@ def evaluate_results(results_dir: Path, cfg: ExperimentConfig,
         if P.mbon_ids().exists():
             mbon_ids = json.loads(P.mbon_ids().read_text())
             try:
-                left = left_only_sensitivity(pre, posts, labels, mbon_ids, cfg)
+                left = left_only_rescore(pre, posts, labels, mbon_ids, cfg)
             except KeyError as exc:  # e.g. a fake simulator's invented MBON ids
                 left = {"unavailable": str(exc)}
             out["readout_sensitivity"][LEFT_ONLY_KEY] = left
@@ -687,16 +687,21 @@ def _rescore(rows: Sequence[Mapping], readout: Readout,
              "score_B": score(r["mbon_B"])} for r in rows]
 
 
-def left_only_sensitivity(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping]],
-                          labels: Sequence[str], mbon_ids: Sequence[int],
-                          cfg: ExperimentConfig, side: str = LEFT,
-                          sides: Optional[Dict[int, str]] = None) -> dict:
-    """The primary readout restricted to one hemisphere's MBON instances.
+def left_only_rescore(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping]],
+                      labels: Sequence[str], mbon_ids: Sequence[int],
+                      cfg: ExperimentConfig, side: str = LEFT,
+                      sides: Optional[Dict[int, str]] = None) -> dict:
+    """POST-HOC RESCORING of this test under a left-hemisphere-only readout.
 
-    Preregistered sensitivity check (decided 2026-09-22); REPORTED, never gating.
-    Computed by re-scoring the per-MBON rates already saved for each test
-    presentation, so it adds no simulation. Exact here because the teaching signal
-    in this test is fixed by the condition, not by the readout.
+    Preregistered (decided 2026-09-22); REPORTED, never gating, and never an arm or
+    a condition: no run is added.
+
+    EXACT IN THIS TEST. The teaching signal here comes from the condition, not from
+    the readout, so a left-only system would have run identical simulations and this
+    rescoring coincides with what it would have done. That does NOT carry over to the
+    synthetic market, whose loop is closed (score -> action -> teaching): there the
+    rescoring only reads the runs as they actually happened and cannot show what a
+    left-only system would have done (see ``synthetic_market.left_only_rescore``).
     """
     mask = side_mask(mbon_ids, side, sides)
     kept = [label for label, keep in zip(list(labels), mask.tolist()) if keep]

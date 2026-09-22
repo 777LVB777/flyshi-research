@@ -425,8 +425,14 @@ Three terms:
   each type by a different, arbitrary factor. **Which instances to count —
   decided 2026-09-22:** all 96 instances in **both hemispheres** are the primary
   readout, because right-hemisphere output neurons respond to our left-hemisphere
-  input (e.g. a right MBON03 instance fired at ~80 Hz). **Left-hemisphere-only is
-  a preregistered sensitivity check**, with its own margin set from training
+  input (e.g. a right MBON03 instance fired at ~80 Hz). **Left-hemisphere-only
+  exists only as a preregistered POST-HOC RESCORING — never a separate arm,
+  condition or experiment.** In the first learning test that rescoring is *exact*:
+  the teaching signal there comes from the condition rather than the readout, so a
+  left-only system would have run identical simulations. In the synthetic market
+  it is *not*, because that loop is closed (score → action → teaching): it
+  rescores the runs as they actually happened and cannot show what a left-only
+  system would have done. Its margin would have to be set separately from training
   data (see [`open-decisions.md`](open-decisions.md), item 2).
 - **Threshold:** a minimum confidence gap required before we act. Its units
   depend on the aggregation above.
@@ -874,8 +880,11 @@ Stated without softening. These are real, and some could stop the project.
   at the stimuli used in markets is not yet measured.
 - **Which output-neuron instances enter the per-type mean — RESOLVED
   2026-09-22.** All 96 instances, both hemispheres, is primary; left-only is a
-  preregistered sensitivity check (Section 4b). The frozen side table (48 left,
-  48 right) and the per-MBON rate saving needed to recompute it now exist.
+  preregistered **post-hoc rescoring**, never an arm or condition (Section 4b).
+  The frozen side table (48 left, 48 right) and the per-MBON rate saving it needs
+  now exist. Exact in the first learning test (teaching signal fixed by the
+  condition, not the readout); not exact in the closed-loop synthetic market,
+  where it cannot show what a left-only system would have done.
 - **Reward normalization and the accuracy-arm scale — RESOLVED 2026-09-22.**
   `brier_scale = 0.04`, symmetric clipping to [−1, 1], `dead_zone = 0` (Section
   4c). Still **unverified**: whether the 2-point-edge example is typical of the
@@ -1052,15 +1061,16 @@ This document is meant to be argued with and revised.
   [`open-decisions.md`](open-decisions.md)): (1) the degree-preserving shuffle is
   mushroom-body-only (KCs + MBONs + PAM + PPL1 + APL, additions only via a frozen
   annotation rule), whole-network optional and exploratory (6); (2) the readout
-  uses all 96 MBON instances in both hemispheres, left-only as a preregistered
-  sensitivity check (4b); (3) `brier_scale = 0.04`, symmetric [−1, 1] clipping,
+  uses all 96 MBON instances in both hemispheres, with left-only as a
+  preregistered post-hoc rescoring (4b); (3) `brier_scale = 0.04`, symmetric [−1, 1] clipping,
   `dead_zone = 0` (4c); (4) one drift step per acted resolution in controlled and
   real-market phases, drift-off as a preregistered sensitivity check (4d).
   Section 8's four corresponding open items are marked resolved.
 - **2026-09-22 (later still).** The two decisions that needed artifacts got them,
   before any run: the shuffle membership rule is frozen as code with a hashed
   root-ID file, and MBON side labels are frozen so the left-only readout can be
-  recomputed from saved per-MBON rates. The drift-off check runs as its own
+  rescored post hoc from saved per-MBON rates — exact in the first learning test,
+  not exact in the closed-loop synthetic market. The drift-off check runs as its own
   synthetic-market training condition (20,000 runs instead of 15,000); the first
   learning test's 260-run plan is unchanged.
 

@@ -1,4 +1,11 @@
-"""Frozen MBON side labels and the left-only readout (sensitivity check, 2026-09-22)."""
+"""Frozen MBON side labels and the left-only POST-HOC RESCORING (2026-09-22).
+
+Never an arm or a condition. It is exact in the first learning test, whose
+teaching signal comes from the condition and not the readout, so a left-only
+system would have run identical simulations; it is not exact in the closed-loop
+synthetic market (score -> action -> teaching), where it reads the runs as they
+actually happened and cannot show what a left-only system would have done.
+"""
 
 from __future__ import annotations
 
@@ -45,14 +52,14 @@ def test_restrict_keeps_rates_and_labels_aligned():
         restrict_to_side(FAKE_RATES[:3], FAKE_LABELS, FAKE_IDS, LEFT, FAKE_SIDES)
 
 
-def test_left_only_score_equals_scoring_the_left_instances_alone():
+def test_left_only_rescore_equals_scoring_the_left_instances_alone():
     table = load_sign_table("circuit_80")
     left = one_side_score(FAKE_RATES, FAKE_LABELS, FAKE_IDS, table, LEFT, sides=FAKE_SIDES)
     assert left.score == pytest.approx(circuit_score([10.0, 4.0], ["MBON11", "MBON05"], table).score)
     assert left.n_instances == 2
 
 
-def test_left_only_differs_from_the_bilateral_primary_when_the_sides_differ():
+def test_left_only_rescore_differs_from_the_bilateral_primary_when_sides_differ():
     """Silent or differently-driven contralateral instances move the per-type mean,
     which is exactly why the hemisphere choice needed a decision."""
     table = load_sign_table("circuit_80")

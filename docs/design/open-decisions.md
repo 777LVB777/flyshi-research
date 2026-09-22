@@ -172,11 +172,25 @@ the right side would remove a modeled circuit response after it has propagated,
 rather than isolate the input. The left-only sensitivity check will show whether
 the conclusion depends on that choice.
 
+*(Naming note added 2026-09-22 with the decision, so the pre-decision text above
+is not misread: "left-only" is a **post-hoc rescoring**, never an arm or a
+condition. It is exact in the first learning test, whose teaching signal comes
+from the condition and not the readout; in the closed-loop synthetic market it
+rescores the runs as they actually happened and cannot show what a left-only
+system would have done. See the RESOLVED block below.)*
+
 **RESOLVED 2026-09-22 (project owner): all 96 MBON instances, both hemispheres,
 silent instances included at 0 Hz, is the PRIMARY instance set.
-Left-hemisphere-only is a preregistered sensitivity check** (reported, never
-gating; its decision margin calibrated separately on training data because its
-units differ).
+Left-hemisphere-only is a preregistered POST-HOC RESCORING** — never an arm, a
+condition or a separate experiment (reported, never gating; its decision margin
+would have to be calibrated separately on training data because its units differ).
+What it can show differs by experiment: in the **first learning test it is exact**
+— the teaching signal comes from the condition, not the readout, so a left-only
+system would have run identical simulations and the rescoring coincides with what
+it would have done; in the **synthetic market it is not**, because that loop is
+closed (score → action → teaching), so it rescores the runs as they actually
+happened, does not replay the decision loop, and cannot show what a left-only
+system would have done.
 
 *Rationale:* right-side MBONs respond to left-side KC input (e.g. a right
 MBON03 instance fired at ~80 Hz in an existing set-A run), so excluding them
@@ -185,11 +199,9 @@ would discard real circuit output after it has propagated.
 *Done 2026-09-22:* the side labels are frozen in
 `src/flyshi_research/learning/data/mbon_sides_783.json` (96 instances, 48 left and
 48 right, from the pinned annotation release), and both runners save per-MBON
-rates with the MBON root IDs, so the left-only score is recomputed after a run
-with no extra simulation. Caveat for the synthetic market: its decisions and
-weight updates were made under the bilateral readout, so the recomputation
-re-scores those runs rather than replaying the closed loop, and the left-only
-margin would have to be calibrated separately on training markets.
+rates with the MBON root IDs, so the left-only score is rescored after a run with
+no extra simulation — exact in the first learning test, not exact in the
+closed-loop synthetic market. No left-only training arm exists or is planned.
 
 ## 3. Reward normalization and accuracy-arm `brier_scale`
 

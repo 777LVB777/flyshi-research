@@ -396,11 +396,10 @@ def run_dataset(
                 "raw_probability": raw_probability,
                 "action": action.value,
                 "score_difference": difference,
-                # Per-MBON rates are saved so the preregistered left-only readout
-                # can be recomputed after the run (no extra simulation). See
-                # ``left_only_scores``: the decisions and weight updates were made
-                # under the bilateral readout, so the recomputation re-scores these
-                # runs rather than replaying the closed loop.
+                # Per-MBON rates are saved for the preregistered left-only POST-HOC
+                # RESCORING (see ``left_only_rescore``), which adds no simulation and
+                # is never an arm or a condition: it rescores these runs as they
+                # actually happened, it does not replay the decision loop.
                 "mbon_yes": [round(float(x), 4) for x in shown.mbon_yes],
                 "mbon_no": [round(float(x), 4) for x in shown.mbon_no],
             }
@@ -427,16 +426,22 @@ def run_dataset(
     }
 
 
-def left_only_scores(output: Mapping, cfg: SyntheticConfig, side: str = LEFT,
-                     sides: Optional[Dict[int, str]] = None) -> dict:
-    """Re-score a finished job's saved per-MBON rates with one hemisphere only.
+def left_only_rescore(output: Mapping, cfg: SyntheticConfig, side: str = LEFT,
+                      sides: Optional[Dict[int, str]] = None) -> dict:
+    """POST-HOC RESCORING of a finished job under a left-hemisphere-only readout.
 
-    Preregistered sensitivity check (decided 2026-09-22); reported, never gating,
-    and adds no simulation. The actions and weight updates in ``output`` were made
-    under the primary bilateral readout, so this shows what a left-only readout
-    would have said about those same presentations - it is not a rerun of the
-    closed loop, and its score units differ, so its decision margin would have to
-    be calibrated separately on training markets.
+    Preregistered (decided 2026-09-22); reported, never gating, and never an arm or
+    a condition: no run is added.
+
+    NOT EXACT HERE. This experiment's loop is closed - score -> action -> teaching -
+    so a left-only readout would have produced different decisions and different
+    weight updates. This rescores the runs as they actually happened under a
+    left-only readout; it does not replay the decision loop, so it cannot show what
+    a left-only system would have done. (The first learning test differs: its
+    teaching signal comes from the condition, not the readout, so the rescoring
+    there is exact - see ``first_learning.left_only_rescore``.) Its score units also
+    differ, so its decision margin would have to be calibrated separately on
+    training markets.
     """
     labels, mbon_ids = list(output["mbon_labels"]), list(output["mbon_ids"])
     mask = side_mask(mbon_ids, side, sides)
@@ -462,7 +467,8 @@ def left_only_scores(output: Mapping, cfg: SyntheticConfig, side: str = LEFT,
         "condition": output["condition"],
         "strength": output["strength"],
         "market_seed": output["market_seed"],
-        "note": "re-scored from saved rates; decisions and learning were made under the bilateral readout",
+        "note": ("post-hoc rescoring of the runs as they actually happened; the decision loop "
+                 "was not replayed, so this cannot show what a left-only system would have done"),
         "train": rescore(output["train"]),
         "test": rescore(output["test"]),
     }

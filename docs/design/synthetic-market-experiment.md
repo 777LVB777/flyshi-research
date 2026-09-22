@@ -98,16 +98,22 @@ arms differ in signal type rather than size (typicality of that example is
 **unverified**). Drift advances one step per acted-on resolution, the same clock
 the real-market phase will use; `drift_rate = 0.01` is still a placeholder. The
 readout uses all 96 MBON instances in both hemispheres. Left-hemisphere-only
-MBONs and drift disabled are preregistered sensitivity checks; neither changes the
-success criterion in Section 6. Drift-off is the fourth arm above and is in the
-Section 7 job list. The left-only readout adds no runs: every job saves the
+MBONs and drift disabled are both preregistered, and neither changes the success
+criterion in Section 6 — but they are different kinds of thing. Drift-off is the
+fourth *arm* above and is in the Section 7 job list. **Left-only is a POST-HOC
+RESCORING, never an arm or a condition**, and adds no runs: every job saves the
 per-MBON rates of both framings for every market, plus the MBON root IDs and type
-labels, and the check re-scores them against the frozen side table
-(`src/flyshi_research/learning/data/mbon_sides_783.json`). One honest caveat: the
-decisions and weight updates in a saved run were made under the primary bilateral
-readout, so the recomputation shows what a left-only readout would have said about
-those runs; it does not replay the closed loop, and its decision margin would have
-to be calibrated separately on training markets.
+labels, and the rescoring applies the frozen side table
+(`src/flyshi_research/learning/data/mbon_sides_783.json`) to them. **Here the
+rescoring is NOT exact**, because this experiment's loop is closed — score →
+action → teaching — so a left-only readout would have produced different decisions
+and different weight updates. It rescores the runs as they actually happened under
+a left-only readout; it does not replay the decision loop, so it cannot show what
+a left-only system would have done. (The first learning test is the exception: its
+teaching signal comes from the condition and not the readout, so the rescoring
+there is exact — [`first-learning-test.md`](first-learning-test.md), Section 7.)
+The left-only decision margin would also have to be calibrated separately on
+training markets.
 
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
@@ -205,8 +211,8 @@ risk**). Each process owns one network.
   the drift sensitivity check.)
 
 Each job also saves the per-MBON rates of both framings for all 100 markets (for
-the left-only recomputation), about 150 KB per job and roughly 15 MB across the
-sweep — an arithmetic estimate from 96 instances × 2 framings × 100 markets, not a
+the left-only post-hoc rescoring, which adds no runs), about 150 KB per job and
+roughly 15 MB across the sweep — an arithmetic estimate from 96 instances × 2 framings × 100 markets, not a
 measured file size.
 
 Each run is 1000 ms × 5 trials, so this is 100,000 simulated

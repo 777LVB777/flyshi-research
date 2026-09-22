@@ -53,7 +53,10 @@ VARIANT_TEXT = {
     "strict": "STRICT: only confidently labelled MBONs (robustness)",
     "group": "GROUP: group-level behavioural labels (robustness)",
     "circuit_80|instance_sum": "CIRCUIT-80 summed per neuron instead of per type",
-    fl.LEFT_ONLY_KEY: "CIRCUIT-80 over left-hemisphere MBONs only (hemisphere sensitivity)",
+    fl.LEFT_ONLY_KEY: ("CIRCUIT-80 rescored over left-hemisphere MBONs only "
+                       "(post-hoc rescoring; exact for this test, whose teaching signal comes "
+                       "from the condition and not the readout, so a left-only system would "
+                       "have run identical simulations)"),
 }
 
 

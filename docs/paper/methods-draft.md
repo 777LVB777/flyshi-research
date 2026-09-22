@@ -162,8 +162,15 @@ reasons alone) and then summing the signed type averages; an alternative
 aggregation that sums over all instances is implemented but is not the
 default. The primary readout includes all 96 MBON instances in both
 hemispheres, silent instances included, because right-hemisphere MBONs
-respond to our left-hemisphere Kenyon-cell input; a readout restricted to
-left-hemisphere instances is a preregistered sensitivity check. We additionally report two behaviorally grounded, preregistered
+respond to our left-hemisphere Kenyon-cell input. A readout restricted to
+left-hemisphere instances is a preregistered post-hoc rescoring, not a separate
+experimental arm. In the first learning test the teaching signal is determined by
+the experimental condition rather than by the readout, so that rescoring is exact:
+a left-hemisphere-only system would have run identical simulations. In the
+synthetic-market experiment the decision loop is closed, because the readout score
+determines the action and hence the teaching signal, so the rescoring describes
+the runs as they actually occurred and does not establish what a
+left-hemisphere-only system would have done. We additionally report two behaviorally grounded, preregistered
 robustness readouts: STRICT, which uses only individually confirmed
 activation-valence labels, and GROUP, which adds labels established only at
 the level of co-activated neuron groups. CIRCUIT's wiring-derived signs

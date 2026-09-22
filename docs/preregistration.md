@@ -625,8 +625,16 @@ are **unverified synthetic placeholders**."
   to left-side KC input (e.g. a right MBON03 instance at ~80 Hz). The side labels
   are frozen in `src/flyshi_research/learning/data/mbon_sides_783.json` (96
   instances: 48 left, 48 right, from the pinned annotation release), and both
-  runners save per-MBON rates plus MBON root IDs so the left-only score is a
-  post-run recomputation with no extra simulation.
+  runners save per-MBON rates plus MBON root IDs. **The left-only readout exists
+  only as a POST-HOC RESCORING — never an arm, a condition or a separate
+  experiment.** What it can show differs by experiment: in the **first learning
+  test it is exact**, because the teaching signal there comes from the condition
+  and not from the readout, so a left-only system would have run identical
+  simulations and the rescoring coincides with what it would have done; in the
+  **synthetic market it is not exact**, because that loop is closed (score →
+  action → teaching), so it rescores the runs as they actually happened, does not
+  replay the decision loop, and cannot show what a left-only system would have
+  done.
 - **Intensity bias, "problem 4," quoted at length (MB-LEARN, Section 4b):**
   "The score depends strongly on *how hard* the input cells are driven,
   whatever the input means... Except at a price of exactly 0.5, the 'YES at
@@ -720,7 +728,7 @@ added on 2026-09-22 from the project owner's decisions, not from FIRST-LEARN):
 | `strict` | only confidently labelled types (MBON05, MBON21, MBON11, MBON12) | "preregistered robustness check" |
 | `group` | STRICT plus group-level behavioural labels | "preregistered robustness check" |
 | `instance_sum` | `circuit_80` summed per instance instead of per-type mean | "the named aggregation variant" (not one of the preregistered robustness checks per MB-LEARN Section 4b, unless separately added) |
-| left-hemisphere-only MBONs | per-type mean over left-hemisphere instances only; margin calibrated separately on training data | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 2); not gating. **Adds no runs in either experiment:** recomputed from the per-MBON rates each runner saves, against the frozen side table `src/flyshi_research/learning/data/mbon_sides_783.json`. In the synthetic market the decisions and weight updates were made under the bilateral readout, so the recomputation re-scores those runs rather than replaying the closed loop. |
+| left-hemisphere-only MBONs (**POST-HOC RESCORING**, never an arm or condition) | the primary score recomputed over left-hemisphere instances only; margin would have to be calibrated separately on training data | preregistered, decided 2026-09-22 (`open-decisions.md`, item 2); reported, not gating. **Adds no runs in either experiment:** it rescores the per-MBON rates each runner saves, against the frozen side table `src/flyshi_research/learning/data/mbon_sides_783.json`. **Exact in the first learning test** (its teaching signal comes from the condition, not the readout, so a left-only system would have run identical simulations); **not exact in the synthetic market**, whose loop is closed (score → action → teaching) — there it rescores the runs as they actually happened, does not replay the decision loop, and cannot show what a left-only system would have done. |
 | drift disabled | `drift_rate = 0`; everything else unchanged | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 4); not gating. **Run as its own training condition (`profit_drift_off`) in the synthetic-market experiment only** (Section 4.5): drift acts inside the learning loop, so it cannot be recomputed. It is deliberately **not** added to the first learning test, whose 260-run / 35-job / 5-condition plan is unchanged. |
 
 "None of them can change the primary verdict" of the first learning test
@@ -830,9 +838,12 @@ already resolved since MB-LEARN was last revised are marked so.
    is selected; innate-score subtraction is not selected. Its real-model effect
    is still unverified and is tested by item 2.
 4. **RESOLVED 2026-09-22 — MBON instances in the per-type mean.** All 96,
-   both hemispheres, primary; left-only is a preregistered sensitivity check
-   (Section 6.2). The frozen side table (48 left / 48 right) and the per-MBON
-   rate saving both experiments need for the recomputation now exist.
+   both hemispheres, primary; left-only is a preregistered **post-hoc rescoring**,
+   never an arm or condition (Section 6.2). The frozen side table (48 left / 48
+   right) and the per-MBON rate saving it needs now exist. It is exact in the
+   first learning test (teaching signal fixed by the condition, not the readout)
+   and not exact in the closed-loop synthetic market, where it cannot show what a
+   left-only system would have done.
 5. **RESOLVED 2026-09-22 — reward normalization.** Symmetric clipping to
    `[-1, 1]`, `dead_zone = 0` (Section 6.4).
 6. **RESOLVED 2026-09-22 — accuracy-arm reward scale.** `brier_scale = 0.04`,

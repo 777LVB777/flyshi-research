@@ -22,8 +22,13 @@ instance of each type (silent ones at 0 Hz), not just the ones that fired.
 Averaging responders only inflates each type's mean by a different, arbitrary
 factor. This module does not select instances; the caller does. DECIDED
 2026-09-22 (docs/design/open-decisions.md, 2): the primary readout passes all 96
-MBON instances from both hemispheres; left-hemisphere-only is a preregistered
-sensitivity check.
+MBON instances from both hemispheres; left-hemisphere-only exists only as a
+preregistered POST-HOC RESCORING (flyshi_research.learning.mbon_sides), never as
+an arm or condition. It rescores runs as they actually happened under a left-only
+readout: exact in the first learning test, whose teaching signal comes from the
+condition and not the readout, but not in the closed-loop synthetic market
+(score -> action -> teaching), where it cannot show what a left-only system would
+have done.
 
 Sign tables come from data files (``data/``), never from code:
   * ``circuit_<X>``: derived from direct PAM/PPL1->MBON synapse totals with the
