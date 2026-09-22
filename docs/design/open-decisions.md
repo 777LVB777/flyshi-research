@@ -1,0 +1,244 @@
+# Open decisions requiring project-owner sign-off
+
+**Status:** decision brief, written 2026-09-22. No decision is made by this
+document. It consolidates four unresolved items from
+[`docs/preregistration.md`](../preregistration.md), Sections 11–12, against the
+current code. Resource estimates and biological interpretations explicitly
+marked **unverified** have not been checked by a real connectome generation or
+simulation.
+
+## 1. Degree-preserving shuffle scope
+
+The implemented shuffle exchanges the targets of two directed edges while
+leaving their sources, signs, and synapse counts on their original rows. It
+preserves every neuron's row-count in-degree and out-degree exactly, but destroys
+specific partners, motifs, paths, target-specific weighted input, and signed
+input balance inside the selected scope. The two available scopes answer
+different questions.
+
+### Option A — mushroom-body-only
+
+Only rows whose **two endpoints** belong to a frozen mushroom-body neuron list
+are eligible. Boundary edges between an MB neuron and a neuron outside that list,
+and all other central-brain edges, remain unchanged.
+
+What it isolates:
+
+- whether the particular internal mushroom-body wiring—especially the local
+  organization connecting KCs, MBONs, dopamine neurons, and other declared MB
+  neurons—is needed for learning and readout;
+- while retaining the native surrounding network, boundary connections, and
+  broad dynamical operating point.
+
+What it does not isolate:
+
+- it is a weaker null for the claim that the *whole fly connectome* matters;
+- any useful structure carried by unchanged MB boundary edges or the rest of the
+  brain remains available;
+- the result depends on the membership definition. At minimum that definition
+  must explicitly address KCs, MBONs, PAM neurons, PPL1 neurons, and APL. It must
+  be frozen as a root-ID file before generation, rather than adjusted after a
+  result.
+
+Resource cost in the current implementation:
+
+- The entire connectivity parquet is still loaded, copied, validated, indexed,
+  and written. The Python set used to reject duplicate edges also contains the
+  whole network. Peak memory and output-file size are therefore approximately
+  the same as for the whole-network scope: **8.9 GiB estimated peak and 17.9 GiB
+  recommended RAM**, both **unverified** planning figures for 15 million rows.
+- The swap loop requests ten accepted swaps per **eligible MB-internal edge**, so
+  it should take less CPU time than the whole-network shuffle in proportion to
+  the smaller eligible edge set. The eligible count and runtime are **unverified**
+  until the frozen membership and real table are inspected on the server.
+- Subsequent Brian2 simulations still instantiate the full network, so their
+  memory and runtime are not reduced by choosing this scope.
+
+### Option B — whole-network
+
+Every connectivity row is eligible.
+
+What it isolates:
+
+- the broadest null: whether performance requires the fly's particular global
+  partner structure, rather than merely the same neurons, row-degree sequence,
+  and source-attached weight/sign material.
+
+What makes it less diagnostic:
+
+- it can destroy generic propagation, recurrent dynamics, sensory pathways, and
+  downstream structure before the mushroom-body computation is evaluated;
+- therefore, poor performance would not specifically show that KC→MBON or other
+  mushroom-body organization matters. It could simply show that the globally
+  shuffled network no longer occupies a usable dynamical regime.
+
+Resource cost in the current implementation:
+
+- The same **8.9 GiB estimated peak / 17.9 GiB recommended RAM** applies, and the
+  full shuffled parquet has the same scale as the input. These figures remain
+  **unverified**.
+- Ten accepted swaps are requested for each of the roughly 15 million planning
+  rows: approximately 150 million accepted swaps, plus rejected attempts, in a
+  Python loop. Runtime is **unverified** and may be substantial. This is expected
+  to be much slower than an MB-only swap, although both pay the same full-table
+  read, memory, validation, and write costs.
+- Subsequent simulation size and nominal per-run cost are again unchanged.
+
+### Recommendation
+
+Use **mushroom-body-only as the primary structural control**, with a membership
+file frozen before generation, because the intervention then targets the circuit
+whose learning rule and readout are under study while preserving a functioning
+surrounding network. This gives a more interpretable causal comparison: a loss
+of learning is more plausibly attributable to destroyed MB organization.
+
+If server time permits, use the whole-network shuffle as a secondary stress-test,
+not as the sole structural control. It answers a broader question, but a negative
+result is too easily explained by global network disruption. For the MB list, the
+recommended starting definition is all annotated KCs, MBONs, PAM/PPL1 dopamine
+neurons, and APL, plus any additional class included by a written annotation rule;
+the exact membership still requires approval.
+
+**DECISION NEEDED:** Choose `mushroom-body` or `whole-network` as the primary shuffle scope; if `mushroom-body`, approve the membership rule (recommended: KCs + MBONs + PAM + PPL1 + APL, with any additions fixed by an explicit annotation rule).
+
+## 2. MBON instances included in the per-type mean
+
+The ambiguity is in [`mb-learning-interface.md`](mb-learning-interface.md),
+Section 4b and its open-items list, and is repeated in the preregistration. The
+readout code itself does not select a hemisphere:
+`learning/readout.py::circuit_score` averages exactly the labels and rates the
+caller supplies. The real backend currently supplies **all 96 annotated MBON
+instances from both hemispheres**, without filtering. The historical graded
+test and first-learning-test specification also use all instances in both
+hemispheres, including silent instances as zero. Thus bilateral inclusion is the
+effective current behavior, but it has not been recorded as the final study
+decision.
+
+The concrete primary options are:
+
+1. **Both hemispheres, all instances (current effective behavior).** For each
+   MBON type, average every annotated left and right instance, including silent
+   instances, then give the type one signed vote. This measures the output of the
+   complete modeled circuit and retains cross-hemisphere propagation. It is also
+   continuous with every circuit diagnostic completed so far. Its cost is that a
+   strong ipsilateral response can be diluted by silent contralateral instances,
+   and types with unequal left/right instance counts implicitly weight the side
+   with more instances more heavily inside the type mean.
+2. **Stimulated hemisphere only (left).** Average only left-side instances,
+   because the encoder stimulates left KCs. This makes the readout more local to
+   the injected circuit and avoids dilution by contralateral neurons. It discards
+   real right-side activity produced by the full network, changes the score scale
+   and decision-margin calibration, and breaks direct continuity with the
+   completed diagnostics unless those analyses are recomputed.
+
+A useful sensitivity analysis is to keep bilateral inclusion as primary and
+recompute scores from left-only MBONs. This is analysis-only once full per-MBON
+outputs are saved, but the left-only decision margin must be calibrated
+separately on training data because its units differ. The current real backend
+exposes MBON IDs and type labels but not a parallel side mask through the shared
+simulator interface, so the frozen annotation-derived left/right mask and its
+metadata would need to be added before that sensitivity analysis is run.
+
+### Recommendation
+
+Use **all instances in both hemispheres as the primary readout**, with silent
+instances included, and pre-state **left-only as a sensitivity analysis**. The
+model is a connected bilateral network, right MBONs demonstrably respond to left
+KC input, and the existing diagnostics already use all 96 instances. Excluding
+the right side would remove a modeled circuit response after it has propagated,
+rather than isolate the input. The left-only sensitivity check will show whether
+the conclusion depends on that choice.
+
+**DECISION NEEDED:** Choose the primary instance set: `both hemispheres/all 96` (recommended, with left-only sensitivity) or `left hemisphere only`.
+
+## 3. Reward normalization and accuracy-arm `brier_scale`
+
+The implemented accuracy reward is
+
+```text
+raw improvement = Brier(market price, outcome) - Brier(circuit forecast, outcome)
+normalised reward = clip(raw improvement / brier_scale, -1, 1).
+```
+
+The current `brier_scale = 0.25` is explicitly a placeholder. With the documented
+example—market price 0.60, circuit forecast 0.62, outcome YES—the raw improvement
+is 0.0156, so the current normalized reward is only 0.0624.
+
+For comparison, in the synthetic configuration a winning YES position bought at
+0.60 has gross profit 0.40 and net profit 0.38 after the placeholder 0.01 fee and
+0.01 half-spread. With `profit_scale = 1.0`, its profit reward is 0.38. Calling
+either example “typical” is **unverified**; the actual training-market
+distribution must be reported.
+
+Concrete alternatives:
+
+| `brier_scale` | Reward for improvement 0.0156 | Rationale and tradeoff |
+|---:|---:|---|
+| **0.10** | **0.156** | Conservative amplification. It strengthens small accuracy edges by 2.5× relative to the placeholder while leaving more headroom before clipping. It will usually make accuracy teaching weaker than the example profit reward. |
+| **0.04** | **0.390** | Direct example-matching choice: the documented two-point edge produces nearly the same magnitude as the example net profit reward (0.38). It makes the two reward arms comparable in this concrete case, but that case is not yet known to represent the training distribution. |
+| **0.025** | **0.624** | Aggressive accuracy teaching. It gives small edges strong influence but clips whenever `|Brier improvement| ≥ 0.025`, potentially erasing distinctions among moderately large gains and losses. |
+
+Whichever value is selected, it must be frozen before the preregistered run and
+not selected from held-out outcomes. A defensible training-only check is to report
+the distribution of absolute Brier improvements and the resulting clipping rate
+under each already-proposed value; that describes the consequence of the choice
+without changing the success criterion. The current symmetric clipping to
+`[-1,1]` and `dead_zone = 0` should also be explicitly confirmed or changed at
+the same sign-off.
+
+**DECISION NEEDED:** Choose `brier_scale = 0.10`, `0.04`, or `0.025` (or supply another value), and confirm whether symmetric `[-1,1]` clipping with `dead_zone = 0` remains fixed.
+
+## 4. Drift-pace unit
+
+The code in `learning/plasticity.py` applies drift as
+
+```text
+W_after = W0 + (1 - drift_rate)^n_steps × (W_before - W0).
+```
+
+With the current placeholders, `drift_rate = 0.01` and
+`drift_steps_per_resolution = 1`. After an acted-on market resolves, the code
+first applies any dopamine-gated weakening and then closes **1% of every
+weight's remaining gap back to its original connectome value**. An acted-on
+resolution with no teaching signal still advances drift. An abstained market's
+resolution applies neither learning nor drift. `advance(n_steps)` exists for
+explicit time passage, but the current experiment runners do not use it as a
+calendar clock.
+
+Physically, one current “step” therefore means **one acted-on market resolution**,
+not one hour, day, simulation second, or unit of biological time. Ten markets
+resolving together cause ten successive drift steps; one market resolving after
+a month causes one. With no further learning, the remaining deviation is
+`0.99^N` after `N` acted resolutions—about one half after 69 resolutions and 37%
+after 100. The pace also depends on abstention rate, because abstained resolutions
+do not advance it.
+
+This event-count clock is well-defined for the controlled first-learning and
+synthetic-market experiments, where presentations/resolutions are the intended
+experimental unit. It is not automatically comparable across historical or
+prospective datasets with different market frequency, overlap, or time to
+resolution. Before a real-market experiment it needs an explicit interpretation:
+
+1. **Keep the current event clock:** one step per acted resolution. This treats
+   forgetting as experience-dependent and requires no timestamp handling, but
+   makes drift depend on market density and abstention.
+2. **Use elapsed calendar time:** call `advance` according to a fixed unit such
+   as one day and define/freeze the corresponding `drift_rate` or half-life.
+   This gives comparable forgetting across datasets but requires reliable event
+   timestamps and a newly justified time constant.
+3. **Disable drift in the primary real-market analysis:** set `drift_rate = 0`
+   and retain drift as a sensitivity condition. This removes an unanchored
+   timescale but also removes the safeguard intended to restore weights and
+   prevent long-run saturation.
+
+### Recommendation
+
+Keep **one step per acted resolution for the already-defined controlled
+experiments**, where it is a clear exposure unit. Before the real historical or
+prospective experiment, anchor drift to **elapsed calendar time** (preferably a
+reported half-life, implemented through `advance`) or explicitly disable it;
+do not silently carry the event-count rate across datasets with different event
+density. The calendar unit and half-life must be fixed from biological rationale
+or training-period behavior, never from held-out performance.
+
+**DECISION NEEDED:** For controlled experiments, confirm `1 step per acted resolution`; for the real-market phase, choose `acted-resolution clock`, `calendar-time clock` (state unit/half-life), or `drift disabled in primary`.
