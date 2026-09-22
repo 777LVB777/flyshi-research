@@ -124,11 +124,12 @@ def _load_script(path: Path, name: str):
     return module
 
 
-def test_runner_dry_run_requires_no_mitigation_and_writes_nothing(tmp_path, capsys) -> None:
+def test_runner_dry_run_defaults_to_selected_mitigation_and_writes_nothing(tmp_path, capsys) -> None:
     runner = _load_script(RUNNER_PATH, "synthetic_runner_test")
     assert runner.main(["--dry-run", "--results-base", str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert "15000" in output and "20000" in output and "OPEN DECISION" in output
+    assert "15000" in output and "total_drive_balancing" in output
+    assert "OPEN DECISION" not in output and "20000" not in output
     assert not any(tmp_path.iterdir())
 
 

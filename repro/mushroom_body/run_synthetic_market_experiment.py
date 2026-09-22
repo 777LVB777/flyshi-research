@@ -60,7 +60,9 @@ def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--mitigation", choices=sm.MITIGATIONS,
-                   help="Required for a real run; deliberately has no default.")
+                   default=sm.TOTAL_DRIVE_BALANCING,
+                   help="Default: the selected total-drive-balancing encoder."
+                   " Innate subtraction is retained only for historical comparison.")
     p.add_argument("--dry-run", action="store_true", help="Print plans only; simulate nothing.")
     p.add_argument("--results-base", type=Path, default=RESULTS_BASE)
     group = p.add_mutually_exclusive_group()
@@ -72,12 +74,6 @@ def parser() -> argparse.ArgumentParser:
 
 def _config(mitigation: str) -> sm.SyntheticConfig:
     return sm.SyntheticConfig(mitigation=mitigation)
-
-
-def _require_mitigation(args: argparse.Namespace) -> sm.SyntheticConfig:
-    if not args.mitigation:
-        raise SystemExit("choose --mitigation total_drive_balancing or innate_score_subtraction")
-    return _config(args.mitigation)
 
 
 def _load_outputs(cfg: sm.SyntheticConfig, paths: Paths) -> dict:
@@ -102,12 +98,7 @@ def finish(cfg: sm.SyntheticConfig, results_base: Path) -> dict:
 
 def main(argv=None) -> int:
     args = parser().parse_args(argv)
-    if args.dry_run and not args.mitigation:
-        for mitigation in sm.MITIGATIONS:
-            print("\n".join(plan_lines(_config(mitigation), args.results_base)))
-        print("OPEN DECISION: choose exactly one mitigation before any real run.")
-        return 0
-    cfg = _require_mitigation(args)
+    cfg = _config(args.mitigation)
     directory = sm.results_dir_for(args.results_base, cfg)
     paths = Paths(directory)
     if args.dry_run:

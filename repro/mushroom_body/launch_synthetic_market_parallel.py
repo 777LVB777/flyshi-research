@@ -40,7 +40,7 @@ def acquire_lock(path: Path) -> None:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split(";")[0])
-    p.add_argument("--mitigation", required=True, choices=sm.MITIGATIONS)
+    p.add_argument("--mitigation", default=sm.TOTAL_DRIVE_BALANCING, choices=sm.MITIGATIONS)
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--max-procs", type=int, default=1,
                    help="Maximum workers; default 1 because real per-process RAM is UNVERIFIED.")

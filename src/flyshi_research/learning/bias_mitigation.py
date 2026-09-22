@@ -1,9 +1,9 @@
-"""Named mitigations for the Option-B input-intensity bias.
+"""Legacy helpers for the Option-B input-intensity-bias alternatives.
 
-Both options were proposed in ``docs/design/mb-learning-interface.md``.  Neither
-is selected as the study default.  Total-drive balancing implemented here uses
-an explicit filler KC pool; innate-score subtraction uses exact pre-learning
-scores supplied by the caller.  Their behavior on the real model is unverified.
+Total-drive balancing is now selected and implemented directly by
+``KCEncoder.option_b_stimuli``. The standalone pool functions remain for tests
+and historical comparison; new code should use the encoder default. Innate-score
+subtraction is not selected. Behavior on the real model remains unverified.
 """
 
 from __future__ import annotations

@@ -23,7 +23,11 @@ def test_statuses_are_known_and_only_readout_tables_are_preregistered():
     assert pre == {("readout", "sign_table"), ("readout", "sensitivity_tables"),
                    ("readout", "robustness_tables")}
     decided = {(g, n) for g, n, s, _ in P.PARAMETER_TABLE if s == P.DEC}
-    assert decided == {("readout", "aggregation")}
+    assert decided == {
+        ("encoder", "balance_pool_size"),
+        ("encoder", "option_b_variant"),
+        ("readout", "aggregation"),
+    }
 
 
 def test_readout_aggregation_default_is_type_mean_with_sum_as_named_variant():
@@ -94,11 +98,11 @@ def test_learning_package_never_imports_brian2():
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
-def test_encoder_rate_bound_placeholders_are_the_graded_test_range():
+def test_encoder_rate_bound_placeholders_are_pending_balanced_revalidation():
     e = P.EncoderParams()
     assert (e.min_rate_hz, e.max_rate_hz) == (30.0, 150.0)  # min was 0 before 2026-09-21
     rows = {(g, n): m for g, n, _, m in P.PARAMETER_TABLE}
     for key in (("encoder", "min_rate_hz"), ("encoder", "max_rate_hz")):
-        assert "EQUAL the validated range" in rows[key]
+        assert "pending the balanced graded re-validation" in rows[key]
     assert "placeholder" in [st for g, n, st, _ in P.PARAMETER_TABLE
                              if (g, n) == ("encoder", "min_rate_hz")][0]

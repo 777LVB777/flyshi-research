@@ -290,33 +290,60 @@ be clean (no spread, fully separable). Giving each feature its own dedicated,
 non-overlapping pool means the circuit can, in principle, tell the features
 apart. Using a fixed seed makes the whole thing reproducible.
 
-**What could go wrong.** *Graded rates are untested.* Every simulation so far
-drove cells at one rate (150 Hz), so we know the circuit tells *which* cells were
-driven, but not whether its output changes in an orderly way with *how hard* they
-are driven. Encoding a value as a rate depends on exactly that. The test, with its
-acceptance criterion fixed in advance, is in
-[`graded-encoding.md`](graded-encoding.md). **It has since been run (2026-09-21)
-and the verdict is ACCEPTED**: with one group of 100 cells driven at 30, 60, 90, 120
+**Historical graded-rate result — SUPERSEDED for the current encoder.** The test
+in [`graded-encoding.md`](graded-encoding.md) was run on 2026-09-21 and its
+verdict was ACCEPTED: with one group of 100 cells driven at 30, 60, 90, 120
 and 150 Hz, the CIRCUIT readout score was strictly monotonic — but *decreasing*:
 −9.6, −18.5, −33.9, −51.9, −66.8 — and the difference between the output-neuron
 patterns at 30 and 150 Hz was 222.9 Hz against a threshold of 15.3 Hz (three times
 the same-cue noise floor). So the encoding by rate works in the sense that the
 readout follows the rate. (The other two possible verdicts were *usable range*, a
-monotonic stretch shorter than the whole range, and *fail*.) Caveats: one seed, one
-group of cells at a uniform rate; several groups driven at once have not been
-tested. **The decreasing direction reveals a bias that matters for Option B: see
-4b, problem 4.**
+monotonic stretch shorter than the whole range, and *fail*.) That experiment used
+one uniform, unbalanced KC pool. Total-drive balancing changes Option B into a
+multi-pool pattern, so the ACCEPTED result no longer validates the current
+encoder. It is retained as history and as the observation that exposed the
+intensity bias. The replacement test is pre-stated in
+[`graded-encoding-balanced.md`](graded-encoding-balanced.md) and is **NOT RUN;
+balanced graded encoding is pending re-validation**.
 
-**Encoder rate bounds (decided 2026-09-21).** The encoder maps a feature's lowest
+**Encoder rate bounds (historical decision, pending balanced re-validation).** The encoder maps a feature's lowest
 value to a minimum firing rate and its highest to a maximum. **After the graded
 test, that minimum and maximum must equal the validated range** — all five tested
 rates (30 to 150 Hz) if accepted, or the chosen stretch if a usable range. The test
-was accepted, so the bounds are **30 to 150 Hz**, which is what the encoder uses
+was accepted, so the bounds were set to **30 to 150 Hz**, which the encoder still uses
 (the minimum was changed from 0 to 30 Hz so it cannot emit a rate below anything
 tested; one consequence is that no feature's group of cells is ever silent, even at
 that feature's lowest value). The code checks this
 (`encoder_params_for`, `require_encoder_matches` in `graded_check.py`; the check
-passes with the default bounds). The range is validated for one group of cells only.
+passes with the default bounds). That validation applies only to the superseded
+single-pool encoder. For the balanced encoder, 30–150 Hz are the pre-stated
+nominal bounds under test, not an accepted result.
+
+**Total-drive balancing (decided 2026-09-22; Option B default).** Each feature
+keeps its existing fixed, disjoint, uniform KC pool. For framing `s`, its raw
+feature-pool drive is
+
+`D_s = sum_f n_f r_s,f`,
+
+where `n_f` is the number of KCs in feature pool `f` and `r_s,f` is that pool's
+encoded rate. Because every KC in a feature pool has that rate, this is exactly
+the sum of per-KC input rates, the expected aggregate Poisson spike drive per
+second. Reserve one disjoint balancing pool of `B = 300` KCs. Let
+`Delta = |D_YES - D_NO|`. Every balancing KC in the higher-drive framing receives
+`r_min = 30 Hz`; every balancing KC in the lower-drive framing receives
+`r_min + Delta/B`. Therefore both totals are
+
+`max(D_YES, D_NO) + B r_min`.
+
+The default three mirrored features can differ by at most
+`3 × 100 × (150-30)` Hz of aggregate drive, so 300 balancing KCs have exactly
+enough rate headroom to keep their rates within 30–150 Hz. The feature-pool rates
+are not rescaled: only the per-KC identity/rate pattern, including which framing
+has the raised balancing pool, differs; aggregate drive is equal. This is the
+correct definition for the existing per-feature-pool encoder because total
+expected input spikes are additive across disjoint pools. Equal expected drive
+does **not** establish equal downstream circuit effect; that remains unverified.
+The historical behavior is retained as the named `unbalanced` ablation.
 
 Real Kenyon cells do not normally receive input this
 way, so this is an engineered interface, not a biological claim — we are using
@@ -474,22 +501,20 @@ below: they do not). The abstain option keeps the system from acting on noise.
    therefore essential in every market experiment**: it shows what the innate lean
    alone earns.
 
-   *Two ways to remove it. Proposed, not chosen, and neither has been built.*
+   *Chosen mitigation (2026-09-22): total-drive balancing.*
 
-   **(a) Total-drive balancing:** design the encoding so the YES and NO framings
-   deliver equal total stimulation. For example, give each evidence feature a "for"
-   and an "against" group of cells that swap rates between the framings, or add a
-   filler group that tops the total up.
-   *Costs:* more groups of cells (three extra for the three mirrored features);
-   several groups driven at once is untested, so the encoder change needs its own
-   graded-style test and pre-statement; a filler group carries the total *inversely*,
+   **(a) Total-drive balancing (SELECTED):** the exact reserved-pool construction
+   and formula are recorded in Section 4a. It is now the default Option B encoder.
+   *Costs:* one additional group of 300 cells; several groups driven at once is
+   untested, so the changed encoder has its own pre-stated graded-style test
+   ([`graded-encoding-balanced.md`](graded-encoding-balanced.md)); a filler group carries the total *inversely*,
    so the intensity information is moved, not removed. *Could hide:* equal total
    drive is not equal effect, because different groups reach different output
    neurons (cues A and B differ by about 79 Hz at the readout), so a smaller lean
    tied to *which* group is driven harder would remain, harder to see because the
    total looks balanced and so falsely reassuring.
 
-   **(b) Innate-score subtraction:** score each framing before learning, with the
+   **(b) Innate-score subtraction (NOT SELECTED):** score each framing before learning, with the
    original connection strengths, and use *score now − innate score* in the decision,
    so only what learning changed counts.
    *Costs:* the innate score is needed for the exact stimulus of every decision:
@@ -505,7 +530,7 @@ below: they do not). The abstain option keeps the system from acting on noise.
    subtracted score is zero, so the learning-off control would always abstain and
    stop measuring the innate lean, so a separate innate-only arm would be needed.
 
-   The two can be combined. **Not decided.** *The first learning test
+   The two will not be combined in the primary experiment. *The first learning test
    ([`first-learning-test.md`](first-learning-test.md)) is unaffected:* it drives
    both cues at the same constant 150 Hz and measures a *change* in the difference
    between them, so any fixed offset cancels. It does not show that learning works
@@ -815,18 +840,17 @@ Stated without softening. These are real, and some could stop the project.
   random 100-Kenyon-cell cue sets, **not** for the eventual market-feature
   encoding (Section 4a), whose separability **must be checked separately** once
   that encoding exists.
-- **Graded encoding: tested and accepted; two things remain open.** The graded-rate
-  test ([`graded-encoding.md`](graded-encoding.md)) was run on 2026-09-21 and the
-  verdict is ACCEPTED: the readout is strictly monotonic (decreasing) across 30–150 Hz
-  and the encoder's bounds equal that range (Section 4a). Still open: (i) it is one
-  seed and one group of cells at a uniform rate, so several groups driven at once are
-  untested; (ii) the intensity bias it revealed (next item).
-- **The intensity bias must be addressed before any market experiment.** The score
+- **Balanced graded encoding is pending re-validation.** The historical
+  single-pool graded-rate test was ACCEPTED, but is now **SUPERSEDED** for the
+  current balanced encoder. The replacement pre-statement is
+  [`graded-encoding-balanced.md`](graded-encoding-balanced.md); it has not been run.
+- **The intensity-bias mitigation is selected but not validated on the real model.** The score
   depends strongly on input intensity, so under Option B the two framings differ
   innately whenever the price is not 0.5, and the direction of that lean depends on
   the sign table (CIRCUIT falls with drive; STRICT and GROUP rise) — see 4b, problem
-  4. Two remedies are proposed (total-drive balancing; innate-score subtraction).
-  **The choice is undecided and neither is built or tested.** The bias must also be
+  4. Total-drive balancing is selected and implemented as the Option B default;
+  innate-score subtraction is not selected. The balanced encoder has not been
+  tested on the real model. The bias must also be
   measured under STRICT, GROUP and the 70/90% variants, and the noise of the scores
   at the stimuli used in markets is not yet measured.
 - **Which output-neuron instances enter the per-type mean is open.** The mean
@@ -1002,6 +1026,13 @@ This document is meant to be argued with and revised.
   (problem 4) with two proposed remedies, undecided. It was checked against the
   other sign tables: the dependence on intensity holds in all of them, but the
   direction flips between CIRCUIT and STRICT/GROUP.
+- **2026-09-22.** Total-drive balancing was selected over innate-score
+  subtraction and made the Option B default. Section 4a records the exact
+  reserved-pool formula. The old `unbalanced` construction remains a named
+  ablation. Because the accepted 2026-09-21 graded-rate result used an
+  unbalanced uniform cue, it is now marked **SUPERSEDED** for the current
+  encoder. Its balanced replacement was pre-stated in
+  [`graded-encoding-balanced.md`](graded-encoding-balanced.md) and has not run.
 
 ---
 

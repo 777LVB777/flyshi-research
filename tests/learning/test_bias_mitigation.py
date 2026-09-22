@@ -12,6 +12,7 @@ from flyshi_research.learning.bias_mitigation import (  # noqa: E402
     total_drive_balance,
 )
 from flyshi_research.learning.encoder import KCEncoder  # noqa: E402
+from flyshi_research.learning.params import OPTION_B_UNBALANCED  # noqa: E402
 
 
 KC_IDS = np.arange(1000, 3000, dtype=np.int64)
@@ -34,7 +35,7 @@ class IntensityBiasedFake:
 
 def test_total_drive_balancing_removes_a_fake_builtin_intensity_bias() -> None:
     encoder = KCEncoder(KC_IDS)
-    pair = encoder.option_b_stimuli(FEATURES)
+    pair = encoder.option_b_stimuli(FEATURES, variant=OPTION_B_UNBALANCED)
     fake = IntensityBiasedFake()
     before = fake.score(pair.yes) - fake.score(pair.no)
     assert before != 0.0
@@ -49,7 +50,7 @@ def test_total_drive_balancing_removes_a_fake_builtin_intensity_bias() -> None:
 
 
 def test_innate_score_subtraction_removes_the_same_fake_intensity_bias() -> None:
-    pair = KCEncoder(KC_IDS).option_b_stimuli(FEATURES)
+    pair = KCEncoder(KC_IDS).option_b_stimuli(FEATURES, variant=OPTION_B_UNBALANCED)
     fake = IntensityBiasedFake()
     innate_yes, innate_no = fake.score(pair.yes), fake.score(pair.no)
     assert innate_yes - innate_no != 0.0

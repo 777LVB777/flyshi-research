@@ -17,6 +17,7 @@ def doc(name: str) -> str:
 
 DESIGN = doc("mb-learning-interface.md")
 GRADED = doc("graded-encoding.md")
+BALANCED_GRADED = doc("graded-encoding-balanced.md")
 
 
 def section(text: str, start: str, end: str) -> str:
@@ -59,22 +60,24 @@ def test_graded_result_is_recorded_in_both_documents():
                    "Strictly monotonic across all five rates: yes, and decreasing",
                    "0.00 Hz", "Validated range: 30–150 Hz"):
         assert needle in results, needle
-    assert "the verdict is ACCEPTED" in DESIGN and "222.9 Hz against a threshold of 15.3 Hz" in DESIGN
+    assert "verdict was ACCEPTED" in DESIGN and "222.9 Hz against a threshold of 15.3 Hz" in DESIGN
+    assert "**SUPERSEDED**" in DESIGN and "balanced graded encoding is pending re-validation" in DESIGN
+    assert "**Status: PRE-STATED; NOT RUN.**" in BALANCED_GRADED
     assert "no criterion in this document was changed after the run" in GRADED
 
 
-def test_intensity_bias_is_documented_with_both_options_undecided_and_the_sign_caveat():
+def test_intensity_bias_records_selected_balancing_and_the_sign_caveat():
     p4 = section(DESIGN, "4. **An intensity bias", "**The separation score, defined precisely")
     for needle in ("30 + 0.8 × 120 = 126 Hz", "54 Hz", "innately prefers NO whenever YES is the expensive side",
                    "(a) Total-drive balancing", "(b) Innate-score subtraction",
-                   "*Costs:*", "*Could hide:*", "**Not decided.**",
+                   "*Costs:*", "*Could hide:*", "(SELECTED)", "(NOT SELECTED)",
                    "STRICT (0.0 → +53.2) and GROUP (+10.8 → +77.6) rise",
                    "the direction depends on the readout",
                    "first learning test", "is unaffected", "constant 150 Hz",
                    "Any market experiment must address this bias first"):
         assert needle in p4, needle
     assert p4.count("*Costs:*") == 2 and p4.count("*Could hide:*") == 2  # each option states both
-    assert "The intensity bias must be addressed before any market experiment" in DESIGN
+    assert "Total-drive balancing (decided 2026-09-22; Option B default)" in DESIGN
     assert "four real problems" in DESIGN
 
 

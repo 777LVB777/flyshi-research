@@ -13,6 +13,7 @@ file citation; everything else is this document's own summary):**
 - `docs/design/readout-and-plasticity-options.md` (hereafter **READOUT**)
 - `docs/design/first-learning-test.md` (hereafter **FIRST-LEARN**)
 - `docs/design/graded-encoding.md` (hereafter **GRADED**)
+- `docs/design/graded-encoding-balanced.md` (hereafter **BALANCED-GRADED**)
 - `docs/design/mbon-separability.md` (hereafter **SEPARABILITY**)
 - `docs/design/synthetic-market-experiment.md` (hereafter **SYNTH-MARKET**)
 - `docs/design/degree-preserving-connectome-control.md` (hereafter **SHUFFLE**)
@@ -96,7 +97,7 @@ Each subsection gives: the question, the fixed design, the exact pass/fail
 wording (quoted), the seeds, and the run status as of this document's
 assembly.
 
-### 4.1 Graded-rate encoding test — **COMPLETED, verdict ACCEPTED**
+### 4.1 Historical graded-rate encoding test — **COMPLETED, verdict ACCEPTED; SUPERSEDED for the balanced encoder**
 
 **Question** (GRADED, Section 1): "Whether the output neurons respond in a
 graded, monotonic way to *how hard* one pool is driven has **never been
@@ -130,7 +131,7 @@ The 15.30 Hz threshold is 3 × d_AA (5.10 Hz; see Section 4.2), fixed before
 this test's run: "the endpoint threshold is 3 × 5.10 = **15.30 Hz**, inclusive
 (≥)" (GRADED, Section 4).
 
-**Result (GRADED, "Results" section): Verdict ACCEPTED.** Score strictly
+**Historical result (GRADED, "Results" section): Verdict ACCEPTED.** Score strictly
 monotonic decreasing over 30–150 Hz (−9.6, −18.5, −33.9, −51.9, −66.8), 30-vs-150
 Hz endpoint distance 222.88 Hz (≈14.6× the 15.30 Hz threshold). Validated range
 30–150 Hz, matching the encoder's bounds. Secondary, non-criterion finding: the
@@ -138,7 +139,44 @@ same five files scored under other preregistered sign tables show the score
 *rising* with drive under STRICT and GROUP, and falling under CIRCUIT 70/80/90%
 and `instance_sum` — "the **dependence on intensity is robust, but its
 direction is not**" (GRADED, "What the result shows"). This is the origin of
-the intensity bias discussed in Sections 4.4 and 4.6 below.
+the intensity bias discussed in Sections 4.4 and 4.6 below. The result used one
+uniform, unbalanced cue. Total-drive balancing changes the stimulus into a
+multi-pool pattern, so this ACCEPTED result is **SUPERSEDED** as validation of
+the current encoder. It is retained as history.
+
+### 4.1b Balanced graded-encoding re-validation — **PRE-STATED; NOT RUN**
+
+The replacement protocol is
+[`docs/design/graded-encoding-balanced.md`](design/graded-encoding-balanced.md).
+It sweeps price feature values `0.00, 0.25, 0.50, 0.75, 1.00`; the corresponding
+30, 60, 90, 120, and 150 Hz values are only the YES price pool's nominal
+pre-balance rate labels. Each value produces a total-drive-balanced YES/NO pair.
+The primary sequence is the Option B contrast score and the distance gates use
+the MBON contrast vectors.
+
+**Pre-stated verdict rule, copied exactly from BALANCED-GRADED Section 5:**
+
+> - **ACCEPTED** — `S(v)` is strictly monotonic across **all five** values, and the
+>   Euclidean distance `||c(0.00)-c(1.00)||` is at least
+>   `T(0.00,1.00) = 3 × d_change(0.00,1.00)`.
+>
+> - **USABLE RANGE** — the full endpoint distance passes, but `S(v)` is not
+>   strictly monotonic across all five values, and the longest strictly monotonic
+>   **contiguous** sub-range spanning at least three tested values has its own
+>   endpoint contrast-vector distance at least its pair-specific threshold
+>   `T(a,b) = 3 × d_change(a,b)`.
+>
+> - **FAIL** — the full endpoint distance is below `T(0.00,1.00)`, or no strictly
+>   monotonic contiguous sub-range spans at least three tested values, or the
+>   chosen sub-range's own endpoint distance is below its pair-specific `T(a,b)`.
+>   The balanced value encoding must change before any learning experiment.
+
+The original 5.10 Hz noise floor was measured on unbalanced single-cue vectors
+and is not used for this verdict. A `sqrt(2)` extrapolation would require
+independent, identically distributed noise and is not adopted. Five complete
+balanced repeat seeds (20260317–20260321; 50 simulations) directly measure the
+noise of each change-in-contrast statistic. The primary test remains ten
+simulations at seed 20260316. All runs are 1000 ms × 5 trials.
 
 ### 4.2 MBON-separability / noise-floor test — **COMPLETED, verdict CONFIRMED**
 
@@ -291,7 +329,7 @@ tolerance, 8/8 discriminator signs correct) — the learning test is now cleared
 to run."** No run of the first learning test itself has occurred as of this
 document.
 
-### 4.5 Synthetic-market signal-requirement experiment — **NOT YET RUN.** One open decision blocks it (Section 11).
+### 4.5 Synthetic-market signal-requirement experiment — **NOT YET RUN.**
 
 **Question, quoted (SYNTH-MARKET, header):** "how much controlled extra
 information must the engineered signal feature contain before the learned
@@ -317,17 +355,12 @@ shuffled."
 **Arms (SYNTH-MARKET, Section 3):** `profit` (headline), `accuracy`
 (comparison), `learning_off`.
 
-**Intensity-bias mitigation — explicitly an open decision, quoted in full
-(SYNTH-MARKET, Section 4):**
-
-> "The full run has **no default mitigation**. Luca must choose one explicitly
-> before any job is launched. Both are implemented and fake-tested; neither has
-> been tested on the real model."
-
-Option A (`total_drive_balancing`) and Option B (`innate_score_subtraction`)
-are both specified (SYNTH-MARKET, Section 4) but "**The options are not
-combined**." This is carried into Section 11 as an open decision blocking the
-run.
+**Intensity-bias mitigation — RESOLVED 2026-09-22.** Total-drive balancing is
+selected and is the default Option B encoder. Innate-score subtraction is not
+selected. The formula and capacity rule are recorded in MB-LEARN Section 4a and
+BALANCED-GRADED. The balanced encoder's real-model behavior remains
+**unverified**, and the balanced graded-encoding re-validation must run before
+the synthetic-market experiment.
 
 **Pre-stated success criterion, quoted in full (SYNTH-MARKET, Section 6):**
 
@@ -522,8 +555,14 @@ are **unverified synthetic placeholders**."
   spread and fully separable patterns (MB-LEARN Section 3c).
 - Features: "Price," "Recent price change," "Time to resolution," "Liquidity,"
   and, "Signal feature (synthetic markets only)" (MB-LEARN, Section 4a).
-- Encoder rate bounds, quoted: "the bounds are **30 to 150 Hz**" (MB-LEARN,
-  Section 4a), validated by the graded-rate test (Section 4.1 above).
+- Encoder rate bounds remain **30 to 150 Hz**, but their original single-pool
+  validation is SUPERSEDED; they are nominal bounds pending the balanced test
+  in Section 4.1b.
+- **Selected total-drive rule:** for each framing, raw feature drive is
+  `D_s = sum_f n_f r_s,f`. A reserved pool of `B=300` KCs fires at 30 Hz in
+  the higher-drive framing and at `30 + |D_YES-D_NO|/B` Hz in the lower-drive
+  framing. Both totals therefore equal `max(D_YES,D_NO) + B×30`. This is the
+  Option B default. `unbalanced` is the named historical ablation.
 - NO-framing mirroring rule, quoted in full (MB-LEARN, Section 4a table):
 
   | Feature | Under NO | Why |
@@ -570,9 +609,10 @@ are **unverified synthetic placeholders**."
   prefers NO whenever YES is the expensive side, and YES whenever it is cheap:
   a price-dependent, contrarian lean unrelated to anything learned." Direction
   is readout-dependent: "CIRCUIT at 70% and 90% also fall, but **STRICT (0.0 →
-  +53.2) and GROUP (+10.8 → +77.6) rise**." Two proposed, unbuilt remedies:
-  total-drive balancing and innate-score subtraction (both "**Not decided**").
-  "**Any market experiment must address this bias first.**"
+  +53.2) and GROUP (+10.8 → +77.6) rise**." Total-drive balancing was selected
+  on 2026-09-22 and implemented as the encoder default; innate-score subtraction
+  was not selected. Its effectiveness in the real circuit is **unverified** and
+  the replacement graded test in Section 4.1b is pending.
 
 ### 6.3 CIRCUIT assignment detail and its disagreement with behavioral labels
 (READOUT)
@@ -735,14 +775,12 @@ already resolved since MB-LEARN was last revised are marked so.
    Quoted (MB-LEARN, Section 8): "MBON11 approach (Aso et al. 2014b, *eLife*
    3:e04580, Fig. 2C); MBON21 avoidance (Rubin & Aso 2023, *eLife* RP90523,
    Fig. 3H–I); MBON02 attraction (Mohammad et al. 2024, *PLOS Biology*)."
-2. **Graded encoding — resolved (ACCEPTED), but two things remain open**
-   (MB-LEARN, Section 8): "(i) it is one seed and one group of cells at a
-   uniform rate, so several groups driven at once are untested; (ii) the
-   intensity bias it revealed."
-3. **The intensity bias must be addressed before any market experiment**
-   (MB-LEARN, Section 8; SYNTH-MARKET Section 4). Two remedies proposed,
-   **neither chosen nor tested on the real model**. This is the specific open
-   decision blocking Section 4.5 above from being launched.
+2. **Balanced graded encoding is pending re-validation.** The old unbalanced
+   test remains historically ACCEPTED but is **SUPERSEDED** for the current
+   encoder. The replacement test is pre-stated and not run.
+3. **The intensity-bias mitigation choice is resolved.** Total-drive balancing
+   is selected; innate-score subtraction is not selected. Its real-model effect
+   is still unverified and is tested by item 2.
 4. **Which output-neuron instances enter the per-type mean is open** (MB-LEARN,
    Section 8): "whether that means both hemispheres... or only the left has
    not been decided."
@@ -771,10 +809,8 @@ already resolved since MB-LEARN was last revised are marked so.
 11. **Degree-preserving shuffle scope not chosen** (SHUFFLE): mushroom-body-only
     vs. whole-network; "**Open decision for the project owner:**... Neither
     option is selected here."
-12. **Intensity-bias mitigation for the synthetic-market run not chosen**
-    (SYNTH-MARKET, Section 4): "Luca must choose one explicitly before any job
-    is launched" — Option A (total-drive balancing) or Option B (innate-score
-    subtraction).
+12. **RESOLVED 2026-09-22 — intensity-bias mitigation.** Total-drive balancing
+    was selected; this item is no longer open.
 13. **First-learning-test parameter placeholders not yet tuned/confirmed**
     (FIRST-LEARN, Section 6): "Every value in this table is a placeholder. It
     must be fixed before the run and must not be tuned on this test's
@@ -802,11 +838,11 @@ already resolved since MB-LEARN was last revised are marked so.
 
 ## 12. Cross-document consistency check
 
-Every numeric and logical claim that appears in more than one of the eight
+Every numeric and logical claim that appears in more than one of the nine
 source documents was checked against every occurrence found. **No
-outright contradiction was found between any two of the eight source
+outright contradiction was found between any two of the nine source
 documents** (e.g., the 80% CIRCUIT threshold, the d_AA = 5.10 Hz noise floor,
-the 15.30 Hz graded-test threshold, the "8 consistent discriminators" and
+the historical 15.30 Hz unbalanced graded-test threshold, the "8 consistent discriminators" and
 their identities, the MBON09/MBON08 disagreement with behavioral labels, and
 the intensity-bias numbers at 150 Hz all agree, word-for-word or number-for-
 number, everywhere they are repeated).
@@ -848,6 +884,11 @@ are not mistaken for contradictions later:
   noise measurements on two different quantities; FIRST-LEARN says so
   explicitly ("It is therefore independent of the earlier `d_AA = 5.10 Hz`").
   They should not be conflated even though both use a "3×" margin.
+- The historical unbalanced graded test's fixed 15.30 Hz threshold and the
+  balanced test's pair-specific `3 × d_change(a,b)` thresholds apply to
+  different statistics. BALANCED-GRADED explicitly rejects carrying 15.30 Hz
+  over or treating `sqrt(2) × d_AA` as exact; this is a correction of the new,
+  unrun pre-statement, not a contradiction in completed results.
 
 ---
 
@@ -855,11 +896,12 @@ are not mistaken for contradictions later:
 
 | Experiment | Status |
 |---|---|
-| Graded-rate encoding test (4.1) | **Run. Verdict: ACCEPTED.** |
+| Historical graded-rate encoding test (4.1) | **Run. Verdict: ACCEPTED, but SUPERSEDED for the balanced encoder.** |
+| Balanced graded-encoding re-validation (4.1b) | **Pre-stated; not run.** |
 | MBON-separability / noise-floor test (4.2) | **Run. Verdict: CONFIRMED** (fine cell); marginal at the cheap cell. |
 | Fast-runner equivalence test (4.3) | **Run. Verdict: ACCEPTED** (recorded only in git/run log, not in the design doc). |
 | First learning test (4.4) | **Not run.** Blocking dependency (fast-runner equivalence) now satisfied. |
-| Synthetic-market experiment (4.5) | **Not run.** Blocked on an explicit open decision (intensity-bias mitigation choice, item 12 above). |
+| Synthetic-market experiment (4.5) | **Not run.** Mitigation selected; balanced graded re-validation remains pending. |
 | Learning-off control (4.6.1) | Not run standalone; embedded as a condition/arm of 4.4 and 4.5. |
 | Degree-preserving shuffled connectome (4.6.2) | Implementation and synthetic-graph tests complete; real shuffle not generated; scope not chosen (item 11 above). |
 | Reduced mushroom-body model (4.6.3) | **Protocol-fidelity unit test run and passed** against an unverified, invented tolerance; not a validated numerical match to the source paper; market-scale performance untested. |

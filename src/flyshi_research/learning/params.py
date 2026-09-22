@@ -28,6 +28,12 @@ AGG_TYPE_MEAN = "type_mean"  # DEFAULT: mean within each cell type, then one vot
 AGG_INSTANCE_SUM = "instance_sum"  # named variant: plain sum over instances
 AGGREGATIONS = (AGG_TYPE_MEAN, AGG_INSTANCE_SUM)
 
+# Option B stimulus construction. Total-drive balancing is the decided default;
+# the historical construction remains available only as a named ablation.
+OPTION_B_BALANCED = "total_drive_balanced"
+OPTION_B_UNBALANCED = "unbalanced"
+OPTION_B_VARIANTS = (OPTION_B_BALANCED, OPTION_B_UNBALANCED)
+
 PLACEHOLDER_NOTICE = (
     "Defaults are PLACEHOLDERS, not tuned values. Set and freeze them before the "
     "preregistered experiment; never tune them on that experiment's results."
@@ -86,23 +92,19 @@ def _default_features() -> Tuple[FeatureSpec, ...]:
 class EncoderParams:
     pool_size: int = 100  # KCs per feature; earlier cue experiments used 100
     pool_seed: int = 20260401  # arbitrary fixed seed; freeze before prereg
+    # Reserved KCs used only to equalise total YES/NO drive. There are three
+    # mirrored default features, so 3 * pool_size KCs can absorb the worst-case
+    # drive difference without leaving [min_rate_hz, max_rate_hz].
+    balance_pool_size: int = 300
+    option_b_variant: str = OPTION_B_BALANCED
     # ---- RATE BOUNDS ------------------------------------------------------- #
-    # A feature's min/max value is encoded at min_rate_hz / max_rate_hz. The
-    # graded-rate test (docs/design/graded-encoding.md) will cover 30, 60, 90, 120
-    # and 150 Hz ONLY, and it has NOT been run: 150 Hz is still the only KC-direct
-    # rate ever simulated, and no graded rate has been shown to work (UNVERIFIED).
-    # So, for now, the placeholders are the ends of the range that test will cover:
-    # min_rate_hz is 30 (it was 0), so the encoder cannot emit a rate below anything
-    # tested. Consequence: no feature pool is ever silent, even at a feature's
-    # minimum value.
-    #
-    # RULE once the graded test has run: min_rate_hz and max_rate_hz must EQUAL the
-    # validated range - all five rates (30-150 Hz) for ACCEPTED, the chosen
-    # sub-range for USABLE RANGE; on FAIL the encoder must change instead.
-    # graded_check.encoder_params_for(result) builds such params and
-    # graded_check.require_encoder_matches(params, result) enforces the rule. The
-    # values below are placeholders and must not be used for a learning experiment
-    # before that check has been made.
+    # A feature's min/max value is encoded at min_rate_hz / max_rate_hz. The old
+    # unbalanced, uniform-pool graded test accepted 30-150 Hz, but total-drive
+    # balancing changes the stimulus pattern, so that result is SUPERSEDED for the
+    # current encoder. These remain the nominal endpoints of the pre-stated
+    # replacement test (docs/design/graded-encoding-balanced.md), which is NOT RUN.
+    # They must not be treated as validated balanced-encoder bounds until that test
+    # passes. Consequence of the 30-Hz nominal minimum: no included pool is silent.
     min_rate_hz: float = 30.0  # rate at a feature's min_value
     max_rate_hz: float = 150.0  # rate at a feature's max_value
     features: Tuple[FeatureSpec, ...] = field(default_factory=_default_features)
@@ -110,11 +112,29 @@ class EncoderParams:
     def __post_init__(self) -> None:
         if self.pool_size < 1:
             raise ValueError("pool_size must be >= 1")
+        if self.balance_pool_size < 1:
+            raise ValueError("balance_pool_size must be >= 1")
         if not 0.0 <= self.min_rate_hz < self.max_rate_hz:
             raise ValueError("need 0 <= min_rate_hz < max_rate_hz")
         names = [f.name for f in self.features]
         if len(set(names)) != len(names):
             raise ValueError("duplicate feature names")
+        if self.option_b_variant not in OPTION_B_VARIANTS:
+            raise ValueError(
+                f"option_b_variant must be one of {OPTION_B_VARIANTS}, "
+                f"got {self.option_b_variant!r}"
+            )
+        # At an endpoint, every mirrored feature can contribute a difference of
+        # pool_size * (max_rate-min_rate). A balancing KC has exactly that rate
+        # span available above min_rate, hence this capacity condition.
+        n_mirrored = sum(f.mirror_for_no for f in self.features)
+        required = self.pool_size * n_mirrored
+        if self.balance_pool_size < required:
+            raise ValueError(
+                "balance_pool_size is too small to guarantee bounded Option B "
+                f"balancing: need at least {required} for {n_mirrored} mirrored "
+                f"features, got {self.balance_pool_size}"
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -239,8 +259,10 @@ DEC = "decided"
 PARAMETER_TABLE: Tuple[Tuple[str, str, str, str], ...] = (
     ("encoder", "pool_size", PH, "KCs per feature pool (100 matches the earlier cue experiments)"),
     ("encoder", "pool_seed", PH, "seed for pool assignment; arbitrary, freeze before prereg"),
-    ("encoder", "min_rate_hz", PH, "KC rate at a feature's min value; 30 Hz = lowest rate the graded test covers; after that test must EQUAL the validated range's low end"),
-    ("encoder", "max_rate_hz", PH, "KC rate at a feature's max value; 150 Hz = highest rate the graded test covers; after that test must EQUAL the validated range's high end"),
+    ("encoder", "balance_pool_size", DEC, "reserved Option B balancing KCs; at least pool_size times the number of mirrored features (300 for the defaults)"),
+    ("encoder", "option_b_variant", DEC, "total_drive_balanced by default; unbalanced is the named historical ablation"),
+    ("encoder", "min_rate_hz", PH, "nominal KC rate at a feature's min value; 30 Hz pending the balanced graded re-validation"),
+    ("encoder", "max_rate_hz", PH, "nominal KC rate at a feature's max value; 150 Hz pending the balanced graded re-validation"),
     ("encoder", "features", PH, "per-feature value range (placeholder) and required flag; NO-framing mirroring flags are DECIDED (see FeatureSpec)"),
     ("readout", "sign_table", PRE, "primary readout: CIRCUIT with 80% dominant-family rule"),
     ("readout", "sensitivity_tables", PRE, "CIRCUIT 70% and 90% sensitivity checks"),

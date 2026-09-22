@@ -20,6 +20,12 @@ cannot show them.
 (see "Results" at the bottom). The sentences above and below describe the state at
 the time of the pre-statement; no criterion in this document was changed after the run.
 
+**Update, 2026-09-22: SUPERSEDED for the current encoder.** Total-drive
+balancing is now the Option B default, so this unbalanced uniform-cue result no
+longer validates the current multi-pool stimulus. It remains a historical result.
+The replacement pre-statement is
+[`graded-encoding-balanced.md`](graded-encoding-balanced.md); it has not run.
+
 Terms used here (Kenyon cell, MBON, firing rate, cell type, noise floor) are
 explained in [`mb-learning-interface.md`](mb-learning-interface.md) and
 [`mbon-separability.md`](mbon-separability.md).
@@ -366,7 +372,8 @@ and GROUP more drive means a more approach-like score, and Option B would lean t
 the *more expensive* side instead. MBON09, the largest contributor, is exactly the type
 where CIRCUIT (avoidance-like) and the group-level label (approach) disagree.
 
-**Two remedies are proposed in the design doc, not chosen:** (a) *total-drive
+**Historical status at the time of this result:** two remedies were proposed in
+the design doc and not yet chosen: (a) *total-drive
 balancing*, so the YES and NO framings deliver equal total stimulation (costs: more
 groups of cells, untested with several groups at once, and equal total drive is not
 equal effect, which could leave a smaller, less visible lean); (b) *innate-score

@@ -40,12 +40,10 @@ from .bias_mitigation import (
     MITIGATIONS,
     TOTAL_DRIVE_BALANCING,
     score_difference,
-    select_balance_pool,
-    total_drive_balance,
 )
 from .encoder import KCEncoder, OptionBStimuli
 from .first_learning import Readout
-from .params import EncoderParams, PlasticityParams, RewardParams
+from .params import OPTION_B_UNBALANCED, EncoderParams, PlasticityParams, RewardParams
 from .plasticity import CompartmentMap, PlasticKCMBON
 from .readout import load_dopamine_counts
 from .reward import brier_improvement_reward, dopamine_signal, profit_reward
@@ -72,9 +70,9 @@ class Simulator(Protocol):
 
 @dataclass(frozen=True)
 class SyntheticConfig:
-    """Pre-stated sweep settings. Mitigation is deliberately mandatory."""
+    """Pre-stated sweep settings; total-drive balancing is the selected default."""
 
-    mitigation: str
+    mitigation: str = TOTAL_DRIVE_BALANCING
     signal_strengths: Tuple[float, ...] = SIGNAL_STRENGTHS
     market_seeds: Tuple[int, ...] = MARKET_SEEDS
     markets_per_seed: int = 100
@@ -86,8 +84,6 @@ class SyntheticConfig:
     exploration_seed: int = 20261090
     score_scale: float = 20.0
     decision_margin: float = 0.0
-    balance_pool_size: int = 300
-    balance_pool_seed: int = 20260403
     bootstrap_resamples: int = 2000
     bootstrap_seed: int = 20261099
     confidence_level: float = 0.95
@@ -225,19 +221,12 @@ def _stimuli(
     encoder: KCEncoder,
     market: Market,
     cfg: SyntheticConfig,
-    balance_pool: Optional[np.ndarray],
 ) -> OptionBStimuli:
-    pair = encoder.option_b_stimuli(market_features(market))
-    if cfg.mitigation == TOTAL_DRIVE_BALANCING:
-        if balance_pool is None:
-            raise AssertionError("total-drive balancing needs its filler pool")
-        pair = total_drive_balance(
-            pair,
-            balance_pool,
-            min_rate_hz=cfg.encoder.min_rate_hz,
-            max_rate_hz=cfg.encoder.max_rate_hz,
-        )
-    return pair
+    # Total-drive balancing now belongs to the encoder and is its default.
+    # The retained innate-subtraction comparison must use the historical raw
+    # stimuli or it would silently receive both mitigations.
+    variant = None if cfg.mitigation == TOTAL_DRIVE_BALANCING else OPTION_B_UNBALANCED
+    return encoder.option_b_stimuli(market_features(market), variant=variant)
 
 
 def _score_pair(
@@ -283,15 +272,8 @@ def _teaching(
     return dopamine_signal(value, cfg.reward).strengths()
 
 
-def setup_encoder(sim: Simulator, cfg: SyntheticConfig) -> Tuple[KCEncoder, Optional[np.ndarray]]:
-    encoder = KCEncoder(sim.kc_ids, params=cfg.encoder)
-    balance_pool = None
-    if cfg.mitigation == TOTAL_DRIVE_BALANCING:
-        occupied = np.concatenate(list(encoder.pools.values()))
-        balance_pool = select_balance_pool(
-            sim.kc_ids, occupied, pool_size=cfg.balance_pool_size, seed=cfg.balance_pool_seed
-        )
-    return encoder, balance_pool
+def setup_encoder(sim: Simulator, cfg: SyntheticConfig) -> KCEncoder:
+    return KCEncoder(sim.kc_ids, params=cfg.encoder)
 
 
 def compute_innate_scores(
@@ -301,12 +283,12 @@ def compute_innate_scores(
     markets = generate_signal_markets(
         cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
     )
-    encoder, balance_pool = setup_encoder(sim, cfg)
+    encoder = setup_encoder(sim, cfg)
     readout = Readout(sim.mbon_labels, _first_learning_config())
     sim.set_weights(sim.baseline_weights())
     out = []
     for index, market in enumerate(markets):
-        pair = _stimuli(encoder, market, cfg, balance_pool)
+        pair = _stimuli(encoder, market, cfg)
         _, _, yes, no = _score_pair(
             sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
         )
@@ -342,7 +324,7 @@ def run_dataset(
     markets = generate_signal_markets(
         cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
     )
-    encoder, balance_pool = setup_encoder(sim, cfg)
+    encoder = setup_encoder(sim, cfg)
     readout = Readout(sim.mbon_labels, _first_learning_config())
     baseline = np.asarray(sim.baseline_weights(), dtype=float)
     cmap = CompartmentMap.from_dopamine_counts(
@@ -354,7 +336,7 @@ def run_dataset(
     for index, market in enumerate(markets):
         train = index < cfg.train_count
         sim.set_weights(plastic.weights if condition != LEARNING_OFF else baseline)
-        pair = _stimuli(encoder, market, cfg, balance_pool)
+        pair = _stimuli(encoder, market, cfg)
         kc_yes, kc_no, yes_score, no_score = _score_pair(
             sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
         )

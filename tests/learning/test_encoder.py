@@ -5,12 +5,18 @@ import pytest
 np = pytest.importorskip("numpy")
 
 from flyshi_research.learning.encoder import (  # noqa: E402
+    BALANCE_FEATURE,
     KCEncoder,
     assign_pools,
     option_b_stimuli,
     value_to_rate,
 )
-from flyshi_research.learning.params import EncoderParams, FeatureSpec  # noqa: E402
+from flyshi_research.learning.params import (  # noqa: E402
+    OPTION_B_BALANCED,
+    OPTION_B_UNBALANCED,
+    EncoderParams,
+    FeatureSpec,
+)
 
 # Synthetic stand-ins for left-hemisphere KC root IDs (same magnitude as FlyWire
 # IDs, so int64 handling is exercised). No real IDs are hardcoded anywhere.
@@ -38,6 +44,8 @@ def test_pools_are_disjoint_and_correct_size():
         assert not (seen & set(pool.tolist())), f"{name} overlaps an earlier pool"
         seen |= set(pool.tolist())
     assert set(enc.pools) == set(NAMES)
+    assert enc.balance_pool.size == enc.params.balance_pool_size
+    assert not seen & set(enc.balance_pool.tolist())
 
 
 def test_pools_come_from_supplied_ids_only():
@@ -201,6 +209,53 @@ def test_option_b_stimuli_differ_only_where_intended():
     for neutral in ("time_to_resolution", "liquidity"):
         assert pair.yes.feature_rates_hz[neutral] == pair.no.feature_rates_hz[neutral]
     assert not np.array_equal(pair.yes.rates_hz, pair.no.rates_hz)
+
+
+@pytest.mark.parametrize(
+    "price,change,liquidity,signal",
+    [
+        (0.0, -0.2, 0.0, 0.0),
+        (1.0, 0.2, 1.0, 1.0),
+        (0.137, -0.073, 0.819, 0.911),
+        (0.5, 0.0, 0.25, 0.5),
+        (-9.0, 8.0, 0.4, 3.0),  # clipping must not break the invariant
+    ],
+)
+def test_option_b_default_has_equal_total_drive_for_arbitrary_values(
+    price, change, liquidity, signal
+):
+    enc = make_encoder()
+    pair = enc.option_b_stimuli(
+        {
+            "price": price,
+            "recent_change": change,
+            "time_to_resolution": 47.25,
+            "liquidity": liquidity,
+            "signal": signal,
+        }
+    )
+    assert enc.params.option_b_variant == OPTION_B_BALANCED
+    assert pair.yes.feature_rates_hz[BALANCE_FEATURE] <= enc.params.max_rate_hz
+    assert pair.no.feature_rates_hz[BALANCE_FEATURE] <= enc.params.max_rate_hz
+    assert np.sum(pair.yes.rates_hz) == pytest.approx(
+        np.sum(pair.no.rates_hz), abs=1e-10, rel=0.0
+    )
+
+
+def test_option_b_unbalanced_is_named_historical_ablation():
+    enc = make_encoder()
+    balanced = enc.option_b_stimuli(FEATURES)
+    old = enc.option_b_stimuli(FEATURES, variant=OPTION_B_UNBALANCED)
+    assert BALANCE_FEATURE in balanced.yes.feature_rates_hz
+    assert BALANCE_FEATURE not in old.yes.feature_rates_hz
+    assert old.yes.kc_ids.size == len(FEATURES) * enc.params.pool_size
+    assert np.sum(old.yes.rates_hz) != pytest.approx(np.sum(old.no.rates_hz))
+
+
+def test_option_b_variant_can_be_selected_in_params():
+    enc = make_encoder(option_b_variant=OPTION_B_UNBALANCED)
+    pair = enc.option_b_stimuli(FEATURES)
+    assert BALANCE_FEATURE not in pair.yes.feature_rates_hz
 
 
 def test_recent_change_mirrors_sign_under_no():

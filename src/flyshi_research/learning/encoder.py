@@ -8,7 +8,9 @@ Design (docs/design/mb-learning-interface.md, 4a):
   * a feature value becomes a firing rate by a bounded linear map, with
     out-of-range values clipped and the clipping REPORTED (never silent);
   * Option B (4b) needs two stimuli per decision: "YES at price p" and
-    "NO at price 1 - p".
+    "NO at price 1 - p". By default a reserved KC pool exactly equalises their
+    aggregate rate x pool-size drive; ``unbalanced`` retains the old behaviour
+    as a named ablation.
 
 Runner hand-off: ``Stimulus.rates_by_kc_id()`` gives the ``{root_id: Hz}`` mapping
 that ``repro/mushroom_body/fast_runner.run_cue_rates`` consumes (the scalar-rate
@@ -22,10 +24,17 @@ from typing import Dict, Iterable, Mapping, Optional, Tuple
 
 import numpy as np
 
-from .params import EncoderParams, FeatureSpec
+from .params import (
+    OPTION_B_BALANCED,
+    OPTION_B_UNBALANCED,
+    OPTION_B_VARIANTS,
+    EncoderParams,
+    FeatureSpec,
+)
 
 YES = "YES"
 NO = "NO"
+BALANCE_FEATURE = "__total_drive_balance__"
 
 
 @dataclass(frozen=True)
@@ -160,9 +169,31 @@ class KCEncoder:
         self.specs: Dict[str, FeatureSpec] = {f.name: f for f in self.params.features}
         # Pools for ALL features, including optional ones, so an absent optional
         # feature never shifts anyone else's pool.
-        self.pools: Dict[str, np.ndarray] = assign_pools(
-            kc_ids, list(self.specs), self.params.pool_size, self.seed
-        )
+        arr = np.asarray(list(kc_ids) if not isinstance(kc_ids, np.ndarray) else kc_ids)
+        if arr.size == 0:
+            raise ValueError("kc_ids is empty")
+        if not np.issubdtype(arr.dtype, np.integer):
+            raise TypeError(f"kc_ids must be integers, got dtype {arr.dtype}")
+        ids = np.sort(arr.astype(np.int64))
+        if np.any(ids[1:] == ids[:-1]):
+            raise ValueError("kc_ids contains duplicates")
+        feature_need = self.params.pool_size * len(self.specs)
+        need = feature_need + self.params.balance_pool_size
+        if need > ids.size:
+            raise ValueError(
+                f"need {need} distinct KCs ({feature_need} feature-pool KCs + "
+                f"{self.params.balance_pool_size} balancing KCs) but only "
+                f"{ids.size} were supplied"
+            )
+        shuffled = ids[np.random.default_rng(self.seed).permutation(ids.size)]
+        names = list(self.specs)
+        self.pools = {
+            name: np.sort(
+                shuffled[i * self.params.pool_size : (i + 1) * self.params.pool_size]
+            )
+            for i, name in enumerate(names)
+        }
+        self.balance_pool = np.sort(shuffled[feature_need:need])
 
     def encode(self, features: Mapping[str, float], side: str = YES) -> Stimulus:
         """Encode one market's features for one framing (``"YES"`` or ``"NO"``).
@@ -215,11 +246,83 @@ class KCEncoder:
             omitted=tuple(omitted),
         )
 
-    def option_b_stimuli(self, features: Mapping[str, float]) -> OptionBStimuli:
-        """The two Option B stimuli: "YES at price p" and "NO at price 1 - p"."""
-        return OptionBStimuli(yes=self.encode(features, YES), no=self.encode(features, NO))
+    def option_b_stimuli(
+        self, features: Mapping[str, float], variant: Optional[str] = None
+    ) -> OptionBStimuli:
+        """Build the paired Option B stimuli.
+
+        ``total_drive_balanced`` (the default) leaves every feature-pool rate
+        unchanged and appends the same reserved pool of ``B`` KCs to both
+        framings. Let ``D_Y = sum_i rate_Y[i]`` and likewise ``D_N`` over the
+        feature pools, ``r_min`` be the encoder minimum, and
+        ``Delta = |D_Y-D_N|``. The higher-drive framing gives every balancing KC
+        ``r_min``; the lower-drive framing gives each one
+
+            r_min + Delta / B.
+
+        Thus both totals are exactly ``max(D_Y,D_N) + B*r_min`` in real
+        arithmetic. The capacity check in :class:`EncoderParams` guarantees the
+        balancing rate remains within the encoder bounds for every in-range
+        feature value. Because the existing encoder uses disjoint uniform pools,
+        summing per-KC rates is exactly ``sum(rate_f * pool_size_f)``: this is the
+        requested total spike-drive, while the identity/rate pattern remains the
+        only difference between YES and NO. Floating-point totals can differ by
+        machine rounding only.
+
+        ``unbalanced`` returns the historical feature pools without the reserved
+        pool and is retained solely as a named comparison/ablation.
+        """
+        chosen = self.params.option_b_variant if variant is None else variant
+        if chosen not in OPTION_B_VARIANTS:
+            raise ValueError(f"variant must be one of {OPTION_B_VARIANTS}, got {chosen!r}")
+        yes = self.encode(features, YES)
+        no = self.encode(features, NO)
+        if chosen == OPTION_B_UNBALANCED:
+            return OptionBStimuli(yes=yes, no=no)
+
+        d_yes = float(np.sum(yes.rates_hz, dtype=np.float64))
+        d_no = float(np.sum(no.rates_hz, dtype=np.float64))
+        difference = abs(d_yes - d_no)
+        low_balance_rate = self.params.min_rate_hz + difference / self.balance_pool.size
+        if low_balance_rate > self.params.max_rate_hz + 1e-12:
+            raise ValueError(
+                "balancing pool lacks capacity for this Option B pair: "
+                f"required rate {low_balance_rate:g} Hz exceeds "
+                f"{self.params.max_rate_hz:g} Hz"
+            )
+
+        if d_yes >= d_no:
+            yes_rate, no_rate = self.params.min_rate_hz, low_balance_rate
+        else:
+            yes_rate, no_rate = low_balance_rate, self.params.min_rate_hz
+        return OptionBStimuli(
+            yes=self._append_balance_pool(yes, yes_rate),
+            no=self._append_balance_pool(no, no_rate),
+        )
+
+    def _append_balance_pool(self, stimulus: Stimulus, rate_hz: float) -> Stimulus:
+        """Return ``stimulus`` with the encoder's reserved balancing pool."""
+        feature_rates = dict(stimulus.feature_rates_hz)
+        feature_rates[BALANCE_FEATURE] = float(rate_hz)
+        feature_values = dict(stimulus.feature_values)
+        feature_values[BALANCE_FEATURE] = float(rate_hz)
+        return Stimulus(
+            side=stimulus.side,
+            kc_ids=np.concatenate((stimulus.kc_ids, self.balance_pool)),
+            rates_hz=np.concatenate(
+                (stimulus.rates_hz, np.full(self.balance_pool.size, rate_hz, dtype=np.float64))
+            ),
+            feature_rates_hz=feature_rates,
+            feature_values=feature_values,
+            clip_events=stimulus.clip_events,
+            omitted=stimulus.omitted,
+        )
 
 
-def option_b_stimuli(encoder: KCEncoder, features: Mapping[str, float]) -> OptionBStimuli:
+def option_b_stimuli(
+    encoder: KCEncoder,
+    features: Mapping[str, float],
+    variant: Optional[str] = None,
+) -> OptionBStimuli:
     """Module-level form of :meth:`KCEncoder.option_b_stimuli`."""
-    return encoder.option_b_stimuli(features)
+    return encoder.option_b_stimuli(features, variant=variant)

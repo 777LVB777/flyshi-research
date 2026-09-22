@@ -54,7 +54,8 @@ distribution may differ from frozen-weight test forecasts.
 ## 3. Circuit presentation and learning
 
 The encoder uses all five feature pools: price, recent change, time to resolution,
-liquidity and signal. Its validated rate range is 30–150 Hz. Each decision uses
+liquidity and signal. Its nominal rate range is 30–150 Hz; the earlier unbalanced
+validation is superseded and balanced re-validation is pending. Each decision uses
 Option B: one YES framing and one NO framing. A presentation is **1000 ms × 5
 trials**, because 100 ms × 1 trial was below the pre-stated single-shot noise margin.
 YES and NO use the same simulation seed for a market; seeds start at 20270000 and are
@@ -65,8 +66,7 @@ probability by `sigmoid(mitigated_score_difference / 20)`. The 20-Hz scale is an
 **unverified fixed placeholder**; Platt calibration is intended to absorb scale, but
 could be affected by saturation. The decision margin is zero.
 
-An untouched circuit can tie, and innate-score subtraction makes every untouched
-score difference exactly zero. Because abstentions teach nothing, training would
+An untouched circuit can tie. Because abstentions teach nothing, training would
 otherwise never start. Therefore, **on training markets only**, an exact abstention
 is replaced by a seeded 50/50 YES/NO exploratory action (exploration seed 20261090).
 It is a real acted-on decision and may learn; test ties always abstain. This
@@ -85,25 +85,26 @@ Dopamine remains an abstract teaching signal applied by our plasticity rule. No
 dopamine neuron is stimulated. Reward scaling, drift pace and the inferred
 compartment map retain the **unverified** status documented elsewhere.
 
-## 4. Intensity-bias mitigation — OPEN DECISION BEFORE THE RUN
+## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
-The full run has **no default mitigation**. Luca must choose one explicitly before
-any job is launched. Both are implemented and fake-tested; neither has been tested
-on the real model.
+The primary experiment uses `total_drive_balancing`. It is the default Option B
+encoder. `innate_score_subtraction` is not selected.
 
 ### Option A: `total_drive_balancing`
 
-A fixed, disjoint pool of 300 filler KCs is added to both framings. The framing with
-higher original summed KC rate drives the filler pool at 30 Hz. The other framing's
-filler rate is raised just enough that the summed rates are exactly equal, never
-above 150 Hz. This removes a fake score term that depends only on total rate.
+A fixed, disjoint pool of `B=300` balancing KCs is added to both framings. If
+`D_s = sum_f n_f r_s,f` is the raw feature-pool drive, the higher-drive framing's
+balancing pool fires at 30 Hz and the lower-drive framing's pool fires at
+`30 + |D_YES-D_NO|/B` Hz. Both totals are therefore
+`max(D_YES,D_NO) + B×30`, without changing any feature-pool rate. This removes a
+fake score term that depends only on aggregate rate.
 
 **Unverified:** equal summed drive need not mean equal circuit effect because different
 KCs reach different MBONs. Several simultaneous pools and the 300-KC filler pool have
 not been validated by a real graded-style experiment. The filler also carries the
 original imbalance inversely rather than destroying it.
 
-### Option B: `innate_score_subtraction`
+### Not selected: `innate_score_subtraction`
 
 For each exact market stimulus, run both framings at original weights and save their
 scores. Decisions use `(current_yes - innate_yes) - (current_no - innate_no)`. The
@@ -114,8 +115,9 @@ jobs are shared across the three arms.
 can retain an intensity×learning interaction, removes useful innate structure, and
 makes the learning-off score identically zero (hence its test behavior is abstention).
 
-The options are not combined. The selected name is part of the configuration hash.
-A result from one option says nothing about the other.
+The options are not combined in the primary experiment. The selected name remains
+part of the configuration hash. The old unbalanced encoder remains available as a
+named ablation, not as the primary stimulus.
 
 ## 5. Baselines and metrics
 
@@ -173,12 +175,10 @@ interrupted 100-market chain restarts that chain, while every completed chain is
 preserved. Per-market checkpoints are not implemented (**unverified operational
 risk**). Each process owns one network.
 
-- Total-drive balancing: 5 strengths × 5 seeds × 3 arms × 100 markets × 2 framings
+- Selected total-drive-balancing run: 5 strengths × 5 seeds × 3 arms × 100 markets × 2 framings
   = **15,000 simulation runs**.
-- Innate-score subtraction: the same 15,000 current-weight runs plus 5 strengths ×
-  5 seeds × 100 markets × 2 baseline framings = **20,000 simulation runs**.
 
-Each run is 1000 ms × 5 trials, so these are 75,000 or 100,000 simulated
+Each run is 1000 ms × 5 trials, so this is 75,000 simulated
 trial-seconds respectively, plus network builds. Wall-clock time and memory on the
 server are **unverified**. The fast runner equivalence test has since been run
 and PASSED (git commit `6a00cdd`; mean old-vs-new distance 4.61 Hz against the
@@ -192,5 +192,5 @@ processes by RAM.
 
 ## Results
 
-*None. Append results here after the explicitly selected mitigation has completed;
+*None. Append results here after the selected mitigation has completed;
 do not edit the protocol or criterion above in response to results.*
