@@ -36,11 +36,13 @@ import numpy as np
 
 from .params import PlasticityParams, RewardParams
 from .plasticity import CompartmentMap, PlasticKCMBON
+from .mbon_sides import LEFT, side_mask
 from .readout import circuit_score, load_dopamine_counts, load_sign_table
 from .reward import dopamine_signal, profit_reward
 
 CUE_A, CUE_B = "A", "B"
 NOISE_MARGIN = 3.0
+LEFT_ONLY_KEY = "circuit_80|left_only"
 
 # ---- verdicts ------------------------------------------------------------------ #
 DEMONSTRATED = "LEARNING DEMONSTRATED"
@@ -313,6 +315,10 @@ class ResultPaths:
     def labels(self) -> Path:
         return self.dir / "mbon_labels.json"
 
+    def mbon_ids(self) -> Path:
+        """MBON root IDs in rate-vector order; needed by the left-only check."""
+        return self.dir / "mbon_ids.json"
+
     def pretest_part(self, seed: int) -> Path:
         return self.parts / f"pretest_seed_{seed}.json"
 
@@ -392,6 +398,10 @@ class Experiment:
                         "this configuration")
         _write_or_check(self.paths.labels(), json.dumps(list(sim.mbon_labels)),
                         "this simulator's MBON labels")
+        # Saved so the preregistered left-only readout can be recomputed from the
+        # per-MBON rates in the test rows without rerunning anything.
+        _write_or_check(self.paths.mbon_ids(), json.dumps([int(i) for i in sim.mbon_ids]),
+                        "this simulator's MBON ids")
         self.readout = Readout(sim.mbon_labels, cfg)
         self.W0 = np.array(sim.baseline_weights(), dtype=np.float64)
         n_kc, n_mbon = self.W0.shape
@@ -572,6 +582,13 @@ def evaluate_results(results_dir: Path, cfg: ExperimentConfig,
     if P.labels().exists():
         labels = json.loads(P.labels().read_text())
         out["readout_sensitivity"] = readout_sensitivity(pre, posts, labels, cfg)
+        if P.mbon_ids().exists():
+            mbon_ids = json.loads(P.mbon_ids().read_text())
+            try:
+                left = left_only_sensitivity(pre, posts, labels, mbon_ids, cfg)
+            except KeyError as exc:  # e.g. a fake simulator's invented MBON ids
+                left = {"unavailable": str(exc)}
+            out["readout_sensitivity"][LEFT_ONLY_KEY] = left
     return out
 
 
@@ -660,9 +677,39 @@ def variant_key(table: str, aggregation: str) -> str:
     return table if aggregation == "type_mean" else f"{table}|{aggregation}"
 
 
-def _rescore(rows: Sequence[Mapping], readout: Readout) -> List[dict]:
-    return [{"seed": r["seed"], "score_A": readout.score(np.asarray(r["mbon_A"])),
-             "score_B": readout.score(np.asarray(r["mbon_B"]))} for r in rows]
+def _rescore(rows: Sequence[Mapping], readout: Readout,
+             mask: Optional[np.ndarray] = None) -> List[dict]:
+    def score(rates: Sequence[float]) -> float:
+        r = np.asarray(rates)
+        return readout.score(r if mask is None else r[mask])
+
+    return [{"seed": r["seed"], "score_A": score(r["mbon_A"]),
+             "score_B": score(r["mbon_B"])} for r in rows]
+
+
+def left_only_sensitivity(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping]],
+                          labels: Sequence[str], mbon_ids: Sequence[int],
+                          cfg: ExperimentConfig, side: str = LEFT,
+                          sides: Optional[Dict[int, str]] = None) -> dict:
+    """The primary readout restricted to one hemisphere's MBON instances.
+
+    Preregistered sensitivity check (decided 2026-09-22); REPORTED, never gating.
+    Computed by re-scoring the per-MBON rates already saved for each test
+    presentation, so it adds no simulation. Exact here because the teaching signal
+    in this test is fixed by the condition, not by the readout.
+    """
+    mask = side_mask(mbon_ids, side, sides)
+    kept = [label for label, keep in zip(list(labels), mask.tolist()) if keep]
+    ro = Readout(kept, cfg)
+    v = evaluate_scores(_rescore(pre, ro, mask), {n: _rescore(r, ro, mask) for n, r in posts.items()}, cfg)
+    cd = (v.get("reported_diagnostics") or {}).get("c_reward_both")
+    return {
+        "verdict": v["verdict"], "reason": v.get("reason"),
+        "sigma": v.get("sigma"), "threshold": v.get("threshold"),
+        "conditions": v.get("conditions", {}), "failed_controls": v.get("failed_controls", []),
+        "c_reward_both_delta": cd["delta"] if cd else None,
+        "n_instances": int(mask.sum()), "side": side,
+    }
 
 
 def readout_sensitivity(pre: Sequence[Mapping], posts: Mapping[str, Sequence[Mapping]],
@@ -707,6 +754,9 @@ def summary_lines(v: dict) -> List[str]:
     if sens:
         lines.append("readout sensitivity variants (REPORTED ONLY; the verdict above is CIRCUIT-80, type mean):")
         for name, sv in sens.items():
+            if "unavailable" in sv:
+                lines.append(f"  {name:28s} NOT COMPUTED ({sv['unavailable']})")
+                continue
             main = sv["conditions"].get("main", {}).get("delta")
             lines.append(f"  {name:28s} {sv['verdict']}"
                          + (f"  (main delta {main:+.3f}, threshold {sv['threshold']:.3f})" if main is not None else ""))

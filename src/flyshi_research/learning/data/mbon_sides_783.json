@@ -1,0 +1,505 @@
+{
+  "annotation_source": {
+    "commit": "8587524c1748ce5ef2080822a2fc890fc03bf597",
+    "license": "unverified: no LICENSE file at the recorded official repository commit",
+    "release_tag": "v3.1.0",
+    "repository": "https://github.com/flyconnectome/flywire_annotations",
+    "table": "supplemental_files/Supplemental_file1_neuron_annotations.tsv"
+  },
+  "completeness_source": {
+    "path": "third_party/Drosophila_brain_model/Completeness_783.csv"
+  },
+  "count": 96,
+  "counts_by_side": {
+    "left": 48,
+    "right": 48
+  },
+  "decision": "docs/design/open-decisions.md item 2, resolved 2026-09-22",
+  "description": "Frozen side label per modelled MBON instance. The PRIMARY readout uses all instances in both hemispheres; the left-only readout is a preregistered sensitivity check and is recomputed from saved per-MBON rates.",
+  "expected_mbon_count": 96,
+  "flywire_version": "783",
+  "records": [
+    {
+      "cell_type": "MBON23",
+      "root_id": 720575940606953858,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON26",
+      "root_id": 720575940607155890,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15-like",
+      "root_id": 720575940608304220,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON32",
+      "root_id": 720575940609959637,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940610647416,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON09",
+      "root_id": 720575940610964946,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON20",
+      "root_id": 720575940611344078,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15-like",
+      "root_id": 720575940612196850,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15",
+      "root_id": 720575940612455338,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON14",
+      "root_id": 720575940614026193,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON29",
+      "root_id": 720575940614392999,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON28",
+      "root_id": 720575940614595218,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON28",
+      "root_id": 720575940614892182,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940615221811,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940616398303,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON22",
+      "root_id": 720575940616463477,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON07",
+      "root_id": 720575940617302365,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON02",
+      "root_id": 720575940617552340,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON23",
+      "root_id": 720575940617567206,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON11",
+      "root_id": 720575940617749538,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON17",
+      "root_id": 720575940617760257,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON30",
+      "root_id": 720575940618008859,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON27",
+      "root_id": 720575940618249797,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940619810389,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON04",
+      "root_id": 720575940620464321,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON21",
+      "root_id": 720575940620715224,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON05",
+      "root_id": 720575940621164720,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON21",
+      "root_id": 720575940621777391,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON12",
+      "root_id": 720575940621828443,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON15",
+      "root_id": 720575940622093436,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON27",
+      "root_id": 720575940622979277,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON18",
+      "root_id": 720575940622997453,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON12",
+      "root_id": 720575940623001480,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON33",
+      "root_id": 720575940623182847,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON11",
+      "root_id": 720575940623201833,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON16",
+      "root_id": 720575940623377802,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON07",
+      "root_id": 720575940623381956,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON24",
+      "root_id": 720575940623464316,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940623750325,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON19",
+      "root_id": 720575940623841463,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON12",
+      "root_id": 720575940623905719,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON01",
+      "root_id": 720575940624117245,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON02",
+      "root_id": 720575940624185095,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON33",
+      "root_id": 720575940624280328,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940624489964,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON18",
+      "root_id": 720575940624539284,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON03",
+      "root_id": 720575940624590316,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940624659943,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON03",
+      "root_id": 720575940624694503,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON15-like",
+      "root_id": 720575940624696810,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON19",
+      "root_id": 720575940626109315,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON13",
+      "root_id": 720575940626315010,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON16",
+      "root_id": 720575940626744921,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON19",
+      "root_id": 720575940626833021,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON25,MBON34",
+      "root_id": 720575940627144069,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON04",
+      "root_id": 720575940628734376,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15-like",
+      "root_id": 720575940628757547,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON07",
+      "root_id": 720575940628783363,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON09",
+      "root_id": 720575940629422086,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940629529722,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940629585602,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON09",
+      "root_id": 720575940629856515,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON26",
+      "root_id": 720575940629981440,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON12",
+      "root_id": 720575940630075703,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON05",
+      "root_id": 720575940630496374,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15",
+      "root_id": 720575940630767959,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON09",
+      "root_id": 720575940630864847,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON24",
+      "root_id": 720575940631177803,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940632118343,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON14",
+      "root_id": 720575940632535756,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON35",
+      "root_id": 720575940632943277,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940633209647,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON19",
+      "root_id": 720575940634482783,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON17-like",
+      "root_id": 720575940634822751,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON22",
+      "root_id": 720575940635063135,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON15-like",
+      "root_id": 720575940635082347,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON15",
+      "root_id": 720575940635841143,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON31",
+      "root_id": 720575940636992368,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON35",
+      "root_id": 720575940637902938,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON30",
+      "root_id": 720575940637934308,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON06",
+      "root_id": 720575940638028607,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON06",
+      "root_id": 720575940638163428,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON32",
+      "root_id": 720575940638526278,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON17",
+      "root_id": 720575940638774606,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940639556467,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON14",
+      "root_id": 720575940639697827,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940642142861,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON01",
+      "root_id": 720575940643309197,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON14",
+      "root_id": 720575940643696288,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON29",
+      "root_id": 720575940643700640,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON20",
+      "root_id": 720575940643863496,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON31",
+      "root_id": 720575940644615716,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON13",
+      "root_id": 720575940645304430,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON10",
+      "root_id": 720575940647328900,
+      "side": "right"
+    },
+    {
+      "cell_type": "MBON17-like",
+      "root_id": 720575940650386553,
+      "side": "left"
+    },
+    {
+      "cell_type": "MBON07",
+      "root_id": 720575940652390134,
+      "side": "left"
+    }
+  ],
+  "schema_version": 1,
+  "selection_rule": "cell_class == 'MBON', restricted to Completeness_783.csv; side column copied verbatim"
+}

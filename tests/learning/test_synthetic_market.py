@@ -34,6 +34,7 @@ class FakeMarketSimulator:
         self.sensitive = sensitive
         self._learned = False
         self._signal_ids = set(KCEncoder(self.kc_ids).pools["signal"].tolist())
+        self.present_calls = 0
 
     def baseline_weights(self):
         return self._W0.copy()
@@ -44,6 +45,7 @@ class FakeMarketSimulator:
 
     def present(self, rates, seed, duration_ms, n_trials):
         del duration_ms
+        self.present_calls += 1
         kc = np.zeros(len(self.kc_ids))
         for kc_id, rate in rates.items():
             kc[self._index[kc_id]] = rate
@@ -107,12 +109,14 @@ def test_fake_with_learning_must_pass() -> None:
 
 
 def test_job_plans_and_run_counts_for_both_open_mitigations() -> None:
+    """Four training conditions since 2026-09-22: the drift-off sensitivity check is
+    its own condition, so the selected plan is 100 jobs / 20,000 runs (was 75/15,000)."""
     balanced = sm.SyntheticConfig(mitigation=TOTAL_DRIVE_BALANCING)
     innate = sm.SyntheticConfig(mitigation=INNATE_SCORE_SUBTRACTION)
-    assert len(sm.plan_jobs(balanced)) == 75
-    assert sm.estimated_run_count(balanced) == 15_000
-    assert len(sm.plan_jobs(innate)) == 100
-    assert sm.estimated_run_count(innate) == 20_000
+    assert len(sm.plan_jobs(balanced)) == 100
+    assert sm.estimated_run_count(balanced) == 20_000
+    assert len(sm.plan_jobs(innate)) == 125
+    assert sm.estimated_run_count(innate) == 25_000
     assert all(job.deps for job in sm.plan_jobs(innate) if job.kind == "condition")
 
 
@@ -128,8 +132,8 @@ def test_runner_dry_run_defaults_to_selected_mitigation_and_writes_nothing(tmp_p
     runner = _load_script(RUNNER_PATH, "synthetic_runner_test")
     assert runner.main(["--dry-run", "--results-base", str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert "15000" in output and "total_drive_balancing" in output
-    assert "OPEN DECISION" not in output and "20000" not in output
+    assert "20000" in output and "total_drive_balancing" in output
+    assert "OPEN DECISION" not in output and "25000" not in output
     assert not any(tmp_path.iterdir())
 
 
@@ -139,5 +143,57 @@ def test_parallel_launcher_dry_run_starts_no_process(tmp_path, capsys) -> None:
         "--dry-run", "--mitigation", TOTAL_DRIVE_BALANCING,
         "--results-base", str(tmp_path), "--max-procs", "3",
     ]) == 0
-    assert "75 jobs" in capsys.readouterr().out
+    assert "100 jobs" in capsys.readouterr().out
     assert not any(tmp_path.iterdir())
+
+
+# ---- drift-off condition and the left-only recompute (decided 2026-09-22) ---- #
+def test_drift_off_is_its_own_condition_and_runs_with_drift_disabled() -> None:
+    cfg = replace(small_config(), plasticity=PlasticityParams(learning_rate=0.3, drift_rate=0.25))
+    out = sm.run_dataset(FakeMarketSimulator(True), cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT_DRIFT_OFF)
+    assert sm.PROFIT_DRIFT_OFF in sm.CONDITIONS and out["drift_rate"] == 0.0
+    # the configured drift rate is untouched for every other condition
+    profit = sm.run_dataset(FakeMarketSimulator(True), cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT)
+    assert profit["drift_rate"] == 0.25
+
+
+def test_drift_off_teaches_like_the_profit_arm_when_drift_is_already_zero() -> None:
+    """Same teaching signal, same seeds: with drift_rate = 0 in the config the two
+    conditions must agree exactly, so any later difference is drift and nothing else."""
+    cfg = small_config()  # drift_rate = 0.0
+    kw = dict(strength=0.8, market_seed=sm.MARKET_SEEDS[0])
+    a = sm.run_dataset(FakeMarketSimulator(True), cfg, condition=sm.PROFIT, **kw)
+    b = sm.run_dataset(FakeMarketSimulator(True), cfg, condition=sm.PROFIT_DRIFT_OFF, **kw)
+    assert [r["action"] for r in a["test"]] == [r["action"] for r in b["test"]]
+    assert [r["score_difference"] for r in a["test"]] == [r["score_difference"] for r in b["test"]]
+
+
+def test_drift_off_diverges_from_the_profit_arm_once_drift_is_on() -> None:
+    cfg = replace(small_config(), plasticity=PlasticityParams(learning_rate=0.3, drift_rate=0.5))
+    kw = dict(strength=0.8, market_seed=sm.MARKET_SEEDS[0])
+    a = sm.run_dataset(FakeMarketSimulator(True), cfg, condition=sm.PROFIT, **kw)
+    b = sm.run_dataset(FakeMarketSimulator(True), cfg, condition=sm.PROFIT_DRIFT_OFF, **kw)
+    assert [r["score_difference"] for r in a["test"]] != [r["score_difference"] for r in b["test"]]
+
+
+def test_runs_save_per_mbon_rates_and_the_instance_labels() -> None:
+    cfg = small_config()
+    sim = FakeMarketSimulator(True)
+    out = sm.run_dataset(sim, cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT)
+    assert out["mbon_ids"] == list(sim.mbon_ids) and out["mbon_labels"] == list(sim.mbon_labels)
+    for row in out["train"] + out["test"]:
+        assert len(row["mbon_yes"]) == len(row["mbon_no"]) == len(sim.mbon_ids)
+
+
+def test_left_only_rescoring_adds_no_simulation_and_keeps_the_run_untouched() -> None:
+    cfg = small_config()
+    sim = FakeMarketSimulator(True)
+    out = sm.run_dataset(sim, cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT)
+    sides = {int(i): ("left" if n == 0 else "right") for n, i in enumerate(sim.mbon_ids)}
+    calls_before = sim.present_calls
+    left = sm.left_only_scores(out, cfg, sides=sides)
+    assert sim.present_calls == calls_before  # nothing was simulated
+    assert left["n_instances"] == 1 and left["side"] == "left"
+    assert len(left["test"]) == len(out["test"])
+    assert all(0.0 <= row["raw_probability"] <= 1.0 for row in left["test"])
+    assert left["note"].startswith("re-scored from saved rates")

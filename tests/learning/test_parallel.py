@@ -138,7 +138,7 @@ def test_every_preregistered_variant_is_reported_and_never_changes_the_verdict(t
     assert v["verdict"] == fl.DEMONSTRATED
     assert set(v["readout_sensitivity"]) == {
         "circuit_70", "circuit_90", "circuit_80_no_gamma3", "strict", "group",
-        "circuit_80|instance_sum"}
+        "circuit_80|instance_sum", fl.LEFT_ONLY_KEY}
     assert ("circuit_80_no_gamma3", "type_mean") in fl.READOUT_VARIANTS
     # circuit_70 is identical to circuit_80 on these labels, so it must agree exactly
     assert v["readout_sensitivity"]["circuit_70"]["conditions"]["main"]["delta"] == pytest.approx(

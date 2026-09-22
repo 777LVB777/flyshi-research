@@ -464,3 +464,54 @@ def test_experiment_verdict_needs_gating_condition_files_but_not_control_c(tmp_p
     exp.condition_path(by["b_reward_b"]).unlink()  # a gate is missing: cannot decide
     v = exp.evaluate()
     assert v["verdict"] == fl.INCONCLUSIVE and "b_reward_b" in v["reason"]
+
+
+# ---- left-only readout: preregistered sensitivity check (decided 2026-09-22) ---- #
+def test_experiment_saves_mbon_ids_so_the_left_only_check_can_be_recomputed(tmp_path):
+    sim = FakeSim()
+    v = run(tmp_path, sim)
+    saved = json.loads((next(tmp_path.glob("first_learning_*")) / "mbon_ids.json").read_text())
+    assert saved == list(sim.mbon_ids)
+    # every test presentation keeps its full per-MBON rate vector
+    pre = json.loads((next(tmp_path.glob("first_learning_*")) / "pretest.json").read_text())
+    assert len(pre["per_seed"][0]["mbon_A"]) == len(sim.mbon_ids)
+    # the fake's invented IDs are not in the frozen side table: reported, never fatal
+    assert "unavailable" in v["readout_sensitivity"][fl.LEFT_ONLY_KEY]
+    assert "NOT COMPUTED" in "\n".join(fl.summary_lines(v))
+
+
+def test_left_only_check_rescores_saved_rates_and_never_gates(tmp_path):
+    """With a fake side table, the check scores the left instances of the SAME saved
+    rates: no simulation is added and the primary verdict is untouched."""
+    sim = FakeSim()
+    v = run(tmp_path, sim)
+    d = next(tmp_path.glob("first_learning_*"))
+    pre = json.loads((d / "pretest.json").read_text())["per_seed"]
+    posts = {c.name: json.loads((d / f"condition_{c.name}.json").read_text())["posttest"]["per_seed"]
+             for c in fl.CONDITIONS}
+    sides = {int(i): ("left" if n % 2 == 0 else "right") for n, i in enumerate(sim.mbon_ids)}
+    before = sim.calls
+    left = fl.left_only_sensitivity(pre, posts, sim.mbon_labels, sim.mbon_ids,
+                                    fl.ExperimentConfig(), sides=sides)
+    assert sim.calls == before  # nothing was simulated
+    assert left["side"] == "left" and left["n_instances"] == len(sim.mbon_ids) // 2
+    assert left["verdict"] in (fl.DEMONSTRATED, fl.NOT_DEMONSTRATED, fl.CONFOUNDED, fl.INCONCLUSIVE)
+    assert v["verdict"] == fl.DEMONSTRATED  # the primary verdict is unchanged by the check
+
+
+def test_left_only_check_uses_only_the_selected_hemisphere(tmp_path):
+    """Right-instance rates must not enter the left-only score."""
+    sim = FakeSim()
+    run(tmp_path, sim)
+    d = next(tmp_path.glob("first_learning_*"))
+    pre = json.loads((d / "pretest.json").read_text())["per_seed"]
+    posts = {c.name: json.loads((d / f"condition_{c.name}.json").read_text())["posttest"]["per_seed"]
+             for c in fl.CONDITIONS}
+    sides = {int(i): ("left" if n % 2 == 0 else "right") for n, i in enumerate(sim.mbon_ids)}
+    left = fl.left_only_sensitivity(pre, posts, sim.mbon_labels, sim.mbon_ids,
+                                    fl.ExperimentConfig(), sides=sides)
+    louder = [dict(row, **{k: [x * 5 if n % 2 else x for n, x in enumerate(row[k])]
+                           for k in ("mbon_A", "mbon_B")}) for row in pre]
+    same = fl.left_only_sensitivity(louder, posts, sim.mbon_labels, sim.mbon_ids,
+                                    fl.ExperimentConfig(), sides=sides)
+    assert same["conditions"]["main"]["delta"] == pytest.approx(left["conditions"]["main"]["delta"])

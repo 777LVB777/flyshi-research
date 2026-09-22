@@ -874,8 +874,8 @@ Stated without softening. These are real, and some could stop the project.
   at the stimuli used in markets is not yet measured.
 - **Which output-neuron instances enter the per-type mean — RESOLVED
   2026-09-22.** All 96 instances, both hemispheres, is primary; left-only is a
-  preregistered sensitivity check (Section 4b). Still to build: a frozen left/right
-  mask exposed by the real backend, so the left-only score can be recomputed.
+  preregistered sensitivity check (Section 4b). The frozen side table (48 left,
+  48 right) and the per-MBON rate saving needed to recompute it now exist.
 - **Reward normalization and the accuracy-arm scale — RESOLVED 2026-09-22.**
   `brier_scale = 0.04`, symmetric clipping to [−1, 1], `dead_zone = 0` (Section
   4c). Still **unverified**: whether the 2-point-edge example is typical of the
@@ -888,8 +888,9 @@ Stated without softening. These are real, and some could stop the project.
   placeholder, and effective forgetting depends on market density and abstention
   rate.
 - **Degree-preserving shuffle scope — RESOLVED 2026-09-22.** Mushroom-body-only
-  is primary (Section 6). Still to write: the annotation rule and frozen root-ID
-  membership file.
+  is primary (Section 6). The annotation rule is frozen as code and the membership
+  file (5,598 root IDs: 5,177 KCs, 96 MBONs, 307 PAM, 16 PPL1, 2 APL) is generated
+  and hashed. The real shuffle has not been generated.
 - **The market data source is not chosen.** We have not selected which real
   prediction-market dataset to use.
 - **Speed is unmeasurable locally.** On the 8-gigabyte Mac, run timings are
@@ -1056,6 +1057,12 @@ This document is meant to be argued with and revised.
   `dead_zone = 0` (4c); (4) one drift step per acted resolution in controlled and
   real-market phases, drift-off as a preregistered sensitivity check (4d).
   Section 8's four corresponding open items are marked resolved.
+- **2026-09-22 (later still).** The two decisions that needed artifacts got them,
+  before any run: the shuffle membership rule is frozen as code with a hashed
+  root-ID file, and MBON side labels are frozen so the left-only readout can be
+  recomputed from saved per-MBON rates. The drift-off check runs as its own
+  synthetic-market training condition (20,000 runs instead of 15,000); the first
+  learning test's 260-run plan is unchanged.
 
 ---
 

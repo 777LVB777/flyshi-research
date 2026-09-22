@@ -74,12 +74,18 @@ training-only exploration rule is an **unverified engineering choice** required 
 bootstrap the stated learning rule. It must be reported and must not silently carry
 into the held-out test.
 
-Three arms use identical markets and seeds:
+Four arms use identical markets and seeds:
 
 - `profit`: headline arm; abstract PAM/PPL1 strength comes from net paper P&L.
 - `accuracy`: comparison arm; strength comes from Brier improvement over market
   price, using the probability available at decision time.
 - `learning_off`: no plasticity, with everything else unchanged.
+- `profit_drift_off`: the profit arm with `drift_rate = 0` — the preregistered
+  **drift sensitivity check** (added 2026-09-22). It is its own *training*
+  condition because drift acts inside the learning loop and cannot be recovered
+  from a run that had drift on. It is reported next to the profit arm and is
+  **not** part of the Section 6 gate, which is defined on `profit` against the
+  market price and against `learning_off`.
 
 Dopamine remains an abstract teaching signal applied by our plasticity rule. No
 dopamine neuron is stimulated. The inferred compartment map retains the
@@ -92,9 +98,16 @@ arms differ in signal type rather than size (typicality of that example is
 **unverified**). Drift advances one step per acted-on resolution, the same clock
 the real-market phase will use; `drift_rate = 0.01` is still a placeholder. The
 readout uses all 96 MBON instances in both hemispheres. Left-hemisphere-only
-MBONs and drift disabled (`drift_rate = 0`) are preregistered sensitivity checks;
-neither changes the success criterion in Section 6. No job list for them is
-defined in Section 7 yet.
+MBONs and drift disabled are preregistered sensitivity checks; neither changes the
+success criterion in Section 6. Drift-off is the fourth arm above and is in the
+Section 7 job list. The left-only readout adds no runs: every job saves the
+per-MBON rates of both framings for every market, plus the MBON root IDs and type
+labels, and the check re-scores them against the frozen side table
+(`src/flyshi_research/learning/data/mbon_sides_783.json`). One honest caveat: the
+decisions and weight updates in a saved run were made under the primary bilateral
+readout, so the recomputation shows what a left-only readout would have said about
+those runs; it does not replay the closed loop, and its decision margin would have
+to be calibrated separately on training markets.
 
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
@@ -186,10 +199,17 @@ interrupted 100-market chain restarts that chain, while every completed chain is
 preserved. Per-market checkpoints are not implemented (**unverified operational
 risk**). Each process owns one network.
 
-- Selected total-drive-balancing run: 5 strengths × 5 seeds × 3 arms × 100 markets × 2 framings
-  = **15,000 simulation runs**.
+- Selected total-drive-balancing run: 5 strengths × 5 seeds × **4 arms** × 100 markets × 2 framings
+  = **20,000 simulation runs** in **100 jobs**. (Before the drift-off arm was added
+  on 2026-09-22 this was 3 arms, 15,000 runs in 75 jobs; the extra 5,000 runs are
+  the drift sensitivity check.)
 
-Each run is 1000 ms × 5 trials, so this is 75,000 simulated
+Each job also saves the per-MBON rates of both framings for all 100 markets (for
+the left-only recomputation), about 150 KB per job and roughly 15 MB across the
+sweep — an arithmetic estimate from 96 instances × 2 framings × 100 markets, not a
+measured file size.
+
+Each run is 1000 ms × 5 trials, so this is 100,000 simulated
 trial-seconds respectively, plus network builds. Wall-clock time and memory on the
 server are **unverified**. The fast runner equivalence test has since been run
 and PASSED (git commit `6a00cdd`; mean old-vs-new distance 4.61 Hz against the

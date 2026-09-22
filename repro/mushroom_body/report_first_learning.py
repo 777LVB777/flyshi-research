@@ -53,6 +53,7 @@ VARIANT_TEXT = {
     "strict": "STRICT: only confidently labelled MBONs (robustness)",
     "group": "GROUP: group-level behavioural labels (robustness)",
     "circuit_80|instance_sum": "CIRCUIT-80 summed per neuron instead of per type",
+    fl.LEFT_ONLY_KEY: "CIRCUIT-80 over left-hemisphere MBONs only (hemisphere sensitivity)",
 }
 
 
@@ -138,12 +139,17 @@ def report_lines(results_dir: Path) -> List[str]:
         L.append("The same rules, recomputed from the saved MBON firing rates with each "
                  "preregistered alternative readout (no extra simulation). These are reported "
                  "only; the verdict above uses CIRCUIT-80.")
+        computed = {n: sv for n, sv in sens.items() if "unavailable" not in sv}
         for name, sv in sens.items():
+            if name not in computed:
+                L.append(f"- {VARIANT_TEXT.get(name, name)}: **NOT COMPUTED** ({sv['unavailable']})")
+                continue
             main = sv["conditions"].get("main", {}).get("delta")
             extra = (f"; main A−B change {main:+.2f} vs 3σ = {sv['threshold']:.2f}"
                      if main is not None and sv.get("threshold") else "")
             fails = f"; failed: {', '.join(sv['failed_controls'])}" if sv.get("failed_controls") else ""
             L.append(f"- {VARIANT_TEXT.get(name, name)}: **{sv['verdict']}**{extra}{fails}")
+        sens = computed
         agree = [n for n, sv in sens.items() if sv["verdict"] == v["verdict"]]
         L.append("")
         if len(agree) == len(sens):

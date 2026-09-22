@@ -114,9 +114,15 @@ it is reported as exploratory and cannot change a preregistered verdict.
 antennal lobe, so the question the control must answer is whether the mushroom
 body's specific wiring matters, not whether the whole brain's does.
 
-*Still to do before generation:* the annotation rule text and the frozen root-ID
-JSON do not yet exist in this repository. The generator keeps `--scope` as a
-required argument with no default, so every run states its scope explicitly.
+*Done 2026-09-22:* the rule is frozen as code
+(`src/flyshi_research/controls/mb_membership.py`) and the membership file was
+generated from the pinned annotation release:
+`repro/connectome/mb_membership_783.json`, sha256
+`b05b5c23ef19e0be6dbb1b574d774f01f07b3a9fd8b7b3b31f0a473cc820446f`. Counts match
+the counts already observed for v783 — 5,177 KCs, 96 MBONs, 307 PAM, 16 PPL1,
+2 APL, 5,598 root IDs in total, no overlap between classes. The generator keeps
+`--scope` as a required argument with no default, so every run states its scope
+explicitly. The shuffle itself has not been generated.
 
 ## 2. MBON instances included in the per-type mean
 
@@ -176,10 +182,14 @@ units differ).
 MBON03 instance fired at ~80 Hz in an existing set-A run), so excluding them
 would discard real circuit output after it has propagated.
 
-*Still to do before the sensitivity check can run:* the real backend does not yet
-expose a frozen annotation-derived left/right side mask through the shared
-simulator interface (see above). Full per-MBON outputs must be saved so the
-left-only score can be recomputed without new simulations.
+*Done 2026-09-22:* the side labels are frozen in
+`src/flyshi_research/learning/data/mbon_sides_783.json` (96 instances, 48 left and
+48 right, from the pinned annotation release), and both runners save per-MBON
+rates with the MBON root IDs, so the left-only score is recomputed after a run
+with no extra simulation. Caveat for the synthetic market: its decisions and
+weight updates were made under the bilateral readout, so the recomputation
+re-scores those runs rather than replaying the closed loop, and the left-only
+margin would have to be calibrated separately on training markets.
 
 ## 3. Reward normalization and accuracy-arm `brier_scale`
 
@@ -299,3 +309,10 @@ with no calibration.
 market density and abstention rate, so it is not comparable across datasets with
 different event density. Both numbers must be reported alongside real-market
 results. `drift_rate = 0.01` itself remains a placeholder.
+
+*Where the drift-off check runs (decided 2026-09-22):* as its own training
+condition, `profit_drift_off`, in the synthetic-market experiment — drift acts
+inside the learning loop, so it cannot be recomputed from a run that had drift on.
+That raises the selected synthetic plan from 15,000 runs in 75 jobs to **20,000
+runs in 100 jobs**. It is deliberately **not** added to the first learning test,
+whose 260-run plan is unchanged.

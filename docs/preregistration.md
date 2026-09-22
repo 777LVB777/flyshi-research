@@ -353,7 +353,13 @@ training markets and 70–99 are held-out test markets. The order is never
 shuffled."
 
 **Arms (SYNTH-MARKET, Section 3):** `profit` (headline), `accuracy`
-(comparison), `learning_off`.
+(comparison), `learning_off`, and — added 2026-09-22 — `profit_drift_off`, the
+profit arm with `drift_rate = 0`. The drift-off arm is the preregistered drift
+sensitivity check; it needs its own training runs because drift acts inside the
+learning loop, so the selected plan grew from 3 arms / 75 jobs / 15,000 runs to
+**4 arms / 100 jobs / 20,000 simulation runs**. It is reported next to the profit
+arm and is **not** part of the pre-stated gate below, which is defined on
+`profit` against the market price and against `learning_off`.
 
 **Intensity-bias mitigation — RESOLVED 2026-09-22.** Total-drive balancing is
 selected and is the default Option B encoder. Innate-score subtraction is not
@@ -429,14 +435,25 @@ destroyed" sections (quoted in Section 9 below, not repeated here for length).
 
 **Scope — RESOLVED 2026-09-22 by the project owner** (`docs/design/open-decisions.md`,
 item 1; SHUFFLE, "Scope"). **Mushroom-body-only is the PRIMARY, preregistered
-structural control.** Membership: all annotated KCs, MBONs, PAM, PPL1 and APL,
-with any additional class admitted only by a written annotation rule frozen,
-together with the resulting root-ID file, before generation. **Whole-network
-shuffle is optional exploratory analysis, not preregistered**, and cannot
-change a preregistered verdict. Rationale: market input enters at the Kenyon
-cells, bypassing the antennal lobe, so the question is whether the mushroom
-body's specific wiring matters. **[NOT YET WRITTEN]:** the annotation rule text
-and the frozen root-ID JSON.
+structural control.** **Whole-network shuffle is optional exploratory analysis,
+not preregistered**, and cannot change a preregistered verdict. Rationale: market
+input enters at the Kenyon cells, bypassing the antennal lobe, so the question is
+whether the mushroom body's specific wiring matters.
+
+**Membership is frozen (2026-09-22).** The rule is code
+(`src/flyshi_research/controls/mb_membership.py`): from the pinned annotation
+release (flywire_annotations v3.1.0, commit `8587524c`), restricted to the
+neurons in `Completeness_783.csv`, select `cell_class == 'Kenyon_Cell'`;
+`cell_class == 'MBON'`; `cell_class == 'DAN'` with `cell_type` starting `PAM` or
+`PPL1`; and `cell_type == 'APL'`. An edge is eligible only when **both** endpoints
+are in the resulting list. The generated file is
+`repro/connectome/mb_membership_783.json`, **sha256
+`b05b5c23ef19e0be6dbb1b574d774f01f07b3a9fd8b7b3b31f0a473cc820446f`** (recorded in
+`mb_membership_783.json.sha256`). Counts, which match the counts this project had
+already observed: **5,177 KCs, 96 MBONs, 307 PAM, 16 PPL1, 2 APL — 5,598 root IDs**
+with no overlap between classes. Adding a class means editing the rule,
+regenerating the file and recording the new hash **before** a shuffle is
+generated, never after seeing a result.
 
 **Pre-stated generation checks, quoted in full (SHUFFLE, "Pre-stated
 generation checks"):**
@@ -605,9 +622,11 @@ are **unverified synthetic placeholders**."
   both hemispheres, silent instances at 0 Hz, is PRIMARY; left-hemisphere-only
   is a preregistered sensitivity check** (reported, never gating; its margin is
   calibrated separately on training data). Rationale: right-side MBONs respond
-  to left-side KC input (e.g. a right MBON03 instance at ~80 Hz). The frozen
-  left/right side mask needed to compute the left-only score is not yet exposed
-  by the real backend.
+  to left-side KC input (e.g. a right MBON03 instance at ~80 Hz). The side labels
+  are frozen in `src/flyshi_research/learning/data/mbon_sides_783.json` (96
+  instances: 48 left, 48 right, from the pinned annotation release), and both
+  runners save per-MBON rates plus MBON root IDs so the left-only score is a
+  post-run recomputation with no extra simulation.
 - **Intensity bias, "problem 4," quoted at length (MB-LEARN, Section 4b):**
   "The score depends strongly on *how hard* the input cells are driven,
   whatever the input means... Except at a price of exactly 0.5, the 'YES at
@@ -701,8 +720,8 @@ added on 2026-09-22 from the project owner's decisions, not from FIRST-LEARN):
 | `strict` | only confidently labelled types (MBON05, MBON21, MBON11, MBON12) | "preregistered robustness check" |
 | `group` | STRICT plus group-level behavioural labels | "preregistered robustness check" |
 | `instance_sum` | `circuit_80` summed per instance instead of per-type mean | "the named aggregation variant" (not one of the preregistered robustness checks per MB-LEARN Section 4b, unless separately added) |
-| left-hemisphere-only MBONs | per-type mean over left-hemisphere instances only; margin calibrated separately on training data | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 2); not gating |
-| drift disabled | `drift_rate = 0`; everything else unchanged | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 4); not gating |
+| left-hemisphere-only MBONs | per-type mean over left-hemisphere instances only; margin calibrated separately on training data | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 2); not gating. **Adds no runs in either experiment:** recomputed from the per-MBON rates each runner saves, against the frozen side table `src/flyshi_research/learning/data/mbon_sides_783.json`. In the synthetic market the decisions and weight updates were made under the bilateral readout, so the recomputation re-scores those runs rather than replaying the closed loop. |
+| drift disabled | `drift_rate = 0`; everything else unchanged | preregistered sensitivity check, decided 2026-09-22 (`open-decisions.md`, item 4); not gating. **Run as its own training condition (`profit_drift_off`) in the synthetic-market experiment only** (Section 4.5): drift acts inside the learning loop, so it cannot be recomputed. It is deliberately **not** added to the first learning test, whose 260-run / 35-job / 5-condition plan is unchanged. |
 
 "None of them can change the primary verdict" of the first learning test
 (FIRST-LEARN, Section 5b). For the graded-rate test they are reported as
@@ -812,7 +831,8 @@ already resolved since MB-LEARN was last revised are marked so.
    is still unverified and is tested by item 2.
 4. **RESOLVED 2026-09-22 — MBON instances in the per-type mean.** All 96,
    both hemispheres, primary; left-only is a preregistered sensitivity check
-   (Section 6.2). Remaining implementation gap: the frozen left/right mask.
+   (Section 6.2). The frozen side table (48 left / 48 right) and the per-MBON
+   rate saving both experiments need for the recomputation now exist.
 5. **RESOLVED 2026-09-22 — reward normalization.** Symmetric clipping to
    `[-1, 1]`, `dead_zone = 0` (Section 6.4).
 6. **RESOLVED 2026-09-22 — accuracy-arm reward scale.** `brier_scale = 0.04`,
@@ -834,10 +854,10 @@ already resolved since MB-LEARN was last revised are marked so.
     "at least one secondary source lists it as **CC BY-NC**... the true status
     is genuinely unclear... This must be resolved before any release."
 11. **RESOLVED 2026-09-22 — degree-preserving shuffle scope.**
-    Mushroom-body-only (KCs + MBONs + PAM + PPL1 + APL, additions via a frozen
-    annotation rule) is primary; whole-network is optional and exploratory
-    (Section 4.6.2). Remaining: write and freeze the annotation rule and root-ID
-    file before generation.
+    Mushroom-body-only (KCs + MBONs + PAM + PPL1 + APL, additions via the frozen
+    annotation rule) is primary; whole-network is optional and exploratory. The
+    rule is frozen in code and the 5,598-ID membership file and its hash are
+    recorded (Section 4.6.2). The shuffle itself has still not been generated.
 12. **RESOLVED 2026-09-22 — intensity-bias mitigation.** Total-drive balancing
     was selected; this item is no longer open.
 13. **First-learning-test parameter placeholders not yet tuned/confirmed**
@@ -932,6 +952,6 @@ are not mistaken for contradictions later:
 | First learning test (4.4) | **Not run.** Blocking dependency (fast-runner equivalence) now satisfied. |
 | Synthetic-market experiment (4.5) | **Not run.** Mitigation selected; balanced graded re-validation remains pending. |
 | Learning-off control (4.6.1) | Not run standalone; embedded as a condition/arm of 4.4 and 4.5. |
-| Degree-preserving shuffled connectome (4.6.2) | Implementation and synthetic-graph tests complete; real shuffle not generated; scope resolved 2026-09-22 (mushroom-body-only primary); membership root-ID file not yet frozen. |
+| Degree-preserving shuffled connectome (4.6.2) | Implementation and synthetic-graph tests complete; real shuffle not generated; scope resolved 2026-09-22 (mushroom-body-only primary); membership rule and 5,598-ID root-ID file frozen with a recorded hash. |
 | Reduced mushroom-body model (4.6.3) | **Protocol-fidelity unit test run and passed** against an unverified, invented tolerance; not a validated numerical match to the source paper; market-scale performance untested. |
 | Logistic regression / market price / random / base-rate (4.6.4) | Implemented as baselines; not yet run against real or synthetic markets outside the pipeline's own fake-simulator tests. |

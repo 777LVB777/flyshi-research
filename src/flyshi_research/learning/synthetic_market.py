@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Protocol, Sequence, Tuple
 
@@ -43,6 +43,7 @@ from .bias_mitigation import (
 )
 from .encoder import KCEncoder, OptionBStimuli
 from .first_learning import Readout
+from .mbon_sides import LEFT, side_mask
 from .params import OPTION_B_UNBALANCED, EncoderParams, PlasticityParams, RewardParams
 from .plasticity import CompartmentMap, PlasticKCMBON
 from .readout import load_dopamine_counts
@@ -51,7 +52,16 @@ from .reward import brier_improvement_reward, dopamine_signal, profit_reward
 PROFIT = "profit"
 ACCURACY = "accuracy"
 LEARNING_OFF = "learning_off"
-CONDITIONS = (PROFIT, ACCURACY, LEARNING_OFF)
+# Preregistered drift sensitivity check (decided 2026-09-22, docs/design/
+# open-decisions.md item 4): the headline profit arm with drift switched off
+# (drift_rate = 0). It is its own TRAINING condition because drift acts inside the
+# learning loop and cannot be recomputed from a run that had drift on. It is
+# reported next to the profit arm and never enters the pre-stated gate, which is
+# defined on PROFIT against the market price and LEARNING_OFF.
+PROFIT_DRIFT_OFF = "profit_drift_off"
+CONDITIONS = (PROFIT, ACCURACY, LEARNING_OFF, PROFIT_DRIFT_OFF)
+#: conditions whose teaching signal is the profit reward
+PROFIT_LIKE = (PROFIT, PROFIT_DRIFT_OFF)
 SIGNAL_STRENGTHS = (0.0, 0.1, 0.2, 0.4, 0.8)
 MARKET_SEEDS = (20261001, 20261002, 20261003, 20261004, 20261005)
 
@@ -229,16 +239,32 @@ def _stimuli(
     return encoder.option_b_stimuli(market_features(market), variant=variant)
 
 
+@dataclass(frozen=True)
+class Presentation:
+    """One Option B decision's raw material: KC patterns, per-MBON rates, scores."""
+
+    kc_yes: np.ndarray
+    kc_no: np.ndarray
+    mbon_yes: np.ndarray
+    mbon_no: np.ndarray
+    score_yes: float
+    score_no: float
+
+
 def _score_pair(
     sim: Simulator,
     readout: Readout,
     pair: OptionBStimuli,
     seed: int,
     cfg: SyntheticConfig,
-) -> Tuple[np.ndarray, np.ndarray, float, float]:
+) -> Presentation:
     kc_yes, mbon_yes = sim.present(pair.yes.rates_by_kc_id(), seed, cfg.duration_ms, cfg.trials)
     kc_no, mbon_no = sim.present(pair.no.rates_by_kc_id(), seed, cfg.duration_ms, cfg.trials)
-    return kc_yes, kc_no, readout.score(mbon_yes), readout.score(mbon_no)
+    return Presentation(
+        np.asarray(kc_yes), np.asarray(kc_no),
+        np.asarray(mbon_yes), np.asarray(mbon_no),
+        readout.score(mbon_yes), readout.score(mbon_no),
+    )
 
 
 def _exploration_action(cfg: SyntheticConfig, market_seed: int, index: int) -> Action:
@@ -261,7 +287,7 @@ def _teaching(
 ) -> Dict[str, float]:
     if condition == LEARNING_OFF or action is Action.ABSTAIN:
         return {}
-    if condition == PROFIT:
+    if condition in PROFIT_LIKE:
         gross = market.outcome - market.quote if action is Action.YES else market.quote - market.outcome
         profit = gross - cfg.fee_per_trade - 0.5 * cfg.spread
         value = profit_reward(profit, cfg.reward)
@@ -289,10 +315,10 @@ def compute_innate_scores(
     out = []
     for index, market in enumerate(markets):
         pair = _stimuli(encoder, market, cfg)
-        _, _, yes, no = _score_pair(
+        shown = _score_pair(
             sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
         )
-        out.append((yes, no))
+        out.append((shown.score_yes, shown.score_no))
     return out
 
 
@@ -330,20 +356,26 @@ def run_dataset(
     cmap = CompartmentMap.from_dopamine_counts(
         list(sim.mbon_labels), load_dopamine_counts(), 80.0
     )
-    plastic = PlasticKCMBON(baseline, cmap, cfg.plasticity)
+    # The drift sensitivity condition differs from the profit arm in one value.
+    plasticity = (
+        replace(cfg.plasticity, drift_rate=0.0)
+        if condition == PROFIT_DRIFT_OFF
+        else cfg.plasticity
+    )
+    plastic = PlasticKCMBON(baseline, cmap, plasticity)
     records = []
 
     for index, market in enumerate(markets):
         train = index < cfg.train_count
         sim.set_weights(plastic.weights if condition != LEARNING_OFF else baseline)
         pair = _stimuli(encoder, market, cfg)
-        kc_yes, kc_no, yes_score, no_score = _score_pair(
+        shown = _score_pair(
             sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
         )
         innate_yes, innate_no = (innate_scores[index] if innate_scores is not None else (None, None))
         difference = score_difference(
-            yes_score,
-            no_score,
+            shown.score_yes,
+            shown.score_no,
             mitigation=cfg.mitigation,
             innate_yes_score=innate_yes,
             innate_no_score=innate_no,
@@ -351,7 +383,7 @@ def run_dataset(
         raw_probability = _sigmoid(difference / cfg.score_scale)
         action = _action(difference, cfg, train=train, market_seed=market_seed, index=index)
         if train and condition != LEARNING_OFF and action is not Action.ABSTAIN:
-            chosen_kc = kc_yes if action is Action.YES else kc_no
+            chosen_kc = shown.kc_yes if action is Action.YES else shown.kc_no
             plastic.record_decision(f"m{index}", chosen_kc, action.value)
             plastic.resolve(
                 f"m{index}", _teaching(condition, market, action, raw_probability, cfg)
@@ -364,6 +396,13 @@ def run_dataset(
                 "raw_probability": raw_probability,
                 "action": action.value,
                 "score_difference": difference,
+                # Per-MBON rates are saved so the preregistered left-only readout
+                # can be recomputed after the run (no extra simulation). See
+                # ``left_only_scores``: the decisions and weight updates were made
+                # under the bilateral readout, so the recomputation re-scores these
+                # runs rather than replaying the closed loop.
+                "mbon_yes": [round(float(x), 4) for x in shown.mbon_yes],
+                "mbon_no": [round(float(x), 4) for x in shown.mbon_no],
             }
         )
 
@@ -379,9 +418,53 @@ def run_dataset(
         "condition": condition,
         "strength": strength,
         "market_seed": market_seed,
+        "drift_rate": plasticity.drift_rate,
+        "mbon_ids": [int(i) for i in sim.mbon_ids],
+        "mbon_labels": list(sim.mbon_labels),
         "train": train_records,
         "test": test_records,
         "calibrator": asdict(calibrated.scaler),
+    }
+
+
+def left_only_scores(output: Mapping, cfg: SyntheticConfig, side: str = LEFT,
+                     sides: Optional[Dict[int, str]] = None) -> dict:
+    """Re-score a finished job's saved per-MBON rates with one hemisphere only.
+
+    Preregistered sensitivity check (decided 2026-09-22); reported, never gating,
+    and adds no simulation. The actions and weight updates in ``output`` were made
+    under the primary bilateral readout, so this shows what a left-only readout
+    would have said about those same presentations - it is not a rerun of the
+    closed loop, and its score units differ, so its decision margin would have to
+    be calibrated separately on training markets.
+    """
+    labels, mbon_ids = list(output["mbon_labels"]), list(output["mbon_ids"])
+    mask = side_mask(mbon_ids, side, sides)
+    readout = Readout([l for l, keep in zip(labels, mask.tolist()) if keep], _first_learning_config())
+
+    def rescore(rows: Sequence[Mapping]) -> list[dict]:
+        out = []
+        for row in rows:
+            yes = readout.score(np.asarray(row["mbon_yes"])[mask])
+            no = readout.score(np.asarray(row["mbon_no"])[mask])
+            out.append({
+                "sequence": row["sequence"],
+                "score_yes": yes,
+                "score_no": no,
+                "score_difference": yes - no,
+                "raw_probability": _sigmoid((yes - no) / cfg.score_scale),
+            })
+        return out
+
+    return {
+        "side": side,
+        "n_instances": int(mask.sum()),
+        "condition": output["condition"],
+        "strength": output["strength"],
+        "market_seed": output["market_seed"],
+        "note": "re-scored from saved rates; decisions and learning were made under the bilateral readout",
+        "train": rescore(output["train"]),
+        "test": rescore(output["test"]),
     }
 
 
