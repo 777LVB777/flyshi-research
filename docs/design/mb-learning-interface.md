@@ -732,7 +732,9 @@ these on the same markets and seeds:
 - **Degree-preserving shuffled connectome** — the fly wiring randomly rewired,
   but with each neuron keeping its original *number* of connections. This keeps
   the "size and shape" of the network while destroying the specific fly
-  structure, so it separates *structure* from *raw capacity*.
+  structure, so it separates *structure* from *raw capacity*. The fixed method,
+  scope options, and pre-run checks are in
+  [`degree-preserving-connectome-control.md`](degree-preserving-connectome-control.md).
 - **Reduced mushroom-body model** — a smaller, simpler model of the same circuit
   from Bennett, Philippides & Nowotny, 2021
   ([doi:10.1038/s41467-021-22592-4](https://doi.org/10.1038/s41467-021-22592-4)).
