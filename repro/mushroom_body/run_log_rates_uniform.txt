@@ -1,0 +1,55 @@
+cue a (run_cue_rates, uniform 150 Hz) @ seed 20260317, 1000ms x 5 trials (FAST path, per-neuron-rate entry point):
+  build once = 1.6s ; simulate = 42.0s total (8.1, 8.3, 8.6, 8.5, 8.5 per trial)
+  34 nonzero MBONs. Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/fast_rates_mbon_cue_a_duration_ms_1000_trials_5_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260317.csv
+  [timing] build_seconds=1.594 sim_seconds_total=42.032
+cue a (run_cue_rates, uniform 150 Hz) @ seed 20260318, 1000ms x 5 trials (FAST path, per-neuron-rate entry point):
+  build once = 1.3s ; simulate = 43.4s total (8.8, 8.6, 8.6, 8.6, 8.8 per trial)
+  34 nonzero MBONs. Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/fast_rates_mbon_cue_a_duration_ms_1000_trials_5_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260318.csv
+  [timing] build_seconds=1.262 sim_seconds_total=43.352
+cue a (run_cue_rates, uniform 150 Hz) @ seed 20260319, 1000ms x 5 trials (FAST path, per-neuron-rate entry point):
+  build once = 1.3s ; simulate = 43.8s total (8.9, 8.8, 8.7, 8.7, 8.7 per trial)
+  35 nonzero MBONs. Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/fast_rates_mbon_cue_a_duration_ms_1000_trials_5_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260319.csv
+  [timing] build_seconds=1.331 sim_seconds_total=43.800
+cue a (run_cue_rates, uniform 150 Hz) @ seed 20260320, 1000ms x 5 trials (FAST path, per-neuron-rate entry point):
+  build once = 1.3s ; simulate = 44.7s total (9.1, 8.7, 8.7, 9.1, 9.1 per trial)
+  38 nonzero MBONs. Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/fast_rates_mbon_cue_a_duration_ms_1000_trials_5_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260320.csv
+  [timing] build_seconds=1.279 sim_seconds_total=44.730
+cue a (run_cue_rates, uniform 150 Hz) @ seed 20260321, 1000ms x 5 trials (FAST path, per-neuron-rate entry point):
+  build once = 1.4s ; simulate = 45.2s total (9.2, 8.9, 9.4, 8.9, 8.8 per trial)
+  31 nonzero MBONs. Wrote /Users/luca/Projects/flyshi-research/repro/mushroom_body/results/fast_rates_mbon_cue_a_duration_ms_1000_trials_5_pn_rate_hz_150_kc_size_100_kc_seed_20260316_seed_20260321.csv
+  [timing] build_seconds=1.434 sim_seconds_total=45.183
+seeds with BOTH old-path reference & run_cue_rates output: [20260317, 20260318, 20260319, 20260320, 20260321]
+
+Per-seed old-path-vs-run_cue_rates MBON-rate Euclidean distance:
+  seed 20260317: 5.463 Hz
+  seed 20260318: 3.231 Hz
+  seed 20260319: 6.053 Hz
+  seed 20260320: 3.904 Hz
+  seed 20260321: 4.382 Hz
+
+mean old-path-vs-run_cue_rates distance = 4.606 Hz
+pre-stated tolerance (noise floor d_AA) = 5.10 Hz
+CRITERION 1 (mean distance <= 5.10): PASS
+
+Sign check on the 8 discriminators (run_cue_rates mean cue A vs existing cue B):
+  MBON03 (…90316): meanA_new=  79.4 B= 104.8 diff= -25.4 sign=-1 established=-1 ok
+  MBON02 (…52340): meanA_new=  45.4 B=  21.8 diff= +23.6 sign=+1 established=+1 ok
+  MBON07 (…90134): meanA_new=   0.8 B=  22.4 diff= -21.6 sign=-1 established=-1 ok
+  MBON07 (…02365): meanA_new=  44.8 B=  63.8 diff= -19.0 sign=-1 established=-1 ok
+  MBON04 (…34376): meanA_new=  16.6 B=  52.4 diff= -35.8 sign=-1 established=-1 ok
+  MBON26 (…81440): meanA_new=   0.0 B=  17.8 diff= -17.8 sign=-1 established=-1 ok
+  MBON11 (…01833): meanA_new=  97.8 B=  73.4 diff= +24.4 sign=+1 established=+1 ok
+  MBON23 (…67206): meanA_new=   0.0 B=  18.0 diff= -18.0 sign=-1 established=-1 ok
+CRITERION 2 (all 8 signs match): 8/8 -> PASS
+
+=== run_cue_rates EQUIVALENCE VERDICT (vs. existing-path cue-A reference) ===
+ACCEPTED: run_cue_rates (uniform-rate case) is equivalent to the existing path within the pre-stated bounds.
+
+--- Bonus diagnostic (does not affect the verdict above) ---
+seeds with both run_cue_rates and run_cue outputs: [20260317, 20260318, 20260319, 20260320, 20260321]
+  seed 20260317: run_cue_rates vs run_cue distance = 0.000 Hz
+  seed 20260318: run_cue_rates vs run_cue distance = 0.000 Hz
+  seed 20260319: run_cue_rates vs run_cue distance = 0.000 Hz
+  seed 20260320: run_cue_rates vs run_cue distance = 0.000 Hz
+  seed 20260321: run_cue_rates vs run_cue distance = 0.000 Hz
+mean run_cue_rates-vs-run_cue distance = 0.000 Hz (expected to be ~0 Hz if run_cue_rates reduces to run_cue at equal rates; this is a diagnostic only, not one of the two pre-stated criteria).
