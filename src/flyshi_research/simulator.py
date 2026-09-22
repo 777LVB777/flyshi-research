@@ -19,6 +19,11 @@ class Market:
     latent_probability: float
     quote: float
     outcome: int
+    signal: float = 0.5
+    recent_change: float = 0.0
+    time_to_resolution: float = 30.0
+    liquidity: float = 0.5
+    sequence: int = 0
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,10 @@ class MarketObservation:
     """The complete Phase 0 information set made available to an agent."""
 
     quote: float
+    signal: float = 0.5
+    recent_change: float = 0.0
+    time_to_resolution: float = 30.0
+    liquidity: float = 0.5
 
 
 class Action(str, Enum):
@@ -111,6 +120,72 @@ def generate_markets(count: int, seed: int, quote_noise: float = 0.15) -> list[M
     return markets
 
 
+def generate_signal_markets(
+    count: int,
+    seed: int,
+    signal_strength: float,
+    price_deviation: float = 0.20,
+) -> list[Market]:
+    """Generate a chronological synthetic market sequence with controlled signal.
+
+    The hidden true probability is uniform on ``[0.1, 0.9]``.  The public market
+    price is that probability plus independent uniform error in
+    ``[-price_deviation, +price_deviation]``, clipped to ``[0.01, 0.99]``.
+
+    The synthetic signal mixes an independent distractor probability with the
+    hidden true probability::
+
+        signal = (1 - strength) * distractor + strength * true_probability
+
+    Thus strength 0 contains no population-level information about truth and
+    strength 1 reveals the true probability exactly.  Using the same ``seed`` at
+    different strengths keeps true probabilities, prices, outcomes and the
+    distractor draws identical; only their mixture changes.  This is an
+    engineered calibration environment, not a model of a real market.
+    """
+    if count <= 0:
+        raise ValueError("count must be positive")
+    if not 0.0 <= signal_strength <= 1.0:
+        raise ValueError("signal_strength must be in [0, 1]")
+    if not 0.0 <= price_deviation <= 0.9:
+        raise ValueError("price_deviation must be in [0, 0.9]")
+    rng = Random(seed)
+    markets: list[Market] = []
+    previous_quote = 0.5
+    for sequence in range(count):
+        true_probability = rng.uniform(0.1, 0.9)
+        price = min(0.99, max(0.01, true_probability + rng.uniform(-price_deviation, price_deviation)))
+        outcome = int(rng.random() < true_probability)
+        distractor = rng.uniform(0.05, 0.95)
+        signal = (1.0 - signal_strength) * distractor + signal_strength * true_probability
+        recent_change = min(0.2, max(-0.2, price - previous_quote))
+        previous_quote = price
+        markets.append(
+            Market(
+                latent_probability=true_probability,
+                quote=price,
+                outcome=outcome,
+                signal=signal,
+                recent_change=recent_change,
+                time_to_resolution=rng.uniform(1.0, 365.0),
+                liquidity=rng.random(),
+                sequence=sequence,
+            )
+        )
+    return markets
+
+
+def observe_market(market: Market) -> MarketObservation:
+    """Drop hidden probability and outcome while retaining public features."""
+    return MarketObservation(
+        quote=market.quote,
+        signal=market.signal,
+        recent_change=market.recent_change,
+        time_to_resolution=market.time_to_resolution,
+        liquidity=market.liquidity,
+    )
+
+
 def run_simulation(markets: list[Market], agent: Agent) -> SimulationMetrics:
     """Score forecasts and settle one simulated contract per resolved market.
 
@@ -126,7 +201,7 @@ def run_simulation(markets: list[Market], agent: Agent) -> SimulationMetrics:
     log_losses: list[float] = []
     pnl = 0.0
     for market in markets:
-        observation = MarketObservation(quote=market.quote)
+        observation = observe_market(market)
         decision = agent.decide(observation)
         prediction = decision.forecast_probability
         if not isfinite(prediction) or not 0.0 <= prediction <= 1.0:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from math import isfinite, log
+from statistics import correlation
 
 import pytest
 
@@ -13,6 +14,8 @@ from flyshi_research.simulator import (
     PublicQuoteAbstainingAgent,
     RandomAgent,
     generate_markets,
+    generate_signal_markets,
+    observe_market,
     run_simulation,
 )
 
@@ -28,6 +31,39 @@ class SequenceAgent:
 def test_market_generation_is_reproducible_for_a_fixed_seed() -> None:
     assert generate_markets(4, seed=123) == generate_markets(4, seed=123)
     assert generate_markets(4, seed=123) != generate_markets(4, seed=124)
+
+
+def test_signal_market_sweep_changes_only_the_controlled_signal_mixture() -> None:
+    zero = generate_signal_markets(20, seed=123, signal_strength=0.0, price_deviation=0.2)
+    full = generate_signal_markets(20, seed=123, signal_strength=1.0, price_deviation=0.2)
+    for a, b in zip(zero, full):
+        assert (a.latent_probability, a.quote, a.outcome, a.recent_change,
+                a.time_to_resolution, a.liquidity, a.sequence) == (
+            b.latent_probability, b.quote, b.outcome, b.recent_change,
+            b.time_to_resolution, b.liquidity, b.sequence)
+        assert b.signal == pytest.approx(b.latent_probability)
+    assert any(a.signal != b.signal for a, b in zip(zero, full))
+
+
+def test_signal_strength_controls_population_correlation_with_truth() -> None:
+    weak = generate_signal_markets(2000, seed=456, signal_strength=0.0)
+    strong = generate_signal_markets(2000, seed=456, signal_strength=0.8)
+    weak_correlation = correlation(
+        [m.signal for m in weak], [m.latent_probability for m in weak]
+    )
+    strong_correlation = correlation(
+        [m.signal for m in strong], [m.latent_probability for m in strong]
+    )
+    assert abs(weak_correlation) < 0.1
+    assert strong_correlation > 0.9
+
+
+def test_observe_signal_market_hides_truth_and_outcome() -> None:
+    market = generate_signal_markets(1, seed=4, signal_strength=0.4)[0]
+    observation = observe_market(market)
+    assert observation.signal == market.signal and observation.quote == market.quote
+    assert not hasattr(observation, "latent_probability")
+    assert not hasattr(observation, "outcome")
 
 
 def test_random_agent_and_metrics_are_reproducible_for_fixed_seeds() -> None:
