@@ -25,9 +25,19 @@ def load_runner():
     return module
 
 
-def write_fake_value_files(runner, directory: Path, values) -> None:
-    table = gc.load_sign_table("circuit_80")
-    label = next(name for name, weight in table.weights.items() if weight != 0)
+def weighted_label(sign: int = 0) -> str:
+    """A label the CIRCUIT-80 table weights: ``sign`` +1/-1 picks that sign, 0 any."""
+    weights = gc.load_sign_table("circuit_80").weights
+    return next(name for name, weight in weights.items()
+                if (weight == sign if sign else weight != 0))
+
+
+def write_fake_value_files(runner, directory: Path, values, no_rate: float = 0.0,
+                           sign: int = 0) -> None:
+    """``values`` are YES rates; ``no_rate`` is the NO rate of every instance. A
+    ``no_rate`` above the YES rates makes the contrast NEGATIVE, as the real balanced
+    data is at some values."""
+    label = weighted_label(sign)
     seeds = runner.NOISE_SEEDS + (runner.PRIMARY_SEED,)
     for seed_index, seed in enumerate(seeds):
         # Small seed-dependent slope makes the measured change noise nonzero.
@@ -37,7 +47,7 @@ def write_fake_value_files(runner, directory: Path, values) -> None:
                 "feature_value": value,
                 "mbon_labels": [label],
                 "yes_mbon_rates_hz": [float(mbon_value + slope_noise * value_index)],
-                "no_mbon_rates_hz": [0.0],
+                "no_mbon_rates_hz": [float(no_rate)],
             }
             runner.output_path(value, directory, seed=seed).write_text(json.dumps(payload))
 
@@ -94,3 +104,58 @@ def test_analyzer_refuses_verdict_without_dedicated_noise_files(tmp_path) -> Non
             )
         )
     assert runner.analyze(log=lambda _: None, results_dir=tmp_path) is None
+
+
+# ---- REGRESSION: the contrast is negative wherever NO fired harder --------------- #
+def test_analysis_handles_negative_contrasts(tmp_path) -> None:
+    """The spec's S(v) = CIRCUIT(m_yes) - CIRCUIT(m_no) is defined for any rates. The
+    contrast m_yes - m_no is negative wherever NO fired harder, so scoring it directly
+    hit the readout's ``rates must be >= 0`` guard and crashed the analysis after all
+    60 simulations had already run."""
+    runner = load_runner()
+    directory = tmp_path / "negative"
+    directory.mkdir()
+    # every YES rate is below the NO rate, on an approach-like (+1) MBON:
+    # all five contrasts, and therefore all five scores, are negative
+    write_fake_value_files(runner, directory, [0.0, 10.0, 20.0, 30.0, 40.0],
+                           no_rate=100.0, sign=1)
+    result = runner.analyze(log=lambda _: None, results_dir=directory)
+    assert result is not None  # no ValueError
+    assert all(score < 0 for score in result.scores)
+    assert result.verdict is gc.Verdict.ACCEPTED  # still strictly monotonic
+
+
+def test_scores_are_the_difference_of_the_two_framing_scores(tmp_path) -> None:
+    """Pre-stated definition (spec section 3), checked against hand arithmetic: a
+    constant NO offset shifts every score by the same amount and cannot change the
+    shape of the sequence."""
+    runner = load_runner()
+    plain, offset = tmp_path / "plain", tmp_path / "offset"
+    plain.mkdir(), offset.mkdir()
+    yes_rates = [0.0, 10.0, 20.0, 30.0, 40.0]
+    write_fake_value_files(runner, plain, yes_rates, no_rate=0.0)
+    write_fake_value_files(runner, offset, yes_rates, no_rate=100.0)
+    a = runner.analyze(log=lambda _: None, results_dir=plain)
+    b = runner.analyze(log=lambda _: None, results_dir=offset)
+    weight = gc.load_sign_table("circuit_80").weights[weighted_label()]
+    for plain_score, offset_score in zip(a.scores, b.scores):
+        assert offset_score == pytest.approx(plain_score - weight * 100.0)
+    # the Euclidean gates use the contrast, which the offset leaves unchanged
+    assert b.endpoint_distance_hz == pytest.approx(a.endpoint_distance_hz)
+    assert b.endpoint_threshold_hz == pytest.approx(a.endpoint_threshold_hz)
+
+
+def test_evaluate_balanced_takes_yes_no_pairs_not_contrasts() -> None:
+    """The primary sequence must be scored from the raw rate vectors; passing a
+    contrast vector where a rate vector belongs is what produced the crash."""
+    runner = load_runner()
+    labels = [weighted_label(sign=1)]
+    pairs = [(np.array([float(v)]), np.array([100.0])) for v in (0.0, 10.0, 20.0, 30.0, 40.0)]
+    repeats = {
+        seed: [np.array([float(v) - 100.0 + 0.1 * index]) for v in (0.0, 10.0, 20.0, 30.0, 40.0)]
+        for index, seed in enumerate(runner.NOISE_SEEDS)
+    }
+    result = runner.evaluate_balanced(pairs, repeats, labels)
+    assert len(result.scores) == 5 and all(score < 0 for score in result.scores)
+    with pytest.raises((ValueError, TypeError)):
+        runner.evaluate_balanced([p[0] - p[1] for p in pairs], repeats, labels)

@@ -18,7 +18,7 @@ import numpy as np
 
 from flyshi_research.learning import graded_check as gc
 from flyshi_research.learning.encoder import BALANCE_FEATURE, KCEncoder
-from flyshi_research.learning.readout import circuit_score, load_sign_table
+from flyshi_research.learning.readout import circuit_score_difference, load_sign_table
 
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = HERE / "results"
@@ -128,10 +128,19 @@ class BalancedResult:
     fail_reasons: Tuple[str, ...]
 
 
-def _contrast(payload: Mapping[str, object]) -> np.ndarray:
-    return np.asarray(payload["yes_mbon_rates_hz"], dtype=float) - np.asarray(
-        payload["no_mbon_rates_hz"], dtype=float
+def _rate_vectors(payload: Mapping[str, object]) -> Tuple[np.ndarray, np.ndarray]:
+    """The raw (YES, NO) MBON rate vectors of one value/seed result."""
+    return (
+        np.asarray(payload["yes_mbon_rates_hz"], dtype=float),
+        np.asarray(payload["no_mbon_rates_hz"], dtype=float),
     )
+
+
+def _contrast(payload: Mapping[str, object]) -> np.ndarray:
+    """c(v) = m_yes(v) - m_no(v). Used for the Euclidean gates only: it is a signed
+    contrast, not a rate vector, so it is never passed to the readout (spec 3)."""
+    yes, no = _rate_vectors(payload)
+    return yes - no
 
 
 def change_noise_floor(
@@ -148,21 +157,31 @@ def change_noise_floor(
 
 
 def evaluate_balanced(
-    primary: Sequence[np.ndarray],
+    primary: Sequence[Tuple[np.ndarray, np.ndarray]],
     repeats: Mapping[int, Sequence[np.ndarray]],
     labels: Sequence[str],
 ) -> BalancedResult:
-    """Apply the pre-stated rule with pair-specific measured noise thresholds."""
+    """Apply the pre-stated rule with pair-specific measured noise thresholds.
+
+    ``primary``: the (YES, NO) rate-vector pair per feature value, at the primary
+    seed. The pre-stated score is ``S(v) = CIRCUIT(m_yes(v)) - CIRCUIT(m_no(v))``
+    (spec 3), so each framing is scored as the rate vector it is and the two scores
+    are subtracted. ``repeats``: contrast vectors per noise seed - they feed only
+    the Euclidean noise floors, which need no score.
+    """
     if len(primary) != len(VALUES) or set(repeats) != set(NOISE_SEEDS):
         raise ValueError("need all five primary values and all five noise seeds")
     if any(len(vectors) != len(VALUES) for vectors in repeats.values()):
         raise ValueError("each noise seed must contain all five values")
     table = load_sign_table("circuit_80")
-    scores = tuple(circuit_score(v, labels, table, "type_mean").score for v in primary)
+    scores = tuple(
+        circuit_score_difference(yes, no, labels, table, "type_mean") for yes, no in primary
+    )
+    contrasts = tuple(yes - no for yes, no in primary)
     monotonic, direction = gc.strictly_monotonic(scores)
     best, _ = gc.select_usable_subrange(scores)
 
-    endpoint_distance = gc.euclidean(primary[0], primary[-1])
+    endpoint_distance = gc.euclidean(contrasts[0], contrasts[-1])
     endpoint_noise = change_noise_floor(repeats, 0, len(VALUES) - 1)
     endpoint_threshold = gc.NOISE_MARGIN * endpoint_noise
     endpoint_ok = endpoint_distance >= endpoint_threshold
@@ -170,7 +189,7 @@ def evaluate_balanced(
     chosen = sub_distance = sub_noise = sub_threshold = None
     if best is not None:
         chosen = (NOMINAL_RATES[best.start], NOMINAL_RATES[best.end])
-        sub_distance = gc.euclidean(primary[best.start], primary[best.end])
+        sub_distance = gc.euclidean(contrasts[best.start], contrasts[best.end])
         sub_noise = change_noise_floor(repeats, best.start, best.end)
         sub_threshold = gc.NOISE_MARGIN * sub_noise
 
@@ -239,8 +258,11 @@ def analyze(log: Callable[[str], None] = print, results_dir: Path = RESULTS_DIR)
         seed: [_contrast(payload) for payload in by_value]
         for seed, by_value in payloads.items()
     }
+    # The primary seed keeps its raw YES/NO vectors: the score is the difference of
+    # the two framings' scores (spec 3), not the score of their contrast.
+    primary_pairs = [_rate_vectors(payload) for payload in payloads[PRIMARY_SEED]]
     result = evaluate_balanced(
-        contrasts[PRIMARY_SEED],
+        primary_pairs,
         {seed: contrasts[seed] for seed in NOISE_SEEDS},
         labels,
     )

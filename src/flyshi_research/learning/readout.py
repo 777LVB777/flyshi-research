@@ -271,6 +271,27 @@ def circuit_score(
     )
 
 
+def circuit_score_difference(
+    rates_a: Sequence[float],
+    rates_b: Sequence[float],
+    labels: Sequence[str],
+    table: SignTable,
+    aggregation: str = DEFAULT_AGGREGATION,
+) -> float:
+    """``CIRCUIT(a) - CIRCUIT(b)``: the Option B score difference between two stimuli.
+
+    Both arguments must be real rate vectors (>= 0) measured over the SAME labels.
+    Their elementwise difference - a contrast vector - is negative wherever ``b``
+    fired harder, so it is not a rate vector and must never be passed to
+    ``circuit_score``, whose guard rejects negative entries. Because the readout is
+    linear in the rates (per-type mean, then signed sum), this difference of scores
+    is exactly the score the contrast would get if the guard were bypassed; scoring
+    each stimulus and subtracting is the well-defined way to obtain it.
+    """
+    return (circuit_score(rates_a, labels, table, aggregation).score
+            - circuit_score(rates_b, labels, table, aggregation).score)
+
+
 @dataclass(frozen=True)
 class ReadoutDecision:
     choice: Choice

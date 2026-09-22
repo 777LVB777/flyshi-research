@@ -10,6 +10,7 @@ from flyshi_research.learning.readout import (  # noqa: E402
     Choice,
     SignTable,
     circuit_score,
+    circuit_score_difference,
     decide,
     dominant_family,
     DecisionTally,
@@ -349,3 +350,59 @@ def test_raising_the_threshold_raises_the_abstention_rate():
             t.record(decide(y, n, LABELS, TABLE, margin_threshold=thr))
         rates.append(t.abstention_rate)
     assert rates[0] < rates[1] < rates[2]
+
+
+# ---- score DIFFERENCE: the Option B S(v) of the graded-encoding specs ------------- #
+def test_score_difference_equals_scoring_each_stimulus_and_subtracting():
+    """S(v) = CIRCUIT(m_yes) - CIRCUIT(m_no), the pre-stated definition."""
+    yes, no = [10.0, 30.0, 2.0], [4.0, 6.0, 50.0]
+    labels = ["A", "A", "B"]
+    got = circuit_score_difference(yes, no, labels, TABLE)
+    assert got == pytest.approx(circuit_score(yes, labels, TABLE).score
+                                - circuit_score(no, labels, TABLE).score)
+
+
+def test_score_difference_works_when_the_contrast_is_negative():
+    """REGRESSION: the contrast m_yes - m_no is negative wherever NO fired harder.
+    It is not a rate vector, so circuit_score rejects it; the difference of the two
+    scores is how the spec's S(v) is obtained."""
+    yes, no = [1.0, 2.0, 3.0], [40.0, 50.0, 60.0]
+    labels = ["A", "A", "B"]
+    contrast = [y - n for y, n in zip(yes, no)]
+    assert all(c < 0 for c in contrast)
+    with pytest.raises(ValueError, match="rates must be >= 0"):
+        circuit_score(contrast, labels, TABLE)
+    got = circuit_score_difference(yes, no, labels, TABLE)
+    # A: mean(1,2) - mean(40,50) = -43.5 with weight +1; B: 3 - 60 = -57 with weight -1
+    assert TABLE.weight("A") == 1 and TABLE.weight("B") == -1
+    assert got == pytest.approx(-43.5 + 57.0)
+
+
+def test_score_difference_is_linear_so_it_matches_hand_scored_contrast():
+    """The per-type mean is linear in the rates, so scoring each framing and
+    subtracting gives exactly what scoring the contrast by hand would give."""
+    rng = np.random.default_rng(20260316)
+    labels = ["A", "A", "B", "B", "B", "?"]
+    for _ in range(20):
+        yes = rng.uniform(0.0, 120.0, len(labels))
+        no = rng.uniform(0.0, 120.0, len(labels))
+        contrast = yes - no
+        by_type = {}
+        for label, value in zip(labels, contrast.tolist()):
+            by_type.setdefault(label, []).append(value)
+        hand = sum(TABLE.weight(t) * float(np.mean(v)) for t, v in by_type.items())
+        assert circuit_score_difference(yes, no, labels, TABLE) == pytest.approx(hand)
+
+
+def test_score_difference_still_rejects_a_negative_rate_vector():
+    with pytest.raises(ValueError, match="rates must be >= 0"):
+        circuit_score_difference([-1.0], [1.0], ["A"], TABLE)
+    with pytest.raises(ValueError, match="rates must be >= 0"):
+        circuit_score_difference([1.0], [-1.0], ["A"], TABLE)
+
+
+def test_score_difference_honours_the_named_instance_sum_variant():
+    yes, no = [10.0, 30.0, 2.0], [4.0, 6.0, 1.0]
+    labels = ["A", "A", "B"]
+    got = circuit_score_difference(yes, no, labels, TABLE, aggregation="instance_sum")
+    assert got == pytest.approx((10.0 + 30.0 - 2.0) - (4.0 + 6.0 - 1.0))

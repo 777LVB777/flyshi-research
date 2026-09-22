@@ -1,0 +1,48 @@
+[backend] 62261 KC->MBON synapses; build 3.9s
+seed 20260317, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260317.json
+seed 20260317, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260317.json
+seed 20260317, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260317.json
+seed 20260317, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260317.json
+seed 20260317, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260317.json
+seed 20260318, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260318.json
+seed 20260318, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260318.json
+seed 20260318, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260318.json
+seed 20260318, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260318.json
+seed 20260318, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260318.json
+seed 20260319, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260319.json
+seed 20260319, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260319.json
+seed 20260319, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260319.json
+seed 20260319, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260319.json
+seed 20260319, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260319.json
+seed 20260320, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260320.json
+seed 20260320, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260320.json
+seed 20260320, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260320.json
+seed 20260320, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260320.json
+seed 20260320, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260320.json
+seed 20260321, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260321.json
+seed 20260321, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260321.json
+seed 20260321, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260321.json
+seed 20260321, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260321.json
+seed 20260321, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260321.json
+seed 20260316, value 0.00 (nominal 30 Hz): wrote graded_encoding_balanced_value_0p00_seed_20260316.json
+seed 20260316, value 0.25 (nominal 60 Hz): wrote graded_encoding_balanced_value_0p25_seed_20260316.json
+seed 20260316, value 0.50 (nominal 90 Hz): wrote graded_encoding_balanced_value_0p50_seed_20260316.json
+seed 20260316, value 0.75 (nominal 120 Hz): wrote graded_encoding_balanced_value_0p75_seed_20260316.json
+seed 20260316, value 1.00 (nominal 150 Hz): wrote graded_encoding_balanced_value_1p00_seed_20260316.json
+ERROR      Brian 2 encountered an unexpected error. If you think this is a bug in Brian 2, please report this issue either to the discourse forum at <http://brian.discourse.group/>, or to the issue tracker at <https://github.com/brian-team/brian2/issues>. Please include this file with debug information in your report: /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/brian_debug_xoug5fg8.log  Additionally, you can also include a copy of the script that was run, available at: /var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/brian_script_yc8yt7g4.py You can also include a copy of the redirected std stream outputs, available at '/var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/brian_stdout_64xqiv9y.log' and '/var/folders/pn/qnkzbx5165d625_8d23h1z780000gn/T/brian_stderr_k9fepotn.log'. Thanks! [brian2]
+Traceback (most recent call last):
+  File "/Users/luca/Projects/flyshi-research/repro/mushroom_body/run_graded_encoding_balanced.py", line 303, in <module>
+    raise SystemExit(main())
+  File "/Users/luca/Projects/flyshi-research/repro/mushroom_body/run_graded_encoding_balanced.py", line 299, in main
+    return 0 if analyze() is not None else 1
+  File "/Users/luca/Projects/flyshi-research/repro/mushroom_body/run_graded_encoding_balanced.py", line 242, in analyze
+    result = evaluate_balanced(
+  File "/Users/luca/Projects/flyshi-research/repro/mushroom_body/run_graded_encoding_balanced.py", line 161, in evaluate_balanced
+    scores = tuple(circuit_score(v, labels, table, "type_mean").score for v in primary)
+  File "/Users/luca/Projects/flyshi-research/repro/mushroom_body/run_graded_encoding_balanced.py", line 161, in <genexpr>
+    scores = tuple(circuit_score(v, labels, table, "type_mean").score for v in primary)
+  File "/Users/luca/Projects/flyshi-research/src/flyshi_research/learning/readout.py", line 245, in circuit_score
+    r = _as_rates(rates, len(labels))
+  File "/Users/luca/Projects/flyshi-research/src/flyshi_research/learning/readout.py", line 229, in _as_rates
+    raise ValueError("rates must be >= 0")
+ValueError: rates must be >= 0
