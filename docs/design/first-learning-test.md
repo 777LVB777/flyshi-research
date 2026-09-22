@@ -251,7 +251,7 @@ configuration, so a changed value cannot be silently mixed with existing results
 | `learning_rate` | 0.1 | Fraction of the gap to the floor closed per unit gate. |
 | `floor_fraction` | 0.1 | Weight magnitude never below 10% of its connectome value. |
 | `drift_rate` | 0.01 | Fraction of the gap back to the connectome value closed per drift step. |
-| `drift_steps_per_resolution` | 1 | Drift steps after every presentation (with or without teaching). |
+| `drift_steps_per_resolution` | 1 | Drift steps after every presentation (with or without teaching). **Decided 2026-09-22** (one step per acted resolution; [`open-decisions.md`](open-decisions.md), item 4), no longer a placeholder. |
 | `kc_active_threshold_hz` | 1.0 | KCs at or below this rate are not eligible. |
 | `kc_rate_ref_hz` | 150 | KC rate at which eligibility saturates. |
 | training-order seed | 20260402 | |
@@ -422,6 +422,13 @@ with its own copy of the network, and writes its own file:
   protocol can run as parallel processes on a rented server. This changes scheduling
   only. It also makes restarts finer: a finished test seed is no longer redone after
   an interruption. No criterion, seed, parameter or run count changed.
+- **2026-09-22, before any run: project-owner decisions recorded**
+  ([`open-decisions.md`](open-decisions.md)). The drift clock (one step per acted
+  resolution) and the all-96-instance, both-hemisphere readout this test already
+  used are now study decisions rather than test-local choices. The package
+  default `brier_scale` changed from 0.25 to 0.04; this test does not use the
+  accuracy reward, but the value is part of the recorded configuration, so its
+  hash changes. No criterion, seed, run count or value this test uses changed.
 
 ---
 

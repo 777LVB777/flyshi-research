@@ -27,6 +27,9 @@ def test_statuses_are_known_and_only_readout_tables_are_preregistered():
         ("encoder", "balance_pool_size"),
         ("encoder", "option_b_variant"),
         ("readout", "aggregation"),
+        ("reward", "brier_scale"),
+        ("reward", "dead_zone"),
+        ("plasticity", "drift_steps_per_resolution"),
     }
 
 
@@ -34,6 +37,15 @@ def test_readout_aggregation_default_is_type_mean_with_sum_as_named_variant():
     assert P.ReadoutParams().aggregation == "type_mean"
     assert P.AGGREGATIONS == ("type_mean", "instance_sum")
     assert P.ReadoutParams(aggregation="instance_sum").aggregation == "instance_sum"
+
+
+def test_owner_decisions_of_2026_09_22_are_the_defaults():
+    """docs/design/open-decisions.md, items 3 and 4."""
+    r = P.RewardParams()
+    assert (r.brier_scale, r.dead_zone) == (0.04, 0.0)
+    assert P.PlasticityParams().drift_steps_per_resolution == 1
+    # drift disabled is a preregistered sensitivity check, so it must be expressible
+    assert P.PlasticityParams(drift_rate=0.0).drift_rate == 0.0
 
 
 def test_brier_baseline_is_not_a_tunable_parameter():

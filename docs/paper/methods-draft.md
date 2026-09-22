@@ -160,7 +160,10 @@ individual neuron instances of each anatomical cell type (so that a type with
 many instances does not receive disproportionate weight for anatomical
 reasons alone) and then summing the signed type averages; an alternative
 aggregation that sums over all instances is implemented but is not the
-default. We additionally report two behaviorally grounded, preregistered
+default. The primary readout includes all 96 MBON instances in both
+hemispheres, silent instances included, because right-hemisphere MBONs
+respond to our left-hemisphere Kenyon-cell input; a readout restricted to
+left-hemisphere instances is a preregistered sensitivity check. We additionally report two behaviorally grounded, preregistered
 robustness readouts: STRICT, which uses only individually confirmed
 activation-valence labels, and GROUP, which adds labels established only at
 the level of co-activated neuron groups. CIRCUIT's wiring-derived signs
@@ -232,9 +235,12 @@ tuning budget:
   specific wiring or only on the network's coarse size and degree structure.
   The generation procedure and its pre-run correctness checks have been
   implemented and validated on synthetic test graphs; the real v783
-  connectome has not yet been shuffled, and whether the shuffle is applied to
-  the mushroom body alone or to the whole network is an open choice that has
-  not yet been made.
+  connectome has not yet been shuffled. The primary shuffle is restricted to
+  edges between mushroom-body neurons (Kenyon cells, MBONs, PAM and PPL1
+  dopamine neurons, and APL, with any additional class admitted by a written
+  annotation rule frozen before generation), because market input enters
+  directly at the Kenyon cells; a whole-network shuffle may be reported as
+  exploratory.
 - **A reduced mushroom-body model**, an independent, non-connectome
   circuit model of mushroom-body learning from Bennett, Philippides and
   Nowotny (2021), implementing the mixed-valence variant of their published

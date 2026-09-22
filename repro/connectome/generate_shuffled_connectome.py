@@ -45,7 +45,8 @@ def gibibytes(n_bytes: int) -> float:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--scope", required=True, choices=("mushroom-body", "whole-network"),
-                   help="Required study choice; there is deliberately no default.")
+                   help="Required; deliberately no default. mushroom-body is the preregistered "
+                        "primary scope (decided 2026-09-22); whole-network is exploratory only.")
     p.add_argument("--seed", required=True, type=int)
     p.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     p.add_argument("--output", type=Path,

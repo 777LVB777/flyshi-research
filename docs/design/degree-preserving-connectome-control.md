@@ -65,9 +65,10 @@ It is a control for the same directed degree sequence plus the same global
 weight/sign material. A loss of performance can reflect destroyed partner
 selection, target-specific weighted input, or both.
 
-## Scope is an open study decision
+## Scope — RESOLVED 2026-09-22: mushroom-body-only is primary
 
-The generator requires one of these names explicitly and has no default:
+The generator requires one of these names explicitly and has no default (kept
+deliberately, so every run records its scope):
 
 1. **Mushroom-body-only.** Shuffle the induced subgraph whose two endpoints are
    in a supplied MB neuron list; leave boundary and non-MB rows untouched. This
@@ -82,9 +83,17 @@ The generator requires one of these names explicitly and has no default:
    learning circuit is reached. A negative result is therefore less specific
    to mushroom-body computation.
 
-**Open decision for the project owner:** choose the scope and, for the MB scope,
-freeze the exact neuron-ID membership file before generation. Neither option is
-selected here.
+**Decision (project owner, 2026-09-22; see
+[`open-decisions.md`](open-decisions.md), item 1):** **mushroom-body-only is the
+PRIMARY, preregistered structural control.** Membership: all annotated **KCs,
+MBONs, PAM, PPL1 and APL**, plus any further class admitted only by a written
+annotation rule. The rule and the resulting root-ID JSON must be frozen before
+generation and never adjusted after a result. Rationale: market input enters
+directly at the Kenyon cells, bypassing the antennal lobe, so the question is
+whether the mushroom body's specific wiring matters. **Whole-network shuffle is
+optional and exploratory, not preregistered**; a result from it cannot change a
+preregistered verdict. The annotation rule and frozen root-ID file do not yet
+exist in this repository.
 
 ## Pre-stated generation checks
 
@@ -105,14 +114,15 @@ not establish uniform sampling or equivalent network dynamics.
 
 ## Server generation
 
-The simulation-free generator is:
+For the optional, exploratory whole-network scope, the simulation-free generator is:
 
 ```bash
 .venv-shiu/bin/python repro/connectome/generate_shuffled_connectome.py \
   --scope whole-network --seed SEED --dry-run
 ```
 
-or, without choosing its MB membership here:
+or, for the primary MB scope (the `FROZEN_IDS.json` membership file is not yet
+written):
 
 ```bash
 .venv-shiu/bin/python repro/connectome/generate_shuffled_connectome.py \

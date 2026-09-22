@@ -29,8 +29,10 @@ Cues that SHARE KCs will interfere on the shared KC rows; disjoint pools do not.
 Abstentions (decided): a decision whose readout was ABSTAIN causes NO learning
 update - no depression and no drift; its market resolving later leaves the
 weights bit-identical. Only acted (YES/NO) decisions enter the queue. Consequence
-to keep in mind: drift advances only on resolutions of acted decisions (call
-``advance`` for time passing), and an abstained market's outcome teaches nothing.
+to keep in mind: drift advances only on resolutions of acted decisions, and an
+abstained market's outcome teaches nothing. DECIDED 2026-09-22: this acted-
+resolution clock is the drift clock for controlled AND real-market experiments;
+``advance`` exists but the experiments do not drive it from calendar time.
 The abstention rate is tracked in ``PlasticKCMBON.tally``.
 """
 

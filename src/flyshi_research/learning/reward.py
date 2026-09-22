@@ -111,8 +111,9 @@ def brier_improvement_reward(
     ``market_price`` is required so the baseline cannot be forgotten. Pass
     ``baseline_prob`` to override it (e.g. 0.5 for an uninformative baseline) -
     a named variant, not the default. Improvements over a market price are
-    typically small, so the placeholder ``brier_scale`` (0.25) likely makes this
-    arm's dopamine signal weak until it is set from training data (UNVERIFIED).
+    typically small; ``brier_scale`` = 0.04 (DECIDED 2026-09-22) is chosen so a
+    2-point edge gives about the same reward size as the example profit reward
+    (whether that example is typical is UNVERIFIED).
     """
     p = params or RewardParams()
     price = _finite(market_price, "market_price")

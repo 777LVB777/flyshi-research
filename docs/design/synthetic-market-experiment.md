@@ -82,8 +82,19 @@ Three arms use identical markets and seeds:
 - `learning_off`: no plasticity, with everything else unchanged.
 
 Dopamine remains an abstract teaching signal applied by our plasticity rule. No
-dopamine neuron is stimulated. Reward scaling, drift pace and the inferred
-compartment map retain the **unverified** status documented elsewhere.
+dopamine neuron is stimulated. The inferred compartment map retains the
+**unverified** status documented elsewhere.
+
+**Decided 2026-09-22** ([`open-decisions.md`](open-decisions.md), items 2–4):
+the accuracy arm uses `brier_scale = 0.04` with symmetric `[-1, 1]` clipping and
+`dead_zone = 0`, so its reward size matches the example profit reward and the
+arms differ in signal type rather than size (typicality of that example is
+**unverified**). Drift advances one step per acted-on resolution, the same clock
+the real-market phase will use; `drift_rate = 0.01` is still a placeholder. The
+readout uses all 96 MBON instances in both hemispheres. Left-hemisphere-only
+MBONs and drift disabled (`drift_rate = 0`) are preregistered sensitivity checks;
+neither changes the success criterion in Section 6. No job list for them is
+defined in Section 7 yet.
 
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 

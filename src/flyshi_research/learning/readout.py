@@ -20,8 +20,10 @@ is an atypical MBON whose dendrites lie largely outside the lobes.
 The type mean is only as good as the instance list it is given: pass EVERY
 instance of each type (silent ones at 0 Hz), not just the ones that fired.
 Averaging responders only inflates each type's mean by a different, arbitrary
-factor. Which instances count (both hemispheres? left only?) is the caller's
-choice and an OPEN design question (see docs/design/mb-learning-interface.md).
+factor. This module does not select instances; the caller does. DECIDED
+2026-09-22 (docs/design/open-decisions.md, 2): the primary readout passes all 96
+MBON instances from both hemispheres; left-hemisphere-only is a preregistered
+sensitivity check.
 
 Sign tables come from data files (``data/``), never from code:
   * ``circuit_<X>``: derived from direct PAM/PPL1->MBON synapse totals with the

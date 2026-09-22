@@ -421,12 +421,13 @@ Three terms:
   is measured in different units under the two aggregations, so a threshold set
   under one is not valid under the other; (ii) **the mean is only as good as the
   list of instances it is given** — it must include the silent instances (rate
-  0) of every type, in whichever hemispheres we decide to count, because
-  averaging only the neurons that fired would inflate each type by a different,
-  arbitrary factor. Which instances to count (both hemispheres, or left only) is
-  **not settled by this document**; the graded-encoding test fixes a choice (all
-  instances in both hemispheres) for its own purposes, and it is listed as open
-  in Section 8.
+  0) of every type, because averaging only the neurons that fired would inflate
+  each type by a different, arbitrary factor. **Which instances to count —
+  decided 2026-09-22:** all 96 instances in **both hemispheres** are the primary
+  readout, because right-hemisphere output neurons respond to our left-hemisphere
+  input (e.g. a right MBON03 instance fired at ~80 Hz). **Left-hemisphere-only is
+  a preregistered sensitivity check**, with its own margin set from training
+  data (see [`open-decisions.md`](open-decisions.md), item 2).
 - **Threshold:** a minimum confidence gap required before we act. Its units
   depend on the aggregation above.
 - **Abstain:** choosing not to bet. In our markets, abstaining costs and earns
@@ -622,15 +623,20 @@ profit-teaching can cause (this account of that prior project is **unverified**
 by us; we include it as motivation, not as established fact). Teaching also from
 accuracy gives a cleaner, less luck-driven signal to compare against.
 
-**What could go wrong.** The clip-and-normalize details are not yet settled
-(Section 8), and different choices could change results. One consequence of the
-market-price baseline is already visible: market prices are good forecasts, so
-our improvement over them will usually be *small* — a forecast two percentage
-points better than the market on a YES outcome improves the Brier error by only
-about 0.016, which is 6% of the placeholder scale (0.25) we currently divide by.
-Until that scale is set from training data, the accuracy arm's teaching signal is
-likely to be weak (**unverified**; the placeholder is not a tuned value). The
-accuracy arm also needs a *probability* forecast from us, which comes from the
+**Scale and clipping — decided 2026-09-22** (see
+[`open-decisions.md`](open-decisions.md), item 3). Each reward is divided by a
+scale and clipped symmetrically to [−1, 1], with no dead zone (only an exactly
+zero reward teaches nothing). The accuracy arm's scale is **0.04**. Market prices
+are good forecasts, so our improvement over them is usually *small*: a forecast
+two percentage points better than the market on a YES outcome improves the Brier
+error by about 0.016, which 0.04 turns into a teaching signal of 0.39 — about
+the same as the 0.38 profit reward for winning a YES bet bought at 0.60 after
+fees. So the two arms differ in the *kind* of teaching signal, not its size.
+(Whether that example is typical of real training markets is **unverified**, and
+the match assumes the profit scale stays at 1.0.)
+
+**What could go wrong.** Different scaling choices could change results; the
+chosen scale is fixed in advance, not tuned. The accuracy arm also needs a *probability* forecast from us, which comes from the
 calibration step discussed in 4b and is not yet specified. Representing
 dopamine as an abstract teaching signal is, again, an engineered route, not a claim
 about how flies learn or about what the model's dopamine neurons do; and the
@@ -689,9 +695,19 @@ and an abstained market's outcome carries no lesson for the circuit, so a system
 that abstains a lot learns slowly. This is why the abstention rate is tracked
 and reported.
 
+**Drift clock — decided 2026-09-22** (see [`open-decisions.md`](open-decisions.md),
+item 4). One drift step per acted-on market resolution, in **both** the
+controlled experiments and the real-market experiments; drift is not tied to
+calendar time. Using the same clock in every phase lets settings chosen in the
+synthetic phase carry over unchanged, whereas a calendar clock would add a
+half-life we have no way to calibrate. The cost: how fast weights drift back
+depends on how many markets resolve and how often we abstain, so both are
+reported. **Running with drift switched off is a preregistered sensitivity
+check.**
+
 **What could go wrong.** The learning could still collapse or saturate despite
-the floor and drift; the "recently active" window and the drift speed are
-tuning choices that could dominate results. (The earlier worry that the built-in
+the floor and drift; the "recently active" window and the drift speed (the
+per-step rate, still a placeholder) are tuning choices that could dominate results. (The earlier worry that the built-in
 cue separation might be too small for any rule to learn from has since been
 tested and resolved — Section 8 — though the separability of the eventual
 market-feature encoding still has to be confirmed.)
@@ -757,8 +773,11 @@ these on the same markets and seeds:
 - **Degree-preserving shuffled connectome** — the fly wiring randomly rewired,
   but with each neuron keeping its original *number* of connections. This keeps
   the "size and shape" of the network while destroying the specific fly
-  structure, so it separates *structure* from *raw capacity*. The fixed method,
-  scope options, and pre-run checks are in
+  structure, so it separates *structure* from *raw capacity*. **Scope, decided
+  2026-09-22:** only the wiring inside the mushroom body (Kenyon cells, output
+  neurons, PAM and PPL1 dopamine neurons, and APL) is shuffled, because our input
+  enters at the Kenyon cells; shuffling the whole brain is optional and
+  exploratory. The fixed method, scope, and pre-run checks are in
   [`degree-preserving-connectome-control.md`](degree-preserving-connectome-control.md).
 - **Reduced mushroom-body model** — a smaller, simpler model of the same circuit
   from Bennett, Philippides & Nowotny, 2021
@@ -853,29 +872,24 @@ Stated without softening. These are real, and some could stop the project.
   tested on the real model. The bias must also be
   measured under STRICT, GROUP and the 70/90% variants, and the noise of the scores
   at the stimuli used in markets is not yet measured.
-- **Which output-neuron instances enter the per-type mean is open.** The mean
-  (Section 4b) must be taken over every instance of a type, silent ones included,
-  but whether that means both hemispheres (right-hemisphere output neurons do
-  respond, sometimes strongly, even though we only stimulate left-hemisphere
-  Kenyon cells) or only the left has not been decided. The choice changes each
-  type's mean by an instance-count-dependent factor. The graded-encoding test
-  uses all instances in both hemispheres; that is a choice for that test, not a
-  settled design decision.
-- **Reward normalization is unsettled.** The exact clip-and-normalize scheme for
-  the teaching signal (Section 4c) is not decided, and different choices could
-  change the outcome. (The accuracy arm's scale is a separate open item, next.)
-- **The accuracy-arm reward scale must be set before the preregistered
-  experiment.** The accuracy arm divides its Brier improvement over the market
-  price by a scale before clipping (Section 4c). The placeholder is 0.25, the
-  largest improvement possible over a 0.5 baseline, but improvements over a market
-  price are much smaller: a 2-point edge over the market (forecast 0.62 against a
-  price of 0.60, and YES happens) improves the Brier error by 0.0156, which is
-  currently only about 6% of the placeholder scale, so the teaching signal is weak.
-  No tuned value exists (**unverified**); the scale must be set from training data
-  only and frozen before the preregistered experiment, never tuned on its results.
-- **The pace of the slow drift is unsettled.** It advances only when an acted-on
-  market resolves (Section 4d); whether one "step" should instead mean one
-  resolution, one trading day, or something else is open.
+- **Which output-neuron instances enter the per-type mean — RESOLVED
+  2026-09-22.** All 96 instances, both hemispheres, is primary; left-only is a
+  preregistered sensitivity check (Section 4b). Still to build: a frozen left/right
+  mask exposed by the real backend, so the left-only score can be recomputed.
+- **Reward normalization and the accuracy-arm scale — RESOLVED 2026-09-22.**
+  `brier_scale = 0.04`, symmetric clipping to [−1, 1], `dead_zone = 0` (Section
+  4c). Still **unverified**: whether the 2-point-edge example is typical of the
+  training markets; the training-only distribution of Brier improvements and the
+  clipping rate at 0.04 should be reported (descriptively; it cannot change the
+  value).
+- **The unit of the slow drift — RESOLVED 2026-09-22.** One step per acted-on
+  resolution in every phase (Section 4d); drift-off is a preregistered
+  sensitivity check. The per-step rate (`drift_rate = 0.01`) is still a
+  placeholder, and effective forgetting depends on market density and abstention
+  rate.
+- **Degree-preserving shuffle scope — RESOLVED 2026-09-22.** Mushroom-body-only
+  is primary (Section 6). Still to write: the annotation rule and frozen root-ID
+  membership file.
 - **The market data source is not chosen.** We have not selected which real
   prediction-market dataset to use.
 - **Speed is unmeasurable locally.** On the 8-gigabyte Mac, run timings are
@@ -1033,6 +1047,15 @@ This document is meant to be argued with and revised.
   unbalanced uniform cue, it is now marked **SUPERSEDED** for the current
   encoder. Its balanced replacement was pre-stated in
   [`graded-encoding-balanced.md`](graded-encoding-balanced.md) and has not run.
+- **2026-09-22 (later).** Four project-owner decisions recorded (full rationale in
+  [`open-decisions.md`](open-decisions.md)): (1) the degree-preserving shuffle is
+  mushroom-body-only (KCs + MBONs + PAM + PPL1 + APL, additions only via a frozen
+  annotation rule), whole-network optional and exploratory (6); (2) the readout
+  uses all 96 MBON instances in both hemispheres, left-only as a preregistered
+  sensitivity check (4b); (3) `brier_scale = 0.04`, symmetric [−1, 1] clipping,
+  `dead_zone = 0` (4c); (4) one drift step per acted resolution in controlled and
+  real-market phases, drift-off as a preregistered sensitivity check (4d).
+  Section 8's four corresponding open items are marked resolved.
 
 ---
 

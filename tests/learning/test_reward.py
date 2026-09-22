@@ -89,23 +89,37 @@ def test_brier_improvement_is_symmetric_across_outcomes():
 
 
 def test_brier_improvement_scaling_and_clipping():
-    perfect = brier_improvement_reward(1.0, 1, market_price=0.5, params=P)  # 0.25 / 0.25
+    q = RewardParams(brier_scale=0.25)
+    perfect = brier_improvement_reward(1.0, 1, market_price=0.5, params=q)  # 0.25 / 0.25
     assert perfect.value == pytest.approx(1.0) and not perfect.clipped
-    worst = brier_improvement_reward(0.0, 1, market_price=0.5, params=P)  # -0.25
+    worst = brier_improvement_reward(0.0, 1, market_price=0.5, params=q)  # -0.25
     assert worst.value == pytest.approx(-1.0)
     # against a confident-and-wrong market the same forecast beats it by more than the scale
-    r = brier_improvement_reward(1.0, 1, market_price=0.0, params=P)  # improvement 1.0 / 0.25
+    r = brier_improvement_reward(1.0, 1, market_price=0.0, params=q)  # improvement 1.0 / 0.25
     assert r.clipped and r.value == 1.0
 
 
-def test_brier_reward_against_market_is_small_for_small_edges():
-    """Documents why the placeholder brier_scale (0.25) is probably too big here."""
-    # a 2-point edge over the market (0.62 vs 0.60, YES happens): improvement
-    # 0.16 - 0.1444 = 0.0156, i.e. only ~6% of the 0.25 scale.
-    r = brier_improvement_reward(0.62, 1, market_price=0.60, params=P)
-    assert r.raw == pytest.approx(0.0156)
-    assert 0 < r.value < 0.1
-    assert dopamine_signal(r, P).rate_hz < 0.1 * P.dopamine_max_rate_hz
+def test_default_brier_scale_clips_symmetrically_at_0_04():
+    """Decided 2026-09-22: brier_scale 0.04, symmetric [-1, 1] clipping."""
+    inside = brier_improvement_reward(0.62, 1, market_price=0.60, params=P)
+    assert inside.value == pytest.approx(0.0156 / 0.04) and not inside.clipped
+    gain = brier_improvement_reward(1.0, 1, market_price=0.5, params=P)  # +0.25
+    loss = brier_improvement_reward(0.0, 1, market_price=0.5, params=P)  # -0.25
+    assert (gain.value, loss.value) == (1.0, -1.0)
+    assert gain.clipped and loss.clipped
+
+
+def test_default_brier_scale_matches_the_example_profit_reward():
+    """Decided 2026-09-22: a 2-point edge over the market (0.62 vs 0.60, YES
+    happens; improvement 0.16 - 0.1444 = 0.0156) gives about the same reward as
+    the example winning YES at 0.60 (net profit 0.38 after 0.01 fee + 0.01 half-
+    spread), so the two arms differ in signal TYPE, not size."""
+    accuracy = brier_improvement_reward(0.62, 1, market_price=0.60, params=P)
+    profit = profit_reward(1.0 - 0.60 - 0.01 - 0.01, P)
+    assert accuracy.raw == pytest.approx(0.0156)
+    assert accuracy.value == pytest.approx(0.39)
+    assert profit.value == pytest.approx(0.38)
+    assert abs(accuracy.value - profit.value) < 0.02
 
 
 def test_baseline_override_is_a_named_variant_not_the_default():

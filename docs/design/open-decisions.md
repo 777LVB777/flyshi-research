@@ -1,7 +1,10 @@
 # Open decisions requiring project-owner sign-off
 
-**Status:** decision brief, written 2026-09-22. No decision is made by this
-document. It consolidates four unresolved items from
+**Status:** decision brief, written 2026-09-22. **All four items were RESOLVED
+by the project owner on 2026-09-22**; each section ends with the recorded
+decision and rationale. The analysis above each decision is kept unchanged as
+the record of what was weighed. The brief originally consolidated four
+unresolved items from
 [`docs/preregistration.md`](../preregistration.md), Sections 11–12, against the
 current code. Resource estimates and biological interpretations explicitly
 marked **unverified** have not been checked by a real connectome generation or
@@ -99,7 +102,21 @@ recommended starting definition is all annotated KCs, MBONs, PAM/PPL1 dopamine
 neurons, and APL, plus any additional class included by a written annotation rule;
 the exact membership still requires approval.
 
-**DECISION NEEDED:** Choose `mushroom-body` or `whole-network` as the primary shuffle scope; if `mushroom-body`, approve the membership rule (recommended: KCs + MBONs + PAM + PPL1 + APL, with any additions fixed by an explicit annotation rule).
+**RESOLVED 2026-09-22 (project owner): `mushroom-body` is the PRIMARY shuffle
+scope.** The proposed membership is approved: all annotated **KCs + MBONs + PAM +
+PPL1 + APL**, with any additional class admitted only by the written annotation
+rule, which must be frozen (together with the resulting root-ID file) before the
+shuffled connectome is generated and never adjusted after a result.
+**Whole-network shuffle is optional and exploratory, not preregistered**; if run,
+it is reported as exploratory and cannot change a preregistered verdict.
+
+*Rationale:* market input enters directly at the Kenyon cells, bypassing the
+antennal lobe, so the question the control must answer is whether the mushroom
+body's specific wiring matters, not whether the whole brain's does.
+
+*Still to do before generation:* the annotation rule text and the frozen root-ID
+JSON do not yet exist in this repository. The generator keeps `--scope` as a
+required argument with no default, so every run states its scope explicitly.
 
 ## 2. MBON instances included in the per-type mean
 
@@ -149,7 +166,20 @@ the right side would remove a modeled circuit response after it has propagated,
 rather than isolate the input. The left-only sensitivity check will show whether
 the conclusion depends on that choice.
 
-**DECISION NEEDED:** Choose the primary instance set: `both hemispheres/all 96` (recommended, with left-only sensitivity) or `left hemisphere only`.
+**RESOLVED 2026-09-22 (project owner): all 96 MBON instances, both hemispheres,
+silent instances included at 0 Hz, is the PRIMARY instance set.
+Left-hemisphere-only is a preregistered sensitivity check** (reported, never
+gating; its decision margin calibrated separately on training data because its
+units differ).
+
+*Rationale:* right-side MBONs respond to left-side KC input (e.g. a right
+MBON03 instance fired at ~80 Hz in an existing set-A run), so excluding them
+would discard real circuit output after it has propagated.
+
+*Still to do before the sensitivity check can run:* the real backend does not yet
+expose a frozen annotation-derived left/right side mask through the shared
+simulator interface (see above). Full per-MBON outputs must be saved so the
+left-only score can be recomputed without new simulations.
 
 ## 3. Reward normalization and accuracy-arm `brier_scale`
 
@@ -186,7 +216,20 @@ without changing the success criterion. The current symmetric clipping to
 `[-1,1]` and `dead_zone = 0` should also be explicitly confirmed or changed at
 the same sign-off.
 
-**DECISION NEEDED:** Choose `brier_scale = 0.10`, `0.04`, or `0.025` (or supply another value), and confirm whether symmetric `[-1,1]` clipping with `dead_zone = 0` remains fixed.
+**RESOLVED 2026-09-22 (project owner): `brier_scale = 0.04`, symmetric clipping
+to `[-1, 1]`, `dead_zone = 0`.** These are now the defaults in
+`learning/params.py` and are frozen for the preregistered runs.
+
+*Rationale:* with 0.04 the documented two-point edge (improvement 0.0156) gives a
+normalized accuracy reward of 0.39, matching the example net profit reward (0.38)
+under `profit_scale = 1.0`. The profit-vs-accuracy comparison therefore tests the
+*type* of teaching signal rather than a difference in reward size.
+
+*Caveats kept:* that the example is typical of the training distribution remains
+**unverified**; the training-only report of absolute Brier improvements and the
+resulting clipping rate at 0.04 is still to be produced and is descriptive only,
+it cannot change the value. The size match assumes `profit_scale = 1.0`, which
+is still a placeholder; changing it would break the match.
 
 ## 4. Drift-pace unit
 
@@ -241,4 +284,18 @@ do not silently carry the event-count rate across datasets with different event
 density. The calendar unit and half-life must be fixed from biological rationale
 or training-period behavior, never from held-out performance.
 
-**DECISION NEEDED:** For controlled experiments, confirm `1 step per acted resolution`; for the real-market phase, choose `acted-resolution clock`, `calendar-time clock` (state unit/half-life), or `drift disabled in primary`.
+**RESOLVED 2026-09-22 (project owner): one drift step per acted-on resolution
+for BOTH the controlled experiments and the real-market experiments**
+(`drift_steps_per_resolution = 1`; `advance` is not used as a calendar clock).
+**Drift disabled (`drift_rate = 0`) is a preregistered sensitivity check.**
+The recommendation above to switch to a calendar-time clock for the real-market
+phase was **not adopted**.
+
+*Rationale:* one clock across phases lets parameters set in the synthetic phase
+carry over unchanged. A calendar-time clock would introduce a half-life parameter
+with no calibration.
+
+*Consequence kept on record:* the effective forgetting rate still depends on
+market density and abstention rate, so it is not comparable across datasets with
+different event density. Both numbers must be reported alongside real-market
+results. `drift_rate = 0.01` itself remains a placeholder.
