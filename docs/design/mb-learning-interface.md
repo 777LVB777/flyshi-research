@@ -739,8 +739,9 @@ these on the same markets and seeds:
   from Bennett, Philippides & Nowotny, 2021
   ([doi:10.1038/s41467-021-22592-4](https://doi.org/10.1038/s41467-021-22592-4)).
   Checks whether the full connectome is needed or a stripped-down version does
-  as well. (We have not independently re-verified this reference's contents; it
-  is cited as provided.)
+  as well. The source-verified equations, selected MV variant, parameters,
+  adaptation, and reproduction criterion are recorded in
+  [`reduced-mushroom-body-control.md`](reduced-mushroom-body-control.md).
 - **Logistic regression** — a standard, simple statistical method for yes/no
   prediction, reading the same features. A basic "can a plain model do this?"
   bar.
