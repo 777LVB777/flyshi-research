@@ -1,0 +1,19 @@
+[backend] 62261 KC->MBON synapses; build 2.2s
+left-only pool (100 KCs at 150 Hz), seed 20260316: wrote left_only_pool_seed_20260316.json
+left-only pool (100 KCs at 150 Hz), seed 20260317: wrote left_only_pool_seed_20260317.json
+left-only pool (100 KCs at 150 Hz), seed 20260318: wrote left_only_pool_seed_20260318.json
+left-only pool (100 KCs at 150 Hz), seed 20260319: wrote left_only_pool_seed_20260319.json
+left-only pool (100 KCs at 150 Hz), seed 20260320: wrote left_only_pool_seed_20260320.json
+left-only pool (100 KCs at 150 Hz), seed 20260321: wrote left_only_pool_seed_20260321.json
+=== Left-only pool diagnostic (MEASUREMENT; no verdict, no pass criterion) ===
+pool: recent_change, left-hemisphere only, 100 KCs at 150 Hz (15,000 Hz total drive)
+      seed   spread   APL Hz  actMBON    score  state
+  20260316     0.0%    116.6       30    -52.8  contained
+  20260317     0.0%    116.6       27    -51.8  contained
+  20260318     0.0%    117.1       35    -50.8  contained
+  20260319     0.0%    116.3       29    -49.6  contained
+  20260320     0.0%    116.3       28    -50.6  contained
+  20260321     0.0%    116.4       28    -50.3  contained
+left-only: 0/6 runs ignited; score SD 1.12 Hz
+bilateral anchor_100at150 (same drive): 4/6 ignited; score SD 25.90 Hz; pool {'left': 52, 'right': 48}
+Wrote left_only_pool_summary.json
