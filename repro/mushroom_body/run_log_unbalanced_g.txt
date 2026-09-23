@@ -1,0 +1,48 @@
+[backend] 62261 KC->MBON synapses; build 2.4s
+seed 20260316, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260316.json
+seed 20260316, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260316.json
+seed 20260316, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260316.json
+seed 20260316, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260316.json
+seed 20260316, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260316.json
+seed 20260317, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260317.json
+seed 20260317, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260317.json
+seed 20260317, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260317.json
+seed 20260317, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260317.json
+seed 20260317, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260317.json
+seed 20260318, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260318.json
+seed 20260318, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260318.json
+seed 20260318, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260318.json
+seed 20260318, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260318.json
+seed 20260318, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260318.json
+seed 20260319, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260319.json
+seed 20260319, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260319.json
+seed 20260319, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260319.json
+seed 20260319, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260319.json
+seed 20260319, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260319.json
+seed 20260320, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260320.json
+seed 20260320, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260320.json
+seed 20260320, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260320.json
+seed 20260320, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260320.json
+seed 20260320, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260320.json
+seed 20260321, value 0.05 (price pool 36 Hz): wrote unbalanced_g_value_0p05_seed_20260321.json
+seed 20260321, value 0.22 (price pool 56.4 Hz): wrote unbalanced_g_value_0p22_seed_20260321.json
+seed 20260321, value 0.41 (price pool 79.2 Hz): wrote unbalanced_g_value_0p41_seed_20260321.json
+seed 20260321, value 0.63 (price pool 105.6 Hz): wrote unbalanced_g_value_0p63_seed_20260321.json
+seed 20260321, value 0.88 (price pool 135.6 Hz): wrote unbalanced_g_value_0p88_seed_20260321.json
+=== Unbalanced single-framing score diagnostic (DIAGNOSTIC, not a validation) ===
+value=0.05 price_pool=  36.0Hz mean_g=  -212.451  same-stimulus noise=  136.86 Hz
+value=0.22 price_pool=  56.4Hz mean_g=   -84.095  same-stimulus noise=   70.42 Hz
+value=0.41 price_pool=  79.2Hz mean_g=  -115.303  same-stimulus noise=   84.27 Hz
+value=0.63 price_pool= 105.6Hz mean_g=   -74.367  same-stimulus noise=  124.16 Hz
+value=0.88 price_pool= 135.6Hz mean_g=   -70.334  same-stimulus noise=   82.52 Hz
+  seed 20260316: -132.33, -61.76, -157.07, -119.39, -16.51
+  seed 20260317: -228.79, -90.44, -102.94, -2.88, -96.87
+  seed 20260318: -163.77, -72.67, -135.89, -125.98, -104.08
+  seed 20260319: -311.71, -58.38, -56.31, -122.49, -17.60
+  seed 20260320: -239.58, -63.81, -89.90, 6.44, -86.47
+  seed 20260321: -198.52, -157.51, -149.71, -81.91, -100.48
+endpoint distance 321.90 Hz; endpoint noise 136.86 Hz (low 136.86, high 82.52); threshold 410.59 Hz
+monotonic (six-seed mean): False (none)
+  fail: the six-seed mean score sequence is not strictly monotonic across the five values
+  fail: endpoint distance 321.90 Hz is below its measured threshold 410.59 Hz (3 x 136.86 Hz)
+VERDICT: FAIL
