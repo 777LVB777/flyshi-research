@@ -113,22 +113,118 @@ zero. The pairwise noise table shows the same redundancy:
 `d_change(0.00,0.25) = d_change(0.75,1.00) = 258.74 Hz`, and
 `d_change(0.25,0.75) = 376.15 Hz = 2 × d_change(0.25,0.50)`.
 
-### 2b. Balancing opposes the price signal, breaking monotonicity
+### 2b. Balancing perturbs the single-framing score; noise decided the ordering
 
-Total-drive balancing leaves feature-pool rates untouched and equalises totals by
-moving drive into the reserved pool. At `v = 0.00` it sets a price-pool drive gap
-of **−12,000 Hz across 100 KCs** against a balance-pool gap of **+12,000 Hz across
-300 KCs**; at `v = 0.25`, −6,000 against +6,000. The two pools are unrelated
-random KC sets with different downstream wiring, so the MBON contrast is the
-difference of two large opposing effects, and there is no reason for that
-difference to grow with `|v − 0.5|`.
+> **SUPERSEDED 2026-09-22, same day, by the five-seed analysis below. Original
+> wording kept visible:**
+>
+> *"### 2b. Balancing opposes the price signal, breaking monotonicity*
+>
+> *Total-drive balancing leaves feature-pool rates untouched and equalises totals
+> by moving drive into the reserved pool. At `v = 0.00` it sets a price-pool drive
+> gap of −12,000 Hz across 100 KCs against a balance-pool gap of +12,000 Hz across
+> 300 KCs; at `v = 0.25`, −6,000 against +6,000. The two pools are unrelated random
+> KC sets with different downstream wiring, so the MBON contrast is the difference
+> of two large opposing effects, and there is no reason for that difference to grow
+> with `|v − 0.5|`.*
+>
+> *It does not: `|S|` is 102.34 at v = 0.25 but only 30.31 at v = 0.00, even though
+> the price difference at the endpoints (30 vs 150 Hz) is twice as large as at the
+> quartiles (60 vs 120 Hz). This is a second, independent defect: even with the
+> antisymmetry accepted, a monotone sequence would require `|S|` to grow with
+> `|v − 0.5|`, and the balancing opposition prevents it. It also makes the endpoint
+> gate — the one the verdict applies first — the weakest point of the sweep."*
+>
+> **Why it was too strong:** it read a single seed's magnitudes as a deterministic
+> property. The five noise seeds show the quartile contrast is indistinguishable
+> from zero, so noise, not the balance pool, decided the observed ordering.
 
-It does not: `|S|` is **102.34 at v = 0.25** but only **30.31 at v = 0.00**, even
-though the price difference at the endpoints (30 vs 150 Hz) is twice as large as
-at the quartiles (60 vs 120 Hz). This is a second, independent defect: even with
-the antisymmetry accepted, a monotone sequence would require `|S|` to grow with
-`|v − 0.5|`, and the balancing opposition prevents it. It also makes the endpoint
-gate — the one the verdict applies first — the **weakest** point of the sweep.
+**The drive arithmetic stands.** Total-drive balancing leaves feature-pool rates
+untouched and equalises totals by moving drive into the reserved pool: at
+`v = 0.00` a price-pool drive gap of **−12,000 Hz across 100 KCs** against a
+balance-pool gap of **+12,000 Hz across 300 KCs**; at `v = 0.25`, −6,000 against
++6,000. The two pools are unrelated random KC sets with different downstream
+wiring.
+
+**What the balance pool measurably does to the single-framing score.** With
+`g(v) = CIRCUIT(m_yes(v))` at the primary seed:
+
+| v | price pool | balance pool | `g(v)` |
+|---|---:|---:|---:|
+| 0.00 | 30 Hz | **70 Hz** | −96.9 |
+| 0.25 | 60 Hz | **50 Hz** | **−213.8** |
+| 0.50 | 90 Hz | 30 Hz | −110.6 |
+| 0.75 | 120 Hz | 30 Hz | −111.4 |
+| 1.00 | 150 Hz | 30 Hz | −127.2 |
+
+`g` is non-monotone, and the disorder sits exactly in the two rows where the
+balance pool is above its floor. **At the three values where the balance pool
+rests at 30 Hz, `g` is monotone decreasing** (−110.6, −111.4, −127.2). So the
+balance pool moves the score by **~100 Hz** while the price pool moves it by
+**16.6 Hz** across 90→150 Hz — a perturbation roughly six times the signal it is
+supposed to leave alone.
+
+**What the five noise seeds show.** Scalar scores at the five dedicated noise
+seeds (these runs exist only to estimate noise; they are reported here as a
+diagnostic, not as a second verdict):
+
+| v | `S` mean over 5 seeds | `S` SD | SE | primary-seed `S` |
+|---|---:|---:|---:|---:|
+| 0.00 | **+80.3** | 37.0 | 16.5 | +30.3 |
+| 0.25 | +2.6 | 93.4 | 41.8 | −102.3 |
+| 0.50 | 0.0 | 0.0 | 0.0 | 0.0 |
+| 0.75 | −2.6 | 93.4 | 41.8 | +102.3 |
+| 1.00 | **−80.3** | 37.0 | 16.5 | −30.3 |
+
+- The endpoint contrast has a stable deterministic component, about **±80 Hz**.
+- **The quartile contrasts are indistinguishable from zero** (2.6 ± 41.8 SE).
+- The primary seed's −102.3 at `v = 0.25` lies about **1.1 SD** from the noise-seed
+  mean, so the striking zig-zag of the verdict sequence is substantially a
+  single-run noise artifact.
+
+**The accurate statement.** The balance pool demonstrably perturbs `g` by ~100 Hz
+against 16.6 Hz of price-driven swing; the deterministic contrast at the quartiles
+is ~0; and single-run noise decided the ordering that the verdict recorded.
+Whether the deterministic sequence is monotone cannot be established or refuted
+from this data at single-run precision. The FAIL stands — the endpoint gate fails
+on its own arithmetic — but it is better described as a **signal-to-noise
+failure** than as a demonstration that balancing destroys monotonicity.
+
+### 2b-bis. General finding: a one-seed monotonicity judgement is underpowered
+
+This is not specific to balancing and **applies to any redesign**, so it is
+recorded separately.
+
+The specification judges monotonicity from the **primary seed alone** (five values,
+one seed) while measuring noise from a **separate** set of five seeds. That
+structure is sound only when the noise is small next to the value-driven signal.
+Here it is not: the deterministic quartile contrast is ~0 with a per-run SD of
+93.4 Hz, so the primary sequence's ordering is decided by the noise realisation of
+one run. A test built this way can return either verdict at this noise level
+almost regardless of what the encoder does.
+
+**Proposal, not adopted** (any change to a pass/fail rule needs its own dated
+pre-statement, written before the run it governs):
+
+1. **Judge monotonicity on the same replication used for the noise estimate.**
+   Run the value sweep at every seed, and apply the monotonicity rule to the
+   per-value **mean across seeds**, reporting all per-seed sequences alongside.
+   Cost is unchanged when the noise seeds already sweep all five values, as they
+   do today — the current design simply discards that information for the
+   monotonicity judgement.
+2. **Require each successive step to clear its own measured noise**, not just to
+   have the right sign: `|mean S(v_{i+1}) − mean S(v_i)| ≥ k × SE` of that
+   difference, with `k` fixed in advance. This makes "strictly monotonic" a claim
+   about the deterministic sequence rather than about one realisation, and it
+   would have flagged the quartile steps here as unresolved rather than counting
+   them as evidence either way.
+3. **State the power in advance.** With `n` seeds and a per-run SD of `σ`, a step
+   of size `d` is resolvable only when `d ≳ k·σ·sqrt(2/n)`. Recording the smallest
+   resolvable step before the run makes an underpowered design visible on paper
+   rather than after 60 simulations.
+4. **Keep the verdict seed held out if a held-out seed is wanted** — for example,
+   judge on the replicated mean and report the held-out primary seed as a
+   reproducibility check, instead of resting the verdict on it.
 
 ### 2c. The noise floor is dominated by the drive regime, not the statistic
 
@@ -304,6 +400,21 @@ sweep's shape.
 the Option-B default) and the encoder parameters that implement it; the
 synthetic-market cost model, which grows because innate scores need their own
 runs.
+
+**Validation gap (recorded 2026-09-22; a gap, not a blocker).** At baseline
+weights the innate-subtracted score is **identically zero for every value**,
+because `s = s_innate` exactly: the mitigated readout measures only the learned
+change from baseline and carries no pre-learning value signal at all. Two
+consequences. First, a graded test cannot be run on the mitigated score — it would
+be zero everywhere — so **the graded test necessarily validates the RAW contrast
+while the market experiment reads the MITIGATED one**. The quantity validated is
+not the quantity used. Second, before learning every decision is an exact tie, so
+the synthetic market's training-only exploration rule would fire on essentially
+every early training market. A third, smaller point: the mitigated score is a
+difference of four scores rather than two, so its noise is higher — up to ×√2 if
+the runs are independent. The measured common-random-number correlation (+0.174,
++0.591) came from same-weight runs; innate and learned runs differ in their
+weights, so how much cancels is **unverified**.
 
 **Re-validation cost.** ~60 simulations for a graded re-validation, **plus** the
 synthetic-market increase already encoded in the job planner: 125 jobs / 25,000
