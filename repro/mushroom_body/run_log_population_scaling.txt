@@ -1,0 +1,53 @@
+[backend] 62261 KC->MBON synapses; build 1.6s
+ladder_100 (KCs 100, 90 Hz), seed 20260316: wrote population_scaling_ladder_100_seed_20260316.json
+ladder_100 (KCs 100, 90 Hz), seed 20260317: wrote population_scaling_ladder_100_seed_20260317.json
+ladder_100 (KCs 100, 90 Hz), seed 20260318: wrote population_scaling_ladder_100_seed_20260318.json
+ladder_100 (KCs 100, 90 Hz), seed 20260319: wrote population_scaling_ladder_100_seed_20260319.json
+ladder_100 (KCs 100, 90 Hz), seed 20260320: wrote population_scaling_ladder_100_seed_20260320.json
+ladder_100 (KCs 100, 90 Hz), seed 20260321: wrote population_scaling_ladder_100_seed_20260321.json
+ladder_200 (KCs 200, 90 Hz), seed 20260316: wrote population_scaling_ladder_200_seed_20260316.json
+ladder_200 (KCs 200, 90 Hz), seed 20260317: wrote population_scaling_ladder_200_seed_20260317.json
+ladder_200 (KCs 200, 90 Hz), seed 20260318: wrote population_scaling_ladder_200_seed_20260318.json
+ladder_200 (KCs 200, 90 Hz), seed 20260319: wrote population_scaling_ladder_200_seed_20260319.json
+ladder_200 (KCs 200, 90 Hz), seed 20260320: wrote population_scaling_ladder_200_seed_20260320.json
+ladder_200 (KCs 200, 90 Hz), seed 20260321: wrote population_scaling_ladder_200_seed_20260321.json
+ladder_300 (KCs 300, 90 Hz), seed 20260316: wrote population_scaling_ladder_300_seed_20260316.json
+ladder_300 (KCs 300, 90 Hz), seed 20260317: wrote population_scaling_ladder_300_seed_20260317.json
+ladder_300 (KCs 300, 90 Hz), seed 20260318: wrote population_scaling_ladder_300_seed_20260318.json
+ladder_300 (KCs 300, 90 Hz), seed 20260319: wrote population_scaling_ladder_300_seed_20260319.json
+ladder_300 (KCs 300, 90 Hz), seed 20260320: wrote population_scaling_ladder_300_seed_20260320.json
+ladder_300 (KCs 300, 90 Hz), seed 20260321: wrote population_scaling_ladder_300_seed_20260321.json
+ladder_400 (KCs 400, 90 Hz), seed 20260316: wrote population_scaling_ladder_400_seed_20260316.json
+ladder_400 (KCs 400, 90 Hz), seed 20260317: wrote population_scaling_ladder_400_seed_20260317.json
+ladder_400 (KCs 400, 90 Hz), seed 20260318: wrote population_scaling_ladder_400_seed_20260318.json
+ladder_400 (KCs 400, 90 Hz), seed 20260319: wrote population_scaling_ladder_400_seed_20260319.json
+ladder_400 (KCs 400, 90 Hz), seed 20260320: wrote population_scaling_ladder_400_seed_20260320.json
+ladder_400 (KCs 400, 90 Hz), seed 20260321: wrote population_scaling_ladder_400_seed_20260321.json
+ladder_500 (KCs 500, 90 Hz), seed 20260316: wrote population_scaling_ladder_500_seed_20260316.json
+ladder_500 (KCs 500, 90 Hz), seed 20260317: wrote population_scaling_ladder_500_seed_20260317.json
+ladder_500 (KCs 500, 90 Hz), seed 20260318: wrote population_scaling_ladder_500_seed_20260318.json
+ladder_500 (KCs 500, 90 Hz), seed 20260319: wrote population_scaling_ladder_500_seed_20260319.json
+ladder_500 (KCs 500, 90 Hz), seed 20260320: wrote population_scaling_ladder_500_seed_20260320.json
+ladder_500 (KCs 500, 90 Hz), seed 20260321: wrote population_scaling_ladder_500_seed_20260321.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260316: wrote population_scaling_drive_matched_500at30_seed_20260316.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260317: wrote population_scaling_drive_matched_500at30_seed_20260317.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260318: wrote population_scaling_drive_matched_500at30_seed_20260318.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260319: wrote population_scaling_drive_matched_500at30_seed_20260319.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260320: wrote population_scaling_drive_matched_500at30_seed_20260320.json
+drive_matched_500at30 (KCs 500, 30 Hz), seed 20260321: wrote population_scaling_drive_matched_500at30_seed_20260321.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260316: wrote population_scaling_anchor_100at150_seed_20260316.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260317: wrote population_scaling_anchor_100at150_seed_20260317.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260318: wrote population_scaling_anchor_100at150_seed_20260318.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260319: wrote population_scaling_anchor_100at150_seed_20260319.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260320: wrote population_scaling_anchor_100at150_seed_20260320.json
+anchor_100at150 (KCs 100, 150 Hz), seed 20260321: wrote population_scaling_anchor_100at150_seed_20260321.json
+=== Population-scaling diagnostic (MEASUREMENT; no verdict, no pass criterion) ===
+condition                 KCs  driveHz  scoreSD  vecdist  actMBON   APLHz nonstimKC%
+ladder_100                100    9,000     0.58     4.69     22.0   166.2       0.0%
+ladder_200                200   18,000    60.09   179.20     73.0   252.8      65.6%
+ladder_300                300   27,000    72.43   166.28     75.7   294.6      66.4%
+ladder_400                400   36,000    37.91    92.11     81.8   312.3      67.1%
+ladder_500                500   45,000    82.48   176.21     86.0   298.4      67.3%
+drive_matched_500at30     500   15,000    77.74   265.20     63.3   215.2      43.5%
+anchor_100at150           100   15,000    25.90    77.78     57.8   198.8      39.7%
+Wrote population_scaling_summary.json
