@@ -1,5 +1,50 @@
 # Unbalanced single-framing score diagnostic
 
+> **ADDENDUM 2026-09-27: run recorded; FAIL attributable to a since-identified
+> bug.** Added after the run. The pre-statement below is kept exactly as written,
+> including its "NOT RUN" status line, which described the document when it was
+> written.
+>
+> **The recorded result (unchanged).** The run completed: 30 of 30 files, from
+> `repro/mushroom_body/results/unbalanced_g_diagnostic_verdict.json` and
+> `repro/mushroom_body/run_log_unbalanced_g.txt`. **VERDICT: FAIL**, on both
+> conditions:
+>
+> - **Monotonicity:** the six-seed mean `gbar(v)` = −212.45, −84.10, −115.30,
+>   −74.37, −70.33 is not strictly monotonic.
+> - **Endpoint separation:** `D_end` = 321.90 Hz is below its threshold of
+>   410.59 Hz (3 × `d_noise` = 3 × 136.86 Hz).
+>
+> Same-stimulus noise was 70.42–136.86 Hz. This verdict is not altered.
+>
+> **The bug.** The run did not implement §2 as pre-stated. §2 says pools are
+> "drawn from left-hemisphere KCs", but the runner
+> (`repro/mushroom_body/run_unbalanced_g_diagnostic.py:127`) passed all 5,177 KCs
+> to `KCEncoder`. All five pools were split about 50/50 between the hemispheres
+> (left/right 51/49, 52/48, 52/48, 54/46, 43/57).
+>
+> **Why it matters.**
+>
+> - **The background itself ignites.** The bilateral population-scaling rung
+>   `ladder_400` is exactly this run's background: the same four pools at 90 Hz
+>   with price silent. It ignited in 6/6 runs, with 67% non-stimulated KC spread.
+> - **Left-only pools do not.** A left-only ladder at the same rate did not ignite,
+>   apart from one weak event, up to 500 KCs, with score SD 0.5–5.1 Hz against
+>   this run's 37.8–63.0 Hz.
+>
+> See [`bilateral-pool-draw-finding.md`](bilateral-pool-draw-finding.md).
+>
+> **How to read the result.**
+>
+> - **It is not evidence against the unbalanced encoder design.** It is evidence
+>   about the bilateral-draw regime, and it does not support sparing option (c) on
+>   the grounds in §6.
+> - **What the bug does not settle.** Whether the unbalanced encoder with left-only
+>   pools gives a monotone, above-noise `g` is untested. The left-only ladder used
+>   uniform 90 Hz, not this run's price sweep, and ignition in this run is
+>   inferred, not measured, because only MBON rates were saved.
+> - **The §6 total-drive confound stands unchanged.**
+
 **Status: PRE-STATED; NOT RUN. The runner does not exist yet.** Written
 2026-09-22, before any unbalanced market-encoder simulation and before the code
 that would produce one. Everything below — value set, seeds, statistic, pass

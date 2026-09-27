@@ -1,5 +1,37 @@
 # Balanced Option-B encoding: FAIL, diagnosis, and candidate redesigns
 
+> **ADDENDUM 2026-09-27: FAIL attributable to a since-identified bug.** Added
+> after this document was written. Nothing below this box has been changed. The
+> original FAIL verdict, the NOT VIABLE status and every number stand exactly as
+> recorded.
+>
+> **The bug.** This run's pools were drawn from **both hemispheres**. The runner
+> (`repro/mushroom_body/run_graded_encoding_balanced.py:80`) passed all 5,177 KCs
+> to `KCEncoder`, whose docstring requires left-hemisphere KCs. Each feature pool
+> was therefore split about 50/50 between the hemispheres.
+>
+> **Why it matters.** Since then, matched diagnostics have compared left-only
+> pools with this bilateral draw at the same count and 90 Hz. Bilateral pools
+> ignited 6/6 from 200 KCs, with score SD 60–82 Hz. Left-only pools did not
+> ignite, apart from one weak event, up to 500 KCs, with score SD 0.5–5.1 Hz.
+> See [`bilateral-pool-draw-finding.md`](bilateral-pool-draw-finding.md).
+>
+> **How to read the result below.**
+>
+> - **It is not evidence against the encoder design.** The signal-to-noise failure
+>   recorded in §2b–§2e, and the "~14× drive-regime noise" in §2c and §3.1,
+>   describe the bilateral-draw regime.
+> - **The §3 noise measurements need a qualifier.** They are valid measurements of
+>   that regime, but should not be carried over as the noise budget for left-only
+>   pools.
+> - **What the bug does not explain.** The mirroring antisymmetry in §2a is exact
+>   and structural and has nothing to do with hemispheres. It stands as a real
+>   defect of the mirrored encoder whatever the pool draw.
+> - **What the bug does not settle.** Whether a left-only balanced encoder would
+>   pass is untested. The left-only ladder did not reach this run's
+>   54,000–60,000 Hz drive or its non-uniform rates, and ignition in this run is
+>   inferred, not measured, because only MBON rates were saved.
+
 **Status: the balanced Option-B encoder is NOT VIABLE as currently specified.**
 The pre-stated re-validation in
 [`graded-encoding-balanced.md`](graded-encoding-balanced.md) ran in full (60
