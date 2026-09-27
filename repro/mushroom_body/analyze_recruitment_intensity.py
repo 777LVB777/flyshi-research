@@ -72,10 +72,15 @@ def left_only_pool_path(seed: int) -> Path:
 
 
 def recruitment_stats(payload: dict) -> Dict[str, Optional[float]]:
-    kc_ids = payload["population_ids"]["kenyon_cells"]
-    kc_rates = payload["rates_hz"]["kenyon_cells"]
-    stimulated = set(int(i) for i in payload["stimulated_kc_ids"])
-    non_stim_rates = [r for i, r in zip(kc_ids, kc_rates) if int(i) not in stimulated]
+    return recruitment_from_rates(payload["population_ids"]["kenyon_cells"],
+                                  payload["rates_hz"]["kenyon_cells"],
+                                  payload["stimulated_kc_ids"])
+
+
+def recruitment_from_rates(kc_ids, kc_rates, stimulated_kc_ids) -> Dict[str, Optional[float]]:
+    """The measure on one KC rate vector (a seed's trial mean, or one trial)."""
+    stimulated = set(int(i) for i in stimulated_kc_ids)
+    non_stim_rates = [float(r) for i, r in zip(kc_ids, kc_rates) if int(i) not in stimulated]
     n_non_stim = len(non_stim_rates)
     active = [r for r in non_stim_rates if r > ACTIVE_HZ]
     active_fraction = len(active) / n_non_stim if n_non_stim else float("nan")
