@@ -40,8 +40,13 @@ recomputed here with the encoder alone (no simulation):
 The balanced run's 300-KC balance pool was drawn from the same all-KC list. Its
 side split was not recomputed here.
 
-**The runners have not been changed.** The bug is identified, not fixed. Any
-rerun through those two runners would repeat it.
+**Fixed, 2026-09-27, after this finding was written.** Both runners now draw
+from `left_kc_ids()` and assert every drawn KC, in every feature pool and the
+balance pool, is annotated left before simulating; they abort otherwise (test:
+`tests/learning/test_hemisphere_pool_fix.py`). The fix postdates the two recorded
+FAILs above, which were produced by, and remain a true record of, the unfixed
+bilateral-draw runners. **No rerun has been performed**; a rerun would use the
+fixed runners and would not reproduce the bilateral draw.
 
 ## 2. The evidence
 
@@ -101,7 +106,8 @@ Recorded so the finding is not quoted more strongly than the evidence allows:
      rates (30–150 Hz), plus a 300-KC balance pool in the balanced run.
    - The left-only ladder tested only uniform 90 Hz, up to 45,000 Hz.
    - Whether left-only pools stay contained at encoder-realistic drive is **open**
-     (the §6 proposal).
+     ([`left-only-realistic-drive-diagnostic.md`](left-only-realistic-drive-diagnostic.md),
+     §6, not yet run).
 3. **Hemisphere and pool draw remain confounded.**
    - Each left-only rung is a different set of cells from its bilateral
      counterpart; they share only 3, 10, 20 and 50 KCs.
@@ -178,7 +184,14 @@ Per-seed values from the saved files (ratio = measured / imposed 90 Hz):
 
   Rates are 5-second means in 0.2 Hz steps, so 1.2 Hz is about six spikes per KC
   across all five trials. The 1% ignition label counts both states the same way,
-  but by rate they are very different.
+  but by rate they are very different. This is formalised and extended to every
+  saved condition, retrospectively, in
+  [`recruitment-intensity-measure.md`](recruitment-intensity-measure.md): the
+  binary label collapses a ≥30-fold range of recruitment intensity, and the
+  bilateral `anchor_100at150` condition used as the benchmark throughout this
+  document turns out to ignite at the same weak, low-rate order of magnitude
+  (0.85–8.58 Hz) as this 300-KC event, not at the 9–34 Hz seen once the ladder
+  reaches 200+ KCs.
 
 **Stochastic near threshold, or specific to the 300 draw?**
 
@@ -207,11 +220,11 @@ identity, not on count.
 
 **What six seeds cannot determine:**
 
-- **The ignition probability at 300.** One of six has a 95% interval of roughly
-  0.4%–64%. That interval is consistent with near-zero rates at 200 and 500 as
-  well, so the rungs cannot be ranked by ignition probability.
-- **Whether 200 and 500 ever ignite.** Zero of six has a 95% upper bound of
-  about 46%.
+- **The ignition probability at 300, or a ranking against 200 and 500.** 1/6
+  (300 KCs) and 0/6 (200 and 500 KCs) have overlapping 95% confidence intervals —
+  roughly 0.4%–64% for 1/6, 0%–46% for 0/6 — so the six-seed counts alone cannot
+  rank the three rungs' ignition probabilities against each other, and 0/6 does
+  not rule out a rate approaching that of 1/6.
 - **When the event happened within the run.** Only 5-trial, 1000 ms mean rates
   were saved. There are no per-trial or time-resolved rates, so it cannot be told
   whether the event happened in one trial or in all five, or how long it lasted.
@@ -221,60 +234,23 @@ identity, not on count.
   as the same noise.
 - **Whether the event would recur with another pool seed or nesting order.**
 
-## 6. Next diagnostic (proposed, not written, not pre-stated)
+## 6. Next diagnostic: now pre-stated
 
-**Left-only pools at encoder-realistic drive.** The ladder tested uniform 90 Hz
-up to 45,000 Hz. The graded tests ran five pools at unequal rates, totalling
-39,600–60,000 Hz. Proposal:
+The proposal sketched from this finding has been written up as a full, dated
+pre-statement:
+[`left-only-realistic-drive-diagnostic.md`](left-only-realistic-drive-diagnostic.md).
+7 stimuli (the unbalanced diagnostic's five values plus the balanced diagnostic's
+`v=0.00` and `v=0.25`, all left-only, all YES-only) × 6 seeds = 42 simulations,
+~35.4 minutes estimated, with per-trial KC/MBON/APL rates saved so a brief event
+can be time-located, and the rate-weighted recruitment measure
+([`recruitment-intensity-measure.md`](recruitment-intensity-measure.md)) included
+from the start. **Not run; the runner does not exist yet.**
 
-- **Encoder:** `KCEncoder` given left KCs only, default `EncoderParams`, pool seed
-  20260401. These are the same pools as `left_ladder_500`.
-- **Stimuli:** the encoder's own output for the five-feature YES-framed stimuli at
-  the unbalanced value set (`v = 0.05, 0.22, 0.41, 0.63, 0.88`):
-  - price pool 36.0–135.6 Hz;
-  - the four background pools at 90 Hz;
-  - totals 39,600–49,560 Hz.
-- **Two further stimuli, reaching the 54,000–60,000 Hz regime:**
-  - the balanced encoder's `v = 0.00` and `v = 0.25` YES stimuli, with the
-    left-drawn 300-KC balance pool at 70 Hz and 50 Hz;
-  - totals 60,000 Hz and 57,000 Hz.
-
-  An alternative is two unbalanced stimuli with the four background pools raised
-  to reach 54,000 and 60,000 Hz. That departs from encoder output, so the balanced
-  stimuli are preferred.
-- **Size:** 7 stimuli × 6 seeds (20260316–20260321), 1000 ms × 5 trials, so
-  **42 simulations**.
-  - Planning figure: about 35 minutes at 50.5 s per simulation, unverified.
-  - The left-only 90 Hz ladder gave a 50.5 s estimate. Realistic drive could run
-    slower if it ignites.
-- **Records:** everything the left-only ladder records, including hemisphere-split
-  spread, APL and stimulated-KC measured vs imposed rate.
-  - **Add per-trial KC and MBON rates**, so a §5-style event can be placed in time.
-    This needs a runner change; the current path saves 5-trial means only.
-  - Add the same statistic the unbalanced diagnostic used, with its same-stimulus
-    noise, so the result can be set beside the recorded FAIL.
-  - **No verdict field**, as before.
-
-**Would establish:**
-
-- Whether left-only pools stay contained at the drive level and rate pattern the
-  encoder actually produces.
-- What the same-stimulus noise is there. That is the number that decides whether a
-  graded re-validation with left-only pools is worth running.
-- An **exploratory** look at whether the single-framing score varies with price
-  above that noise.
-
-**Would not establish:**
-
-- **Encoder viability.** It is a diagnostic. Only a new pre-stated graded test can
-  do that.
-- **Anything about the balanced encoder's mirroring antisymmetry**, which is
-  structural and hemisphere-independent.
-- **The hemisphere versus pool-draw separation.** It uses one left draw. A second
-  pool seed, or a right-only draw, would be needed.
-- **Any mechanism for containment.** APL would again only be correlated.
-- **Other pool seeds or other feature values.**
-
-It should be pre-stated in its own dated document, with the stimuli fixed before
-anything is run. The two graded runners should also be corrected, or left-only
-variants written, before any graded re-validation, so the bug is not repeated.
+That document states explicitly what is repeated here for this finding's own
+record: it tests **containment and same-stimulus noise only**. It presents YES
+only and never constructs the NO framing or the contrast `S(v) = g(v) - g(1-v)`,
+so it **cannot address the balanced encoder's mirroring antisymmetry**
+(`balanced-encoding-failure.md` §2a) — that antisymmetry is a structural property
+of `NO(v) ≡ YES(1-v)`, holds for any pool draw, and is independent of hemisphere.
+It also does not authorise either encoder, does not separate hemisphere from pool
+draw (one left draw only), and does not test a matched bilateral condition.

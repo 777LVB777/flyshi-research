@@ -31,6 +31,14 @@
 >   pass is untested. The left-only ladder did not reach this run's
 >   54,000–60,000 Hz drive or its non-uniform rates, and ignition in this run is
 >   inferred, not measured, because only MBON rates were saved.
+>
+> **Fix status (2026-09-27, postdates this run).** The runner
+> (`repro/mushroom_body/run_graded_encoding_balanced.py`) now draws its pools from
+> `left_kc_ids()` and asserts every drawn KC, in every feature pool and the
+> balance pool, is annotated left before simulating; it aborts otherwise. **This
+> fix postdates the recorded FAIL above and was not applied to it**: the FAIL was
+> produced by, and remains a true record of, the unfixed bilateral-draw runner.
+> No rerun has been performed.
 
 **Status: the balanced Option-B encoder is NOT VIABLE as currently specified.**
 The pre-stated re-validation in

@@ -10,17 +10,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
-from flyshi_research.learning import graded_check as gc
-from flyshi_research.learning.encoder import BALANCE_FEATURE, KCEncoder
-from flyshi_research.learning.readout import circuit_score_difference, load_sign_table
-
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))  # sibling runner; imports no Brian2 at module level
+
+from flyshi_research.learning import graded_check as gc  # noqa: E402
+from flyshi_research.learning.encoder import BALANCE_FEATURE, KCEncoder  # noqa: E402
+from flyshi_research.learning.readout import circuit_score_difference, load_sign_table  # noqa: E402
+from run_left_only_pool_diagnostic import kc_side_map, left_kc_ids  # noqa: E402
+
 RESULTS_DIR = HERE / "results"
 VALUES = (0.0, 0.25, 0.5, 0.75, 1.0)
 NOMINAL_RATES = gc.PRESTATED_RATES_HZ
@@ -62,6 +66,21 @@ def _write_json(path: Path, payload: dict) -> None:
     partial.replace(path)
 
 
+def _assert_pools_left_only(encoder: KCEncoder, ids_path: Path = None) -> None:
+    """Abort unless every KC in every feature pool and the balance pool is
+    annotated left-hemisphere. Defence in depth: ``KCEncoder`` is given only
+    left-hemisphere IDs to draw from, but this checks the drawn pools directly
+    rather than trusting that alone."""
+    sides = kc_side_map() if ids_path is None else kc_side_map(ids_path)
+    all_pool_ids = [int(i) for pool in encoder.pools.values() for i in pool]
+    all_pool_ids += [int(i) for i in encoder.balance_pool]
+    wrong = [i for i in all_pool_ids if sides.get(i) != "left"]
+    if wrong:
+        raise RuntimeError(
+            f"{len(wrong)} pool KC(s) are not left-hemisphere: {sorted(wrong)[:5]}..."
+        )
+
+
 def simulate_missing(log: Callable[[str], None] = print) -> None:
     """Run missing pairs. This is the only function that constructs the model."""
     # Noise repeats deliberately run before the held-out primary seed.
@@ -77,7 +96,8 @@ def simulate_missing(log: Callable[[str], None] = print) -> None:
     from flyshi_research.learning.first_learning import ExperimentConfig
 
     sim = FastRunnerSimulator(ExperimentConfig())
-    encoder = KCEncoder(sim.kc_ids)
+    encoder = KCEncoder(left_kc_ids())
+    _assert_pools_left_only(encoder)
     for seed, value in todo:
         pair = encoder.option_b_stimuli({"price": value, **FIXED_FEATURES})
         yes_total = float(np.sum(pair.yes.rates_hz))

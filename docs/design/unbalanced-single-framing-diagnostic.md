@@ -44,6 +44,14 @@
 >   uniform 90 Hz, not this run's price sweep, and ignition in this run is
 >   inferred, not measured, because only MBON rates were saved.
 > - **The §6 total-drive confound stands unchanged.**
+>
+> **Fix status (2026-09-27, postdates this run).** The runner
+> (`repro/mushroom_body/run_unbalanced_g_diagnostic.py`) now draws its pools from
+> `left_kc_ids()` and asserts every drawn KC, in every feature pool and the
+> balance pool, is annotated left before simulating; it aborts otherwise. **This
+> fix postdates the recorded FAIL above and was not applied to it**: the FAIL was
+> produced by, and remains a true record of, the unfixed bilateral-draw runner.
+> No rerun has been performed.
 
 **Status: PRE-STATED; NOT RUN. The runner does not exist yet.** Written
 2026-09-22, before any unbalanced market-encoder simulation and before the code
