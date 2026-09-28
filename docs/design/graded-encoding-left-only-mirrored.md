@@ -9,6 +9,21 @@ exception is §3.4: the project owner may substitute candidate set A or C for th
 adopted set B **before the runner is written**, by a dated note in §3.4 alone.
 After the runner exists, the value set is frozen.
 
+> **Erratum and layout note, 2026-09-27, written before the runner and before any
+> run.** No protocol, statistic, seed, value or criterion changes here.
+>
+> 1. **Presentation count.** §9 says "60 × 2 = 120" presentations. That is an
+>    arithmetic error. Each simulation presents one framing at one value and one
+>    seed, so 6 seeds × 5 values × 2 framings = **60 presentations**, the same 60
+>    simulations as §3.2. Recruitment intensity is reported for all 60.
+> 2. **File layout.** At the owner's instruction, results are saved one JSON per
+>    **(value, framing, seed)**:
+>    `graded_left_mirrored_value_<v>_<framing>_seed_<seed>.json`. That is 60
+>    files, and the runner restarts per file. §9 and §12 describe one file per
+>    (value, seed) holding both framings; that wording is superseded **for layout
+>    only**. Each file's contents are as §9 lists, for its one framing. It also
+>    carries the pair's `D_YES` and `D_NO`.
+
 **THIS IS A VALIDATION** (`is_a_validation: true`, `has_pass_criterion: true` in
 the output). This is unlike the diagnostics that led here: the left-only pool,
 left-only ladder, realistic-drive and unbalanced single-framing documents
@@ -272,6 +287,10 @@ avoid a near-reflective pair.
 
 **Adopted: set B.** The owner may substitute A or C under the exception in the
 status block.
+
+> **FROZEN, 2026-09-27.** The project owner confirmed set B (0.56, 0.64, 0.73,
+> 0.83, 0.94) before the runner was written. The §3.4 exception is now used up:
+> the value set cannot change for this pre-statement.
 
 ## 4. Statistic (fixed)
 
