@@ -7,9 +7,11 @@ backend (fast_runner's per-neuron-rate path) and the command line.
 
 RUNNING THIS WITHOUT --dry-run EXECUTES BRIAN2 SIMULATIONS (about 260 runs at the
 placeholder N = 40) and loads the full connectome. Run it yourself; on macOS use
-`caffeinate -i`. It depends on the fast runner, whose equivalence test against the
-existing path HAS NOT BEEN RUN, and on run_cue_rates, which has never executed a
-real net.run (docs/design/fast-runner.md).
+`caffeinate -i`. It depends on the fast runner and on run_cue_rates. Both
+equivalence tests against the existing path have run and were ACCEPTED: run_cue
+(mean distance 4.61 Hz vs the 5.10 Hz tolerance, 8/8 discriminator signs; commit
+6a00cdd) and run_cue_rates (same criteria met, and it matches run_cue at 0.000 Hz;
+commit af8d0d5). See docs/design/fast-runner.md.
 
 Restartable: completed stages are skipped; an interrupted training stage resumes
 from its per-presentation checkpoint.
@@ -140,7 +142,9 @@ def plan_lines(cfg: fl.ExperimentConfig, results_base: Path) -> list:
         f"{fl.critical_path_runs(cfg)} runs (one condition's {cfg.n_training} sequential training "
         "presentations + one post-test seed)",
         "  Wall-clock time: unknown (local timings unusable; see docs/cloud/cost-estimate.md).",
-        "  DEPENDS ON the fast runner, whose equivalence test has NOT been run.",
+        "  Fast-runner dependency satisfied: equivalence tests ACCEPTED - run_cue "
+        "(mean distance 4.61 Hz vs 5.10 Hz tolerance, 8/8 discriminator signs; commit 6a00cdd); "
+        "run_cue_rates (same criteria met, matches run_cue at 0.000 Hz; commit af8d0d5).",
     ]
     return lines
 

@@ -274,8 +274,10 @@ unknown.** Timings on this 8-GB machine are unusable
 test against the existing path has since been run and PASSED**
 (git commit `6a00cdd`; mean old-vs-new distance 4.61 Hz against the 5.10 Hz
 tolerance; all 8 discriminator signs correct —
-[`fast-runner.md`](fast-runner.md), section 4). In addition, `run_cue_rates` has
-never executed a real `net.run` (only its no-simulation self-test). The criteria
+[`fast-runner.md`](fast-runner.md), section 4). `run_cue_rates`, the per-neuron-rate
+path this test uses, has also been run against the existing path and was ACCEPTED
+on the same criteria (git commit `af8d0d5`; mean distance 4.61 Hz, 8/8 signs), and
+it matches `run_cue` at exactly 0.000 Hz on all five seeds. The criteria
 above do not rely on the fast runner matching the old path, because the noise is
 measured within this test on the same path. But a broken fast path (for example,
 state leaking between presentations) would invalidate everything. Control (a)

@@ -414,7 +414,8 @@ def test_dry_run_prints_the_plan_and_never_imports_brian2(tmp_path):
     )
     out = subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True).stdout
     assert "= 260 runs" in out and "500 simulated trial-seconds" in out
-    assert "equivalence test has NOT been run" in out and "UNANCHORED" in out
+    assert "equivalence tests ACCEPTED" in out and "6a00cdd" in out and "af8d0d5" in out
+    assert "has NOT been run" not in out and "UNANCHORED" in out
     assert not any(tmp_path.iterdir())  # dry run writes nothing
 
 
