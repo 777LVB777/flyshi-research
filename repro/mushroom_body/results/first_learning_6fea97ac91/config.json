@@ -1,0 +1,38 @@
+{
+ "aggregation": "type_mean",
+ "compartment_threshold_pct": 80.0,
+ "cue_rate_hz": 150.0,
+ "kc_set_seed": 20260316,
+ "kc_set_size": 100,
+ "n_training": 40,
+ "order_seed": 20260402,
+ "plasticity": {
+  "drift_rate": 0.01,
+  "drift_steps_per_resolution": 1,
+  "floor_fraction": 0.1,
+  "kc_active_threshold_hz": 1.0,
+  "kc_rate_ref_hz": 150.0,
+  "learning_rate": 0.1
+ },
+ "prestated": true,
+ "reward": {
+  "brier_scale": 0.04,
+  "dead_zone": 0.0,
+  "dopamine_max_rate_hz": 150.0,
+  "profit_scale": 1.0
+ },
+ "reward_strength": 1.0,
+ "sign_table": "circuit_80",
+ "test_duration_ms": 1000.0,
+ "test_seeds": [
+  20260317,
+  20260318,
+  20260319,
+  20260320,
+  20260321
+ ],
+ "test_trials": 5,
+ "train_duration_ms": 1000.0,
+ "train_seed_base": 20260500,
+ "train_trials": 1
+}
