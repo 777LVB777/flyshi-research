@@ -1,0 +1,81 @@
+[backend] 62261 KC->MBON synapses; build 2.3s
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260317: wrote graded_left_mirrored_value_0p56_YES_seed_20260317.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260317: wrote graded_left_mirrored_value_0p56_NO_seed_20260317.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260317: wrote graded_left_mirrored_value_0p64_YES_seed_20260317.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260317: wrote graded_left_mirrored_value_0p64_NO_seed_20260317.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260317: wrote graded_left_mirrored_value_0p73_YES_seed_20260317.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260317: wrote graded_left_mirrored_value_0p73_NO_seed_20260317.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260317: wrote graded_left_mirrored_value_0p83_YES_seed_20260317.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260317: wrote graded_left_mirrored_value_0p83_NO_seed_20260317.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260317: wrote graded_left_mirrored_value_0p94_YES_seed_20260317.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260317: wrote graded_left_mirrored_value_0p94_NO_seed_20260317.json
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260318: wrote graded_left_mirrored_value_0p56_YES_seed_20260318.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260318: wrote graded_left_mirrored_value_0p56_NO_seed_20260318.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260318: wrote graded_left_mirrored_value_0p64_YES_seed_20260318.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260318: wrote graded_left_mirrored_value_0p64_NO_seed_20260318.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260318: wrote graded_left_mirrored_value_0p73_YES_seed_20260318.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260318: wrote graded_left_mirrored_value_0p73_NO_seed_20260318.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260318: wrote graded_left_mirrored_value_0p83_YES_seed_20260318.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260318: wrote graded_left_mirrored_value_0p83_NO_seed_20260318.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260318: wrote graded_left_mirrored_value_0p94_YES_seed_20260318.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260318: wrote graded_left_mirrored_value_0p94_NO_seed_20260318.json
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260319: wrote graded_left_mirrored_value_0p56_YES_seed_20260319.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260319: wrote graded_left_mirrored_value_0p56_NO_seed_20260319.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260319: wrote graded_left_mirrored_value_0p64_YES_seed_20260319.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260319: wrote graded_left_mirrored_value_0p64_NO_seed_20260319.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260319: wrote graded_left_mirrored_value_0p73_YES_seed_20260319.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260319: wrote graded_left_mirrored_value_0p73_NO_seed_20260319.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260319: wrote graded_left_mirrored_value_0p83_YES_seed_20260319.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260319: wrote graded_left_mirrored_value_0p83_NO_seed_20260319.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260319: wrote graded_left_mirrored_value_0p94_YES_seed_20260319.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260319: wrote graded_left_mirrored_value_0p94_NO_seed_20260319.json
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260320: wrote graded_left_mirrored_value_0p56_YES_seed_20260320.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260320: wrote graded_left_mirrored_value_0p56_NO_seed_20260320.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260320: wrote graded_left_mirrored_value_0p64_YES_seed_20260320.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260320: wrote graded_left_mirrored_value_0p64_NO_seed_20260320.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260320: wrote graded_left_mirrored_value_0p73_YES_seed_20260320.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260320: wrote graded_left_mirrored_value_0p73_NO_seed_20260320.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260320: wrote graded_left_mirrored_value_0p83_YES_seed_20260320.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260320: wrote graded_left_mirrored_value_0p83_NO_seed_20260320.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260320: wrote graded_left_mirrored_value_0p94_YES_seed_20260320.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260320: wrote graded_left_mirrored_value_0p94_NO_seed_20260320.json
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260321: wrote graded_left_mirrored_value_0p56_YES_seed_20260321.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260321: wrote graded_left_mirrored_value_0p56_NO_seed_20260321.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260321: wrote graded_left_mirrored_value_0p64_YES_seed_20260321.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260321: wrote graded_left_mirrored_value_0p64_NO_seed_20260321.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260321: wrote graded_left_mirrored_value_0p73_YES_seed_20260321.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260321: wrote graded_left_mirrored_value_0p73_NO_seed_20260321.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260321: wrote graded_left_mirrored_value_0p83_YES_seed_20260321.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260321: wrote graded_left_mirrored_value_0p83_NO_seed_20260321.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260321: wrote graded_left_mirrored_value_0p94_YES_seed_20260321.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260321: wrote graded_left_mirrored_value_0p94_NO_seed_20260321.json
+v=0.56 YES (price 97.2 Hz, 45,720 Hz), seed 20260316: wrote graded_left_mirrored_value_0p56_YES_seed_20260316.json
+v=0.56 NO  (price 82.8 Hz, 44,280 Hz), seed 20260316: wrote graded_left_mirrored_value_0p56_NO_seed_20260316.json
+v=0.64 YES (price 106.8 Hz, 46,680 Hz), seed 20260316: wrote graded_left_mirrored_value_0p64_YES_seed_20260316.json
+v=0.64 NO  (price 73.2 Hz, 43,320 Hz), seed 20260316: wrote graded_left_mirrored_value_0p64_NO_seed_20260316.json
+v=0.73 YES (price 117.6 Hz, 47,760 Hz), seed 20260316: wrote graded_left_mirrored_value_0p73_YES_seed_20260316.json
+v=0.73 NO  (price 62.4 Hz, 42,240 Hz), seed 20260316: wrote graded_left_mirrored_value_0p73_NO_seed_20260316.json
+v=0.83 YES (price 129.6 Hz, 48,960 Hz), seed 20260316: wrote graded_left_mirrored_value_0p83_YES_seed_20260316.json
+v=0.83 NO  (price 50.4 Hz, 41,040 Hz), seed 20260316: wrote graded_left_mirrored_value_0p83_NO_seed_20260316.json
+v=0.94 YES (price 142.8 Hz, 50,280 Hz), seed 20260316: wrote graded_left_mirrored_value_0p94_YES_seed_20260316.json
+v=0.94 NO  (price 37.2 Hz, 39,720 Hz), seed 20260316: wrote graded_left_mirrored_value_0p94_NO_seed_20260316.json
+=== Graded-encoding validation: left-only, mirrored, no balancing ===
+    v  YES Hz   NO Hz    mean S  per-seed S
+ 0.56    97.2    82.8    -3.685     -5.05    -5.11    -1.23    -2.34    -7.47    -0.91
+ 0.64   106.8    73.2    -8.281     -8.57    -6.18    -9.01    -7.02    -9.24    -9.67
+ 0.73   117.6    62.4   -15.903    -15.31   -16.29   -15.88   -17.75   -14.39   -15.78
+ 0.83   129.6    50.4   -22.470    -25.40   -21.67   -19.59   -20.25   -26.87   -21.04
+ 0.94   142.8    37.2   -29.086    -29.59   -30.03   -27.02   -26.92   -31.02   -29.94
+seed-mean S strictly monotonic: True (decreasing)
+endpoint gate: 93.17 Hz vs 52.18 Hz (3 x 17.39): met
+recruitment beside the ignition label (label: ign/con; recruited Hz):
+  20260316: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(1.00) 0.73N:con(--) 0.83Y:con(1.20) 0.83N:con(--) 0.94Y:con(1.60) 0.94N:con(--)
+  20260317: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(1.60) 0.73N:con(--) 0.83Y:con(1.40) 0.83N:con(--) 0.94Y:con(2.80) 0.94N:con(--)
+  20260318: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(--) 0.73N:con(--) 0.83Y:con(0.80) 0.83N:con(--) 0.94Y:con(1.60) 0.94N:con(--)
+  20260319: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(--) 0.73N:con(--) 0.83Y:con(0.80) 0.83N:con(--) 0.94Y:con(1.20) 0.94N:con(--)
+  20260320: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(0.60) 0.73N:con(--) 0.83Y:con(0.60) 0.83N:con(--) 0.94Y:con(1.20) 0.94N:con(--)
+  20260321: 0.56Y:con(--) 0.56N:con(--) 0.64Y:con(--) 0.64N:con(--) 0.73Y:con(1.00) 0.73N:con(--) 0.83Y:con(1.40) 0.83N:con(--) 0.94Y:con(2.60) 0.94N:con(--)
+ignited presentations: 0 of 60
+VERDICT: ACCEPTED
+validated v 0.56-0.94; reflected v 0.06-0.44 by identity
+Wrote graded_left_mirrored_verdict.json
