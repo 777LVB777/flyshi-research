@@ -1,0 +1,51 @@
+[backend] 62261 KC->MBON synapses; build 2.7s
+reproducibility check v=0.94 YES seed 20260316: wrote pool_identity_repro_check.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260316: wrote pool_identity_Q_value_0p56_YES_seed_20260316.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260316: wrote pool_identity_Q_value_0p56_NO_seed_20260316.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260316: wrote pool_identity_Q_value_0p73_YES_seed_20260316.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260316: wrote pool_identity_Q_value_0p73_NO_seed_20260316.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260316: wrote pool_identity_Q_value_0p94_YES_seed_20260316.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260316: wrote pool_identity_Q_value_0p94_NO_seed_20260316.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260317: wrote pool_identity_Q_value_0p56_YES_seed_20260317.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260317: wrote pool_identity_Q_value_0p56_NO_seed_20260317.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260317: wrote pool_identity_Q_value_0p73_YES_seed_20260317.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260317: wrote pool_identity_Q_value_0p73_NO_seed_20260317.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260317: wrote pool_identity_Q_value_0p94_YES_seed_20260317.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260317: wrote pool_identity_Q_value_0p94_NO_seed_20260317.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260318: wrote pool_identity_Q_value_0p56_YES_seed_20260318.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260318: wrote pool_identity_Q_value_0p56_NO_seed_20260318.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260318: wrote pool_identity_Q_value_0p73_YES_seed_20260318.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260318: wrote pool_identity_Q_value_0p73_NO_seed_20260318.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260318: wrote pool_identity_Q_value_0p94_YES_seed_20260318.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260318: wrote pool_identity_Q_value_0p94_NO_seed_20260318.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260319: wrote pool_identity_Q_value_0p56_YES_seed_20260319.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260319: wrote pool_identity_Q_value_0p56_NO_seed_20260319.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260319: wrote pool_identity_Q_value_0p73_YES_seed_20260319.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260319: wrote pool_identity_Q_value_0p73_NO_seed_20260319.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260319: wrote pool_identity_Q_value_0p94_YES_seed_20260319.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260319: wrote pool_identity_Q_value_0p94_NO_seed_20260319.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260320: wrote pool_identity_Q_value_0p56_YES_seed_20260320.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260320: wrote pool_identity_Q_value_0p56_NO_seed_20260320.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260320: wrote pool_identity_Q_value_0p73_YES_seed_20260320.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260320: wrote pool_identity_Q_value_0p73_NO_seed_20260320.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260320: wrote pool_identity_Q_value_0p94_YES_seed_20260320.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260320: wrote pool_identity_Q_value_0p94_NO_seed_20260320.json
+Q v=0.56 YES (97.2 Hz on Q, 45,720 Hz), seed 20260321: wrote pool_identity_Q_value_0p56_YES_seed_20260321.json
+Q v=0.56 NO  (82.8 Hz on Q, 44,280 Hz), seed 20260321: wrote pool_identity_Q_value_0p56_NO_seed_20260321.json
+Q v=0.73 YES (117.6 Hz on Q, 47,760 Hz), seed 20260321: wrote pool_identity_Q_value_0p73_YES_seed_20260321.json
+Q v=0.73 NO  (62.4 Hz on Q, 42,240 Hz), seed 20260321: wrote pool_identity_Q_value_0p73_NO_seed_20260321.json
+Q v=0.94 YES (142.8 Hz on Q, 50,280 Hz), seed 20260321: wrote pool_identity_Q_value_0p94_YES_seed_20260321.json
+Q v=0.94 NO  (37.2 Hz on Q, 39,720 Hz), seed 20260321: wrote pool_identity_Q_value_0p94_NO_seed_20260321.json
+=== Pool-identity control (DIAGNOSTIC; no verdict, no pass criterion) ===
+reproducibility check: identical to the validation's saved file
+change           S_P      S_Q      R    X_S   3W_S  scalar            cos     X_V    3W_V  vector
+0.50->0.94    -29.09   -22.02   0.76   7.07   3.24  beyond_noise    0.974   24.48   19.79  beyond_noise  (primary)
+0.50->0.56     -3.69    -2.49   0.68   1.44   5.26  within_noise    0.891    8.67   23.07  within_noise
+0.50->0.73    -15.90   -11.06   0.70   4.84   2.32  beyond_noise    0.971   13.92   20.06  within_noise
+0.56->0.73    -12.22    -8.57   0.70   3.65   6.70  within_noise    0.950   14.66   32.84  within_noise
+0.73->0.94    -13.18   -10.96   0.83   2.36   5.19  within_noise    0.964   15.03   30.24  within_noise
+0.56->0.94    -25.40   -19.52   0.77   5.88   4.35  beyond_noise    0.969   23.42   29.39  within_noise
+primary scalar: beyond the price arm's floor only
+primary: scalar and vector beyond noise: pool identity contributes to S; see R
+ignited substitute presentations: 0 of 36
+Wrote pool_identity_control_summary.json
