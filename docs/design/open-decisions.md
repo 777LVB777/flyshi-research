@@ -10,6 +10,10 @@ current code. Resource estimates and biological interpretations explicitly
 marked **unverified** have not been checked by a real connectome generation or
 simulation.
 
+**Update 2026-09-30:** two further decisions are recorded as items 5
+(the remaining learning-rule and reward placeholders are locked) and 6 (the
+Phase 2 market data source). Items 1–4 are unchanged.
+
 ## 1. Degree-preserving shuffle scope
 
 The implemented shuffle exchanges the targets of two directed edges while
@@ -251,7 +255,8 @@ under `profit_scale = 1.0`. The profit-vs-accuracy comparison therefore tests th
 **unverified**; the training-only report of absolute Brier improvements and the
 resulting clipping rate at 0.04 is still to be produced and is descriptive only,
 it cannot change the value. The size match assumes `profit_scale = 1.0`, which
-is still a placeholder; changing it would break the match.
+is still a placeholder; changing it would break the match. *(2026-09-30:
+`profit_scale = 1.0` is now decided, item 5, so the match is kept.)*
 
 ## 4. Drift-pace unit
 
@@ -320,7 +325,8 @@ with no calibration.
 *Consequence kept on record:* the effective forgetting rate still depends on
 market density and abstention rate, so it is not comparable across datasets with
 different event density. Both numbers must be reported alongside real-market
-results. `drift_rate = 0.01` itself remains a placeholder.
+results. `drift_rate = 0.01` itself remains a placeholder. *(2026-09-30:
+`drift_rate = 0.01` is now decided, item 5.)*
 
 *Where the drift-off check runs (decided 2026-09-22):* as its own training
 condition, `profit_drift_off`, in the synthetic-market experiment — drift acts
@@ -328,3 +334,84 @@ inside the learning loop, so it cannot be recomputed from a run that had drift o
 That raises the selected synthetic plan from 15,000 runs in 75 jobs to **20,000
 runs in 100 jobs**. It is deliberately **not** added to the first learning test,
 whose 260-run plan is unchanged.
+
+## 5. Locking the learning-rule and reward placeholders
+
+**DECIDED 2026-09-30 (project owner).** The following are fixed at the values
+under which the first learning test returned **LEARNING DEMONSTRATED** (tag
+`layer3-learning-demonstrated`, commit `1e1a9f7`). The values match that run's
+saved configuration,
+`repro/mushroom_body/results/first_learning_6fea97ac91/config.json`.
+
+| parameter | value | was |
+|---|---:|---|
+| `profit_scale` | 1.0 | placeholder |
+| `learning_rate` | 0.1 | placeholder |
+| `floor_fraction` | 0.1 | placeholder |
+| `drift_rate` | 0.01 | placeholder |
+
+They are marked `decided` in `learning/params.py`. A test checks them against
+that saved configuration.
+
+*Rationale:*
+
+- **No value is chosen after seeing market results.** Every value carries
+  forward unchanged from the configuration where learning was shown, and no
+  market experiment has been run.
+- **The matched reward sizes are kept.** `profit_scale = 1.0` preserves the
+  match behind `brier_scale = 0.04` (item 3): a two-point edge gives an accuracy
+  reward of 0.39, against an example profit reward of 0.38.
+
+*Kept on record:*
+
+- **Drift disabled remains a preregistered sensitivity check.** `drift_rate = 0`
+  is still run as the `profit_drift_off` condition of the synthetic-market
+  experiment (item 4).
+- **How far the first test constrains `profit_scale`.** That test delivered a
+  profit of exactly ±1 stake (`reward_strength = 1.0`), so the normalised reward
+  was ±1. Any `profit_scale` ≤ 1 would have given the same teaching signal. The
+  test shows learning *at* 1.0; it does not discriminate among values at or
+  below it.
+- **Not tuned.** Learning was demonstrated at these values. They were not
+  selected from alternatives, and no other values were run.
+- **Still placeholders:** `kc_active_threshold_hz`, `kc_rate_ref_hz`,
+  `dopamine_max_rate_hz`, `margin_threshold`, `pool_seed`, `pool_size` and the
+  encoder rate bounds and feature ranges. None of them is decided here.
+
+## 6. Phase 2 market data source
+
+**DECIDED 2026-09-30 (project owner).**
+
+- **Primary source:** **Kalshi**, via its official public REST API
+  **historical endpoints**.
+- **Planned second-venue replication:** **Polymarket**.
+
+*Rationale:*
+
+- **Regulation:** Kalshi is a U.S.-regulated exchange.
+- **Ground truth:** its public history is free and includes settlement
+  outcomes.
+- **Prices:** prices are quoted in cents, which map directly to implied
+  probability.
+- **Independence:** using it requires no research partnership with a company,
+  which avoids a conflict of interest.
+
+*Known pitfall (must be handled by the loader):*
+
+- **Where the data live.** The live endpoints hold only recent months of
+  markets. Older markets are in the `/historical/` namespace.
+- **What the loader must do.** It must read from the historical endpoints and
+  check the archive cutoff explicitly.
+- **What goes wrong otherwise.** A backtest would silently drop older markets.
+  That would bias the market sample, with no error to show it.
+
+*Open before any bulk download:*
+
+- **Terms of use.** Kalshi's terms of use **have not yet been reviewed**. They
+  must be reviewed before any bulk download.
+- **API facts unverified.** The API details above (the endpoint split, the
+  `/historical/` namespace, cent pricing) are recorded as stated by the project
+  owner. They were not re-checked against Kalshi's API documentation when this
+  was written.
+- **Backtest details still open.** Date range, market-selection criteria, fee
+  schedule and the Polymarket replication protocol are not yet specified.

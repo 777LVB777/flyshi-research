@@ -27,8 +27,12 @@ def test_statuses_are_known_and_only_readout_tables_are_preregistered():
         ("encoder", "balance_pool_size"),
         ("encoder", "option_b_variant"),
         ("readout", "aggregation"),
+        ("reward", "profit_scale"),
         ("reward", "brier_scale"),
         ("reward", "dead_zone"),
+        ("plasticity", "learning_rate"),
+        ("plasticity", "floor_fraction"),
+        ("plasticity", "drift_rate"),
         ("plasticity", "drift_steps_per_resolution"),
     }
 
@@ -46,6 +50,29 @@ def test_owner_decisions_of_2026_09_22_are_the_defaults():
     assert P.PlasticityParams().drift_steps_per_resolution == 1
     # drift disabled is a preregistered sensitivity check, so it must be expressible
     assert P.PlasticityParams(drift_rate=0.0).drift_rate == 0.0
+
+
+def test_owner_decisions_of_2026_09_30_lock_the_learning_demonstrated_values():
+    """docs/design/open-decisions.md, item 5: carried forward unchanged from the
+    first learning test's configuration (tag layer3-learning-demonstrated)."""
+    assert P.RewardParams().profit_scale == 1.0
+    pl = P.PlasticityParams()
+    assert (pl.learning_rate, pl.floor_fraction, pl.drift_rate) == (0.1, 0.1, 0.01)
+    # drift disabled remains a preregistered sensitivity check
+    assert P.PlasticityParams(drift_rate=0.0).drift_rate == 0.0
+
+
+def test_decided_values_equal_the_first_learning_test_configuration():
+    """The locked defaults must match the saved config of the run that demonstrated
+    learning, so they cannot drift from it silently."""
+    from pathlib import Path
+    config = json.loads((Path(__file__).resolve().parents[2] / "repro" / "mushroom_body"
+                         / "results" / "first_learning_6fea97ac91" / "config.json").read_text())
+    pl, r = P.PlasticityParams(), P.RewardParams()
+    for name in ("learning_rate", "floor_fraction", "drift_rate"):
+        assert getattr(pl, name) == config["plasticity"][name], name
+    assert r.profit_scale == config["reward"]["profit_scale"]
+    assert r.brier_scale == config["reward"]["brier_scale"]
 
 
 def test_brier_baseline_is_not_a_tunable_parameter():

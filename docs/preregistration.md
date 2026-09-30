@@ -317,6 +317,9 @@ cue rate 150 Hz; reward strength 1.0; `dopamine_max_rate_hz` = 150
 0.01; `drift_steps_per_resolution` = 1; `kc_active_threshold_hz` = 1.0;
 `kc_rate_ref_hz` = 150; training-order seed 20260402; training simulation
 seeds 20260500 + k (k = 0…39); test seeds 20260317–20260321.
+*(2026-09-30: of these, `profit_scale` = 1.0, `learning_rate`, `floor_fraction`
+and `drift_rate` are now **decided** at exactly these values for later
+experiments, Section 11b.)*
 
 **Dependency now satisfied:** FIRST-LEARN, Section 7, states: "**Run the
 fast-runner equivalence test first**" as a precondition, because the test's
@@ -683,7 +686,8 @@ are **unverified synthetic placeholders**."
   `profit_scale = 1.0`), so the profit-vs-accuracy comparison tests the *type*
   of teaching signal rather than reward size. Whether that example is typical of
   the training markets is **unverified**; `profit_scale` itself remains a
-  placeholder.
+  placeholder. *(2026-09-30: `profit_scale = 1.0` is now **decided**, Section
+  11b.)*
 - Motivation for two reward types, quoted: "A previous fly-and-markets project
   reportedly saw its model learn a **blanket aversion**... (this account of
   that prior project is **unverified** by us; we include it as motivation, not
@@ -711,7 +715,10 @@ are **unverified synthetic placeholders**."
   clock across phases lets synthetic-phase parameters carry over unchanged; a
   calendar clock would add an uncalibrated half-life. Consequence: effective
   forgetting depends on market density and abstention rate, both of which are
-  reported. `drift_rate = 0.01` remains a placeholder.
+  reported. `drift_rate = 0.01` remains a placeholder. *(2026-09-30:
+  `learning_rate = 0.1`, `floor_fraction = 0.1` and `drift_rate = 0.01` are now
+  **decided**, Section 11b. Drift-off remains a preregistered sensitivity
+  check.)*
 
 ---
 
@@ -852,9 +859,12 @@ already resolved since MB-LEARN was last revised are marked so.
 7. **RESOLVED 2026-09-22 — drift clock.** One step per acted resolution in
    controlled and real-market phases; drift-off is a preregistered sensitivity
    check (Section 6.5). `drift_rate` itself remains a placeholder.
-8. **The market data source is not chosen** (MB-LEARN, Section 8): "We have
-   not selected which real prediction-market dataset to use." (Blocks stage 2
-   of Section 3.)
+   *(2026-09-30: `drift_rate` is now decided at 0.01, Section 11b.)*
+8. **RESOLVED 2026-09-30 — market data source.** Kalshi (official public REST
+   API, historical endpoints), with Polymarket as a planned second-venue
+   replication (Section 11b). Originally quoted (MB-LEARN, Section 8): "We have
+   not selected which real prediction-market dataset to use." Kalshi's terms of
+   use are still to be reviewed before any bulk download.
 9. **Speed on research hardware is an open question** (MB-LEARN, Section 8).
    Partially informed since: the fast-runner run log records build times of
    1.3–4.6 s (paid once) and simulate times of ~44–48 s per 5-trial run on the
@@ -877,10 +887,15 @@ already resolved since MB-LEARN was last revised are marked so.
     results." (Listed here because the values are placeholders by the doc's
     own admission, not because anything is wrong with them; they are usable
     as-is but are explicitly not final validated constants.)
+    *(2026-09-30: `profit_scale`, `learning_rate`, `floor_fraction` and
+    `drift_rate` are now decided at these values, Section 11b. The remaining
+    items in that table are unchanged by this decision.)*
 14. **Real historical-market baseline/backtest details** are entirely
     unspecified beyond MB-LEARN Section 3's naming of stage 2 — no dataset,
     date range, fee schedule, or market-selection criteria exist in any of the
-    eight documents for that stage.
+    eight documents for that stage. *(2026-09-30: the dataset is now chosen,
+    item 8. Date range, fee schedule and market-selection criteria remain
+    open.)*
 15. **A top-line, single-sentence hypothesis statement** is not written down
     verbatim anywhere in the eight documents (see Section 1 above);
     **[NEEDS LUCA'S CONFIRMATION]** whether one should be composed for the OSF
@@ -893,6 +908,63 @@ already resolved since MB-LEARN was last revised are marked so.
     8 above).
 18. **What follows an INCONCLUSIVE first-learning-test verdict** is not stated
     (see Section 10 above).
+
+### 11b. Decisions recorded 2026-09-30 (project owner)
+
+Both are recorded in full in `docs/design/open-decisions.md`, items 5 and 6.
+
+**1. The remaining learning-rule and reward placeholders are locked.**
+
+| parameter | decided value |
+|---|---:|
+| `profit_scale` | 1.0 |
+| `learning_rate` | 0.1 |
+| `floor_fraction` | 0.1 |
+| `drift_rate` | 0.01 |
+
+These are the values under which the first learning test returned **LEARNING
+DEMONSTRATED** (tag `layer3-learning-demonstrated`, commit `1e1a9f7`). They
+equal that run's saved configuration
+(`repro/mushroom_body/results/first_learning_6fea97ac91/config.json`). They are
+marked `decided` in `learning/params.py`.
+
+- *Rationale:*
+  - every value carries forward from the configuration where learning was
+    shown, so none is chosen after seeing market results;
+  - `profit_scale = 1.0` also preserves the matched reward sizes behind
+    `brier_scale = 0.04` (Section 6.4).
+- **Drift disabled (`drift_rate = 0`) remains a preregistered sensitivity
+  check** (Section 7).
+- *Scope note:* the first learning test delivered a profit of exactly ±1 stake.
+  It therefore shows learning at `profit_scale = 1.0`, but does not
+  discriminate among values ≤ 1.
+- *Not decided here:* `kc_active_threshold_hz`, `kc_rate_ref_hz`,
+  `dopamine_max_rate_hz`, `margin_threshold` and the encoder placeholders.
+
+**2. The Phase 2 market data source is Kalshi, with Polymarket as a planned
+second-venue replication.** Kalshi is read via its official public REST API
+**historical endpoints**.
+
+- *Rationale:*
+  - Kalshi is a U.S.-regulated exchange;
+  - its public history is free and includes settlement outcomes, which give the
+    ground truth;
+  - prices in cents map to implied probability;
+  - it needs no company research partnership, which avoids a conflict of
+    interest.
+- *Known pitfall:*
+  - the live endpoints hold only recent months, and older markets are in the
+    `/historical/` namespace;
+  - the loader must use the historical endpoints and check the archive cutoff
+    explicitly;
+  - otherwise backtests silently drop older markets.
+- *Open:*
+  - **Kalshi's terms of use have not yet been reviewed, and must be before any
+    bulk download.**
+  - The API details above are as stated by the project owner and were not
+    re-verified against Kalshi's documentation when this was recorded.
+  - Date range, fee schedule, market-selection criteria and the Polymarket
+    replication protocol remain open (item 14).
 
 ---
 

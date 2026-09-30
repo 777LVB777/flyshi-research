@@ -172,6 +172,10 @@ class ReadoutParams:
 class RewardParams:
     # Profit (net of fees/spread) is divided by this, then clipped to [-1, 1].
     # 1.0 means "profit measured in stake units; +/-1 stake saturates".
+    # DECIDED 2026-09-30 (docs/design/open-decisions.md, 5): carried forward from
+    # the configuration under which the first learning test demonstrated learning
+    # (tag layer3-learning-demonstrated); it also keeps the matched reward size
+    # behind brier_scale = 0.04. (Was a placeholder.)
     profit_scale: float = 1.0
     # Brier improvement (over the MARKET PRICE, a DECIDED baseline: it is passed
     # per market to brier_improvement_reward, so it is not a parameter here) is
@@ -205,13 +209,19 @@ class RewardParams:
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class PlasticityParams:
+    # learning_rate, floor_fraction and drift_rate: DECIDED 2026-09-30
+    # (docs/design/open-decisions.md, 5), carried forward unchanged from the
+    # configuration under which the first learning test demonstrated learning
+    # (tag layer3-learning-demonstrated), so none is chosen after seeing market
+    # results. (Were placeholders.)
+    #
     # Fraction of the distance to the floor closed per unit (eligibility x
     # dopamine strength x compartment mask). Effective step is clipped to [0, 1].
     learning_rate: float = 0.1
     # Weight magnitude never falls below floor_fraction * |baseline weight|.
     floor_fraction: float = 0.1
     # Fraction of the distance back to the baseline weight closed per drift step.
-    # drift_rate = 0 (drift disabled) is a preregistered sensitivity check.
+    # drift_rate = 0 (drift disabled) remains a preregistered sensitivity check.
     drift_rate: float = 0.01
     # Drift steps applied automatically after each ACTED-ON resolved market.
     # DECIDED 2026-09-22 (docs/design/open-decisions.md, 4): the drift clock is
@@ -277,13 +287,13 @@ PARAMETER_TABLE: Tuple[Tuple[str, str, str, str], ...] = (
     ("readout", "robustness_tables", PRE, "STRICT and GROUP robustness checks"),
     ("readout", "aggregation", DEC, "type_mean (default): average instances within each type, one vote per type; instance_sum = named variant"),
     ("readout", "margin_threshold", PH, "abstain unless score margin > this (Hz, aggregation-specific); set from TRAINING data only"),
-    ("reward", "profit_scale", PH, "profit divisor before clipping to [-1, 1]"),
+    ("reward", "profit_scale", DEC, "profit divisor before clipping to [-1, 1]; 1.0, carried forward from the first learning test's configuration (2026-09-30)"),
     ("reward", "brier_scale", DEC, "Brier-improvement-over-market divisor before symmetric clipping to [-1, 1]; 0.04 matches the example profit reward size (2026-09-22)"),
     ("reward", "dead_zone", DEC, "|reward| at or below this gives no teaching signal; 0 (2026-09-22)"),
     ("reward", "dopamine_max_rate_hz", PH, "RECORDED PAM/PPL1 'rate' at |reward| = 1; never given to the network (dopamine is abstract); unanchored"),
-    ("plasticity", "learning_rate", PH, "fraction of distance to floor closed per unit gate"),
-    ("plasticity", "floor_fraction", PH, "min weight magnitude as a fraction of the connectome weight"),
-    ("plasticity", "drift_rate", PH, "fraction of distance back to connectome weight closed per drift step; 0 = preregistered drift-disabled sensitivity check"),
+    ("plasticity", "learning_rate", DEC, "fraction of distance to floor closed per unit gate; 0.1, carried forward from the first learning test's configuration (2026-09-30)"),
+    ("plasticity", "floor_fraction", DEC, "min weight magnitude as a fraction of the connectome weight; 0.1, carried forward from the first learning test's configuration (2026-09-30)"),
+    ("plasticity", "drift_rate", DEC, "fraction of distance back to connectome weight closed per drift step; 0.01, carried forward from the first learning test's configuration (2026-09-30); 0 = preregistered drift-disabled sensitivity check"),
     ("plasticity", "drift_steps_per_resolution", DEC, "drift steps after each acted-on resolved market; 1, one clock for controlled and real-market phases (2026-09-22)"),
     ("plasticity", "kc_active_threshold_hz", PH, "KC rate at/below which a KC is not 'recently active'"),
     ("plasticity", "kc_rate_ref_hz", PH, "KC rate at which eligibility saturates at 1"),
