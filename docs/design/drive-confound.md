@@ -310,6 +310,25 @@ drive **through non-price KCs**.
 
 ### 3.5 Pool-identity control (a measurement, not a mitigation)
 
+> **Result, 2026-09-30.** This control was pre-stated and run as
+> [`pool-identity-control.md`](pool-identity-control.md); its results section
+> records the outcome. In brief:
+>
+> - **Setup.** The value was moved onto a disjoint left 100-KC pool at matched
+>   total drive and KC count, for `v` = 0.56, 0.73 and 0.94 × 6 seeds.
+> - **Scalar.** The substitute pool reproduced 0.68–0.83 of the price pool's
+>   score changes (`R`). At `v` = 0.94, `S_Q` = −22.02 Hz against
+>   `S_P` = −29.09 Hz. That difference is "beyond the price arm's floor only",
+>   so under the pre-statement it is **not attributed to pool identity**, and
+>   the scalar question is not resolved.
+> - **Vector.** The MBON-vector difference is beyond noise against both arms'
+>   floors: cosine 0.974, the same pattern as §2.3's 0.977, but here without
+>   any change in KC count or operating range.
+> - **Checks.** The reproducibility check was identical, and 0 of 36
+>   presentations ignited.
+>
+> This section's proposal is otherwise unchanged.
+
 Run the §1 counterfactual directly:
 
 - present the same five rate changes on a **non-price** 100-KC pool of the same

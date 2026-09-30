@@ -292,6 +292,48 @@ def test_a_noisier_substitute_is_reported_as_beyond_the_price_floor_only(tmp_pat
     assert out["primary_price_floor_only"]["scalar"] is True
 
 
+def test_flagged_scalar_with_vector_beyond_is_not_attributed_to_identity(tmp_path) -> None:
+    """Spec 5.2: a scalar reading beyond only the price arm's floor is not attributed
+    to pool identity, so the 5.3 'pool identity contributes to S' row is withheld."""
+    runner = load_runner()
+    out, _, _ = run(runner, tmp_path, arm(BASE, amp=0.1), arm(BASE, g=(5.0, 20.0, 40.0), amp=4.0))
+    pr = primary(out)
+    assert pr["scalar"]["reading"] == runner.BEYOND
+    assert pr["scalar"]["reading_against_larger_floor"] == runner.WITHIN
+    assert pr["vector"]["reading"] == pr["vector"]["reading_against_larger_floor"] == runner.BEYOND
+    assert out["primary_price_floor_only"] == {"scalar": True, "vector": False}
+    text = out["primary_interpretation"]
+    assert "pool identity contributes" not in text and "largely generic drive" not in text
+    assert "scalar beyond the price arm's floor only: not attributed to pool identity" in text
+    assert "pool identity is present in the MBON vector" in text
+
+
+def _part(reading, larger):
+    return {"reading": reading, "reading_against_larger_floor": larger}
+
+
+@pytest.mark.parametrize("scalar,vector,present,absent", [
+    (("beyond_noise", "within_noise"), ("beyond_noise", "beyond_noise"),
+     ["scalar beyond the price arm's floor only", "present in the MBON vector"],
+     ["contributes"]),
+    (("beyond_noise", "within_noise"), ("within_noise", "within_noise"),
+     ["scalar beyond the price arm's floor only", "vector within noise"],
+     ["contributes", "generic drive"]),
+    (("within_noise", "within_noise"), ("beyond_noise", "within_noise"),
+     ["scalar within noise", "vector beyond the price arm's floor only"],
+     ["present in the MBON vector", "generic drive"]),
+    (("beyond_noise", "beyond_noise"), ("beyond_noise", "beyond_noise"),
+     ["pool identity contributes to S"], ["floor only"]),
+])
+def test_interpretation_follows_the_robustness_flag(scalar, vector, present, absent) -> None:
+    runner = load_runner()
+    text = runner.interpretation({"scalar": _part(*scalar), "vector": _part(*vector)})
+    for needle in present:
+        assert needle in text, needle
+    for needle in absent:
+        assert needle not in text, needle
+
+
 def test_only_step_changes_carry_single_seed_distances(tmp_path) -> None:
     runner = load_runner()
     out, _, _ = run(runner, tmp_path, arm(BASE), arm(BASE))

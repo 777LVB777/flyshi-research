@@ -494,9 +494,33 @@ def evaluate(mbons: Mapping[Tuple[str, float, str, int], Sequence[float]],
     return out
 
 
+def price_floor_only(part: Mapping) -> bool:
+    """Beyond 3 x W_P but within 3 x max(W_P, W_Q): spec 5.2's robustness flag."""
+    return part["reading"] == BEYOND and part["reading_against_larger_floor"] == WITHIN
+
+
 def interpretation(primary: Mapping) -> str:
-    """The pre-stated meaning of the primary readings (spec section 5.3)."""
+    """The pre-stated meaning of the primary readings (spec sections 5.2-5.3).
+
+    The section 5.3 table is used only when no beyond-noise reading is flagged.
+    A flagged reading "is not attributed to pool identity" (spec 5.2), so every
+    table row that would attribute it is withheld, and each part is stated alone.
+    """
     s, v = primary["scalar"]["reading"], primary["vector"]["reading"]
+    flag_s, flag_v = price_floor_only(primary["scalar"]), price_floor_only(primary["vector"])
+    if flag_s or flag_v:
+        if flag_s:
+            scalar = f"scalar {PRICE_FLOOR_ONLY}: not attributed to pool identity"
+        else:
+            scalar = f"scalar {s.replace('_', ' ')}" + (" against both floors" if s == BEYOND else "")
+        if flag_v:
+            vector = f"vector {PRICE_FLOOR_ONLY}: not attributed to pool identity"
+        elif v == BEYOND:
+            vector = ("vector beyond noise against both floors: pool identity is present "
+                      "in the MBON vector")
+        else:
+            vector = "vector within noise"
+        return f"{scalar}; {vector} (spec 5.2; no row of the spec 5.3 table applies)"
     if s == WITHIN and v == WITHIN:
         return ("scalar and vector within noise: the scalar signal is largely generic drive; "
                 "neither S nor the MBON vector distinguishes the pools at matched drive")
@@ -629,9 +653,7 @@ def summarise(results_dir: Path = RESULTS_DIR, ids_path: Path = IDS_PATH,
         "primary_change": change_name(PRIMARY_CHANGE),
         "primary_interpretation": interpretation(primary),
         "primary_price_floor_only": {
-            part: primary[part]["reading"] == BEYOND
-            and primary[part]["reading_against_larger_floor"] == WITHIN
-            for part in ("scalar", "vector")},
+            part: price_floor_only(primary[part]) for part in ("scalar", "vector")},
         "changes": changes,
         "reproducibility_check": repro,
         "substitute_rate_measured": q_measured,

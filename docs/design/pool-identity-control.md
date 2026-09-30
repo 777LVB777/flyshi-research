@@ -336,3 +336,117 @@ caffeinate -i uv run --python .venv-shiu/bin/python --no-project -- .venv-shiu/b
 `--dry-run` and `--analyze-only` build no model and load no connectome, and
 neither does importing the module. They read only the frozen neuron-ID table and
 saved result files.
+
+---
+
+## Results (recorded 2026-09-30, after the run)
+
+**Everything above this section is the pre-statement, unchanged.** This section
+records the run and applies §5 as written. No stimulus, seed, statistic,
+threshold or reading rule was changed.
+
+**The run.** 37 simulations (36 substitute + 1 reproducibility check). The log is
+`repro/mushroom_body/run_log_pool_identity.txt`, and the summary is
+`results/pool_identity_control_summary.json`.
+
+**Correction to the runner's wording (made after the run, before this section
+was written).** The runner, as first committed, printed and saved the §5.3 row
+"scalar and vector beyond noise: pool identity contributes to S; see R". It did
+that even though it also flagged the primary scalar as "beyond the price arm's
+floor only". §5.2 says such a reading "is not attributed to pool identity", so
+the first wording contradicted the pre-statement.
+
+- **The fix.** The runner now uses the §5.3 table only when no beyond-noise
+  reading is flagged. Otherwise it states each part on its own.
+- **Regenerating the summary.** The summary was rebuilt with `--analyze-only`,
+  with no simulation. Only its `primary_interpretation` field changed; every
+  number is identical. The run log still shows the original wording.
+
+### Reproducibility and containment
+
+- **Reproducibility check** (`v` = 0.94, YES, seed 20260316): **identical** to the
+  validation's saved file. The maximum absolute difference is 0.0 Hz for MBONs,
+  KCs and APL. The cross-arm comparison is therefore not across a simulator
+  change.
+- **Ignition: 0 of 36** substitute presentations. The non-stimulated KC active
+  fraction was 0.0 in every one.
+- **Q's measured rate** was 0.987–0.999 of the imposed rate.
+
+### All six changes
+
+Hz throughout. The P and Q columns are six-seed means. "3 max" is
+`3 × max(W_P, W_Q)`. "Flagged" means "beyond the price arm's floor only".
+
+| change | `S_P` / `ΔS_P` | `S_Q` / `ΔS_Q` | `R` | `X_S` | `3 W_S,P` | 3 max | scalar | cosine | `X_V` | `3 W_V,P` | 3 max | vector |
+|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---|
+| **0.50 → 0.94 (primary)** | **−29.09** | **−22.02** | **0.76** | 7.07 | 3.24 | 8.06 | beyond_noise (flagged) | 0.974 | 24.48 | 19.79 | 20.85 | beyond_noise |
+| 0.50 → 0.56 | −3.69 | −2.49 | 0.68 | 1.44 | 5.26 | 5.42 | within_noise | 0.891 | 8.67 | 23.07 | 23.07 | within_noise |
+| 0.50 → 0.73 | −15.90 | −11.06 | 0.70 | 4.84 | 2.32 | 6.07 | beyond_noise (flagged) | 0.971 | 13.92 | 20.06 | 20.89 | within_noise |
+| 0.56 → 0.73 | −12.22 | −8.57 | 0.70 | 3.65 | 6.70 | 8.39 | within_noise | 0.950 | 14.66 | 32.84 | 32.84 | within_noise |
+| 0.73 → 0.94 | −13.18 | −10.96 | 0.83 | 2.36 | 5.19 | 7.66 | within_noise | 0.964 | 15.03 | 30.24 | 30.24 | within_noise |
+| 0.56 → 0.94 | −25.40 | −19.52 | 0.77 | 5.88 | 4.35 | 13.48 | beyond_noise (flagged) | 0.969 | 23.42 | 29.39 | 32.43 | within_noise |
+
+**`R` ranges from 0.68 to 0.83 across all six changes.**
+
+### The primary change (0.50 → 0.94)
+
+**Scalar.** `S_P` = −29.09 Hz and `S_Q` = −22.02 Hz, so `R` = 0.76.
+
+- **Reading:** `X_S` = 7.07 > `3 W_S,P` = 3.24, so the reading is
+  `beyond_noise`.
+- **Robustness line:** Q's own floor is `W_S,Q` = 2.69 Hz, against
+  `W_S,P` = 1.08 Hz. So `X_S` ≤ `3 × max` = 8.06, and the reading becomes
+  `within_noise` against the larger floor.
+- **Label:** the scalar is **"beyond the price arm's floor only"**.
+
+**Vector.**
+
+- **Reading:** `X_V` = 24.48 > `3 W_V,P` = 19.79, and it stays above
+  `3 × max(W_V,P, W_V,Q)` = 20.85. The reading is `beyond_noise` **against both
+  floors**.
+- **Size of the difference:**
+  - the cosine between the mean changes is 0.974, against split-half ceilings of
+    0.998 (P) and 0.998 (Q);
+  - the norm ratio is 1.006;
+  - the component of Q's change orthogonal to P's is 23.9 Hz, 22.8% of Q's change.
+
+### Conclusion, in the pre-statement's terms
+
+- **The scalar difference is not attributed to pool identity (§5.2).** The §5.3
+  row "beyond | beyond: **Pool identity contributes to `S`**" requires the
+  scalar reading to count, and §5.2 withholds exactly that for a flagged
+  reading. For the same reason, the `R` reading of §5.3 item a ("about `R` of
+  `S` is generic drive and `1 − R` is price-pool-specific") is not applied. `R`
+  is reported only as a description.
+- **Nor does the pre-statement support "the scalar signal is largely generic
+  drive".** That conclusion belongs to the rows whose scalar reading is
+  `within_noise`, and the primary scalar reading is `beyond_noise` against the
+  price arm's floor. The scalar question is therefore **not resolved** by this
+  control. The difference exceeds the price arm's measured noise but not the
+  substitute arm's.
+- **Pool identity is present in the MBON vector.** At matched total drive, KC
+  count, rate distribution and background, moving the value onto another 100
+  KCs changes the MBON contrast beyond both arms' measured noise. This
+  reproduces the orthogonal component of `drive-confound.md` §2.3: cosine 0.974
+  here, against 0.977 there. The earlier comparison changed KC count and
+  operating range; this one changes neither, so the component is not explained
+  by either.
+- **Limits (§7) apply unchanged.** There was one substitute draw, so Q's own
+  identity effect is confounded with the price pool's.
+
+### Descriptive observations (post hoc; they change no reading)
+
+- **`R` < 1 in all six changes.** Q's score change is smaller in magnitude than
+  P's everywhere, including the three changes whose scalar reading is
+  `within_noise`.
+- **One seed drives the flag.** In the primary change, the paired same-seed
+  differences `ΔS_Q,s − ΔS_P,s` are 6.8–9.5 Hz at five seeds and 1.3 Hz at seed
+  20260317. There, `S_Q` = −28.74 Hz, against −18.69 to −24.21 Hz at the other
+  seeds. That seed is what raises `W_S,Q` above `W_S,P`, and so what produces
+  the flag. Checked post hoc: replacing that one value with the mean of the
+  other five seeds lowers `W_S,Q` from 2.69 to 1.41 Hz. `X_S` (8.41) would then
+  exceed `3 × max` (4.24), and the flag would not arise. This is an exploratory
+  counterfactual, not a reading. The pre-stated reading stands as recorded
+  above.
+- **What would resolve the scalar question.** Settling it would need more seeds
+  or more substitute draws. Either would need a new pre-statement.
