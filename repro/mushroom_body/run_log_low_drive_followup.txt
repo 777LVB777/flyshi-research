@@ -1,0 +1,120 @@
+[backend] 62261 KC->MBON synapses; build 4.5s
+below25_1 (22,759 Hz), seed 20261201: wrote low_drive_followup_below25_1_seed_20261201.json
+below25_1 (22,759 Hz), seed 20261202: wrote low_drive_followup_below25_1_seed_20261202.json
+below25_1 (22,759 Hz), seed 20261203: wrote low_drive_followup_below25_1_seed_20261203.json
+below25_1 (22,759 Hz), seed 20261204: wrote low_drive_followup_below25_1_seed_20261204.json
+below25_1 (22,759 Hz), seed 20261205: wrote low_drive_followup_below25_1_seed_20261205.json
+below25_1 (22,759 Hz), seed 20261206: wrote low_drive_followup_below25_1_seed_20261206.json
+below25_1 (22,759 Hz), seed 20261207: wrote low_drive_followup_below25_1_seed_20261207.json
+below25_1 (22,759 Hz), seed 20261208: wrote low_drive_followup_below25_1_seed_20261208.json
+below25_1 (22,759 Hz), seed 20261209: wrote low_drive_followup_below25_1_seed_20261209.json
+below25_1 (22,759 Hz), seed 20261210: wrote low_drive_followup_below25_1_seed_20261210.json
+below25_2 (22,838 Hz), seed 20261201: wrote low_drive_followup_below25_2_seed_20261201.json
+below25_2 (22,838 Hz), seed 20261202: wrote low_drive_followup_below25_2_seed_20261202.json
+below25_2 (22,838 Hz), seed 20261203: wrote low_drive_followup_below25_2_seed_20261203.json
+below25_2 (22,838 Hz), seed 20261204: wrote low_drive_followup_below25_2_seed_20261204.json
+below25_2 (22,838 Hz), seed 20261205: wrote low_drive_followup_below25_2_seed_20261205.json
+below25_2 (22,838 Hz), seed 20261206: wrote low_drive_followup_below25_2_seed_20261206.json
+below25_2 (22,838 Hz), seed 20261207: wrote low_drive_followup_below25_2_seed_20261207.json
+below25_2 (22,838 Hz), seed 20261208: wrote low_drive_followup_below25_2_seed_20261208.json
+below25_2 (22,838 Hz), seed 20261209: wrote low_drive_followup_below25_2_seed_20261209.json
+below25_2 (22,838 Hz), seed 20261210: wrote low_drive_followup_below25_2_seed_20261210.json
+below25_3 (22,916 Hz), seed 20261201: wrote low_drive_followup_below25_3_seed_20261201.json
+below25_3 (22,916 Hz), seed 20261202: wrote low_drive_followup_below25_3_seed_20261202.json
+below25_3 (22,916 Hz), seed 20261203: wrote low_drive_followup_below25_3_seed_20261203.json
+below25_3 (22,916 Hz), seed 20261204: wrote low_drive_followup_below25_3_seed_20261204.json
+below25_3 (22,916 Hz), seed 20261205: wrote low_drive_followup_below25_3_seed_20261205.json
+below25_3 (22,916 Hz), seed 20261206: wrote low_drive_followup_below25_3_seed_20261206.json
+below25_3 (22,916 Hz), seed 20261207: wrote low_drive_followup_below25_3_seed_20261207.json
+below25_3 (22,916 Hz), seed 20261208: wrote low_drive_followup_below25_3_seed_20261208.json
+below25_3 (22,916 Hz), seed 20261209: wrote low_drive_followup_below25_3_seed_20261209.json
+below25_3 (22,916 Hz), seed 20261210: wrote low_drive_followup_below25_3_seed_20261210.json
+below25_4 (23,073 Hz), seed 20261201: wrote low_drive_followup_below25_4_seed_20261201.json
+below25_4 (23,073 Hz), seed 20261202: wrote low_drive_followup_below25_4_seed_20261202.json
+below25_4 (23,073 Hz), seed 20261203: wrote low_drive_followup_below25_4_seed_20261203.json
+below25_4 (23,073 Hz), seed 20261204: wrote low_drive_followup_below25_4_seed_20261204.json
+below25_4 (23,073 Hz), seed 20261205: wrote low_drive_followup_below25_4_seed_20261205.json
+below25_4 (23,073 Hz), seed 20261206: wrote low_drive_followup_below25_4_seed_20261206.json
+below25_4 (23,073 Hz), seed 20261207: wrote low_drive_followup_below25_4_seed_20261207.json
+below25_4 (23,073 Hz), seed 20261208: wrote low_drive_followup_below25_4_seed_20261208.json
+below25_4 (23,073 Hz), seed 20261209: wrote low_drive_followup_below25_4_seed_20261209.json
+below25_4 (23,073 Hz), seed 20261210: wrote low_drive_followup_below25_4_seed_20261210.json
+below25_5 (23,387 Hz), seed 20261201: wrote low_drive_followup_below25_5_seed_20261201.json
+below25_5 (23,387 Hz), seed 20261202: wrote low_drive_followup_below25_5_seed_20261202.json
+below25_5 (23,387 Hz), seed 20261203: wrote low_drive_followup_below25_5_seed_20261203.json
+below25_5 (23,387 Hz), seed 20261204: wrote low_drive_followup_below25_5_seed_20261204.json
+below25_5 (23,387 Hz), seed 20261205: wrote low_drive_followup_below25_5_seed_20261205.json
+below25_5 (23,387 Hz), seed 20261206: wrote low_drive_followup_below25_5_seed_20261206.json
+below25_5 (23,387 Hz), seed 20261207: wrote low_drive_followup_below25_5_seed_20261207.json
+below25_5 (23,387 Hz), seed 20261208: wrote low_drive_followup_below25_5_seed_20261208.json
+below25_5 (23,387 Hz), seed 20261209: wrote low_drive_followup_below25_5_seed_20261209.json
+below25_5 (23,387 Hz), seed 20261210: wrote low_drive_followup_below25_5_seed_20261210.json
+below25_6 (24,691 Hz), seed 20261201: wrote low_drive_followup_below25_6_seed_20261201.json
+below25_6 (24,691 Hz), seed 20261202: wrote low_drive_followup_below25_6_seed_20261202.json
+below25_6 (24,691 Hz), seed 20261203: wrote low_drive_followup_below25_6_seed_20261203.json
+below25_6 (24,691 Hz), seed 20261204: wrote low_drive_followup_below25_6_seed_20261204.json
+below25_6 (24,691 Hz), seed 20261205: wrote low_drive_followup_below25_6_seed_20261205.json
+below25_6 (24,691 Hz), seed 20261206: wrote low_drive_followup_below25_6_seed_20261206.json
+below25_6 (24,691 Hz), seed 20261207: wrote low_drive_followup_below25_6_seed_20261207.json
+below25_6 (24,691 Hz), seed 20261208: wrote low_drive_followup_below25_6_seed_20261208.json
+below25_6 (24,691 Hz), seed 20261209: wrote low_drive_followup_below25_6_seed_20261209.json
+below25_6 (24,691 Hz), seed 20261210: wrote low_drive_followup_below25_6_seed_20261210.json
+band25_30_near26k (25,952 Hz), seed 20261201: wrote low_drive_followup_band25_30_near26k_seed_20261201.json
+band25_30_near26k (25,952 Hz), seed 20261202: wrote low_drive_followup_band25_30_near26k_seed_20261202.json
+band25_30_near26k (25,952 Hz), seed 20261203: wrote low_drive_followup_band25_30_near26k_seed_20261203.json
+band25_30_near26k (25,952 Hz), seed 20261204: wrote low_drive_followup_band25_30_near26k_seed_20261204.json
+band25_30_near26k (25,952 Hz), seed 20261205: wrote low_drive_followup_band25_30_near26k_seed_20261205.json
+band25_30_near26k (25,952 Hz), seed 20261206: wrote low_drive_followup_band25_30_near26k_seed_20261206.json
+band25_30_near26k (25,952 Hz), seed 20261207: wrote low_drive_followup_band25_30_near26k_seed_20261207.json
+band25_30_near26k (25,952 Hz), seed 20261208: wrote low_drive_followup_band25_30_near26k_seed_20261208.json
+band25_30_near26k (25,952 Hz), seed 20261209: wrote low_drive_followup_band25_30_near26k_seed_20261209.json
+band25_30_near26k (25,952 Hz), seed 20261210: wrote low_drive_followup_band25_30_near26k_seed_20261210.json
+band25_30_near27k (27,024 Hz), seed 20261201: wrote low_drive_followup_band25_30_near27k_seed_20261201.json
+band25_30_near27k (27,024 Hz), seed 20261202: wrote low_drive_followup_band25_30_near27k_seed_20261202.json
+band25_30_near27k (27,024 Hz), seed 20261203: wrote low_drive_followup_band25_30_near27k_seed_20261203.json
+band25_30_near27k (27,024 Hz), seed 20261204: wrote low_drive_followup_band25_30_near27k_seed_20261204.json
+band25_30_near27k (27,024 Hz), seed 20261205: wrote low_drive_followup_band25_30_near27k_seed_20261205.json
+band25_30_near27k (27,024 Hz), seed 20261206: wrote low_drive_followup_band25_30_near27k_seed_20261206.json
+band25_30_near27k (27,024 Hz), seed 20261207: wrote low_drive_followup_band25_30_near27k_seed_20261207.json
+band25_30_near27k (27,024 Hz), seed 20261208: wrote low_drive_followup_band25_30_near27k_seed_20261208.json
+band25_30_near27k (27,024 Hz), seed 20261209: wrote low_drive_followup_band25_30_near27k_seed_20261209.json
+band25_30_near27k (27,024 Hz), seed 20261210: wrote low_drive_followup_band25_30_near27k_seed_20261210.json
+band25_30_near28k (27,893 Hz), seed 20261201: wrote low_drive_followup_band25_30_near28k_seed_20261201.json
+band25_30_near28k (27,893 Hz), seed 20261202: wrote low_drive_followup_band25_30_near28k_seed_20261202.json
+band25_30_near28k (27,893 Hz), seed 20261203: wrote low_drive_followup_band25_30_near28k_seed_20261203.json
+band25_30_near28k (27,893 Hz), seed 20261204: wrote low_drive_followup_band25_30_near28k_seed_20261204.json
+band25_30_near28k (27,893 Hz), seed 20261205: wrote low_drive_followup_band25_30_near28k_seed_20261205.json
+band25_30_near28k (27,893 Hz), seed 20261206: wrote low_drive_followup_band25_30_near28k_seed_20261206.json
+band25_30_near28k (27,893 Hz), seed 20261207: wrote low_drive_followup_band25_30_near28k_seed_20261207.json
+band25_30_near28k (27,893 Hz), seed 20261208: wrote low_drive_followup_band25_30_near28k_seed_20261208.json
+band25_30_near28k (27,893 Hz), seed 20261209: wrote low_drive_followup_band25_30_near28k_seed_20261209.json
+band25_30_near28k (27,893 Hz), seed 20261210: wrote low_drive_followup_band25_30_near28k_seed_20261210.json
+band25_30_near29k (28,978 Hz), seed 20261201: wrote low_drive_followup_band25_30_near29k_seed_20261201.json
+band25_30_near29k (28,978 Hz), seed 20261202: wrote low_drive_followup_band25_30_near29k_seed_20261202.json
+band25_30_near29k (28,978 Hz), seed 20261203: wrote low_drive_followup_band25_30_near29k_seed_20261203.json
+band25_30_near29k (28,978 Hz), seed 20261204: wrote low_drive_followup_band25_30_near29k_seed_20261204.json
+band25_30_near29k (28,978 Hz), seed 20261205: wrote low_drive_followup_band25_30_near29k_seed_20261205.json
+band25_30_near29k (28,978 Hz), seed 20261206: wrote low_drive_followup_band25_30_near29k_seed_20261206.json
+band25_30_near29k (28,978 Hz), seed 20261207: wrote low_drive_followup_band25_30_near29k_seed_20261207.json
+band25_30_near29k (28,978 Hz), seed 20261208: wrote low_drive_followup_band25_30_near29k_seed_20261208.json
+band25_30_near29k (28,978 Hz), seed 20261209: wrote low_drive_followup_band25_30_near29k_seed_20261209.json
+band25_30_near29k (28,978 Hz), seed 20261210: wrote low_drive_followup_band25_30_near29k_seed_20261210.json
+=== Low-drive ignition follow-up (MEASUREMENT; no verdict, no pass criterion) ===
+stimulus                driveHz  runs(any trial)   trials   APL ign/other
+below25_1                22,759          0/10      0/50        --/144    
+below25_2                22,838          0/10      0/50        --/144    
+below25_3                22,916          0/10      0/50        --/144    
+below25_4                23,073          1/10      1/50       190/145    
+below25_5                23,387          0/10      0/50        --/145    
+below25_6                24,691          0/10      0/50        --/149    
+band25_30_near26k        25,952          1/10      1/50       250/151    
+band25_30_near27k        27,024          0/10      0/50        --/154    
+band25_30_near28k        27,893          1/10      1/50       172/155    
+band25_30_near29k        28,978          0/10      0/50        --/158    
+pooled all        runs 3/100 [0.006, 0.085]  trials 3/500 [0.001, 0.017]
+pooled below25    runs 1/60 [0.000, 0.089]  trials 1/300 [0.000, 0.018]
+pooled band25_30  runs 2/40 [0.006, 0.169]  trials 2/200 [0.001, 0.036]
+neighbour below_window_0_20khz     runs 0/18  p(new higher) 0.6058085689879962  -> not distinguishable
+neighbour above_window_30_40khz    runs 0/20  p(new higher) 0.5757726819541376  -> not distinguishable
+neighbour above_window_40_70khz    runs 0/134  p(new higher) 0.07670108491478922  -> not distinguishable
+Wrote low_drive_followup_summary.json

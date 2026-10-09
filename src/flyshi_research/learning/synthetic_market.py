@@ -706,6 +706,56 @@ def ignition_exposure(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "S
     return out
 
 
+def _ignited_trials(record: Mapping, cfg: "SyntheticConfig") -> int:
+    return sum(s is not None and s > cfg.ignition_spread_fraction for s in record["spread"])
+
+
+def _ignited_training_counts(rows: Sequence[Mapping], condition: str, cfg: "SyntheticConfig") -> dict:
+    taught = [r for r in rows if condition != LEARNING_OFF and r["action"] != Action.ABSTAIN.value]
+    chosen = {Action.YES.value: "ignition_yes", Action.NO.value: "ignition_no"}
+    return {
+        "training_decisions": len(rows),
+        "training_decisions_with_ignited_framing": sum(_ignited(r) for r in rows),
+        "teaching_decisions": len(taught),
+        "teaching_decisions_with_ignited_framing": sum(_ignited(r) for r in taught),
+        "teaching_decisions_chosen_framing_ignited": sum(
+            bool(r[chosen[r["action"]]]["ignited_any_trial"]) for r in taught),
+        "ignited_trials_in_teaching_decisions": sum(
+            _ignited_trials(r[side], cfg) for r in taught for side in ("ignition_yes", "ignition_no")),
+    }
+
+
+def ignited_training_presentations(
+    outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig"
+) -> dict:
+    """PRE-STATED COUNT (2026-10-09). REPORTED ONLY, NEVER GATING.
+
+    Per arm and per signal strength (and pooled over strengths): how many TRAINING
+    decisions had a framing that ignited in any trial, and how many of those taught
+    the circuit (learning arm, not an abstention), split by whether the taught,
+    chosen framing itself ignited. The learning-off arm teaches nothing; its counts
+    show the baseline-weight exposure. The safeguard that would skip these updates
+    was considered and NOT adopted (spec Section 3), so these decisions did teach.
+    """
+    out = {"note": ("reported only, never gating; decisions that could have taught the "
+                    "circuit from a presentation with an ignited trial (safeguard not adopted)")}
+    try:
+        for condition in CONDITIONS:
+            per_strength = {}
+            pooled_rows = []
+            for strength in cfg.signal_strengths:
+                rows = [r for seed in cfg.market_seeds
+                        for r in outputs[(strength, seed, condition)]["train"]]
+                pooled_rows.extend(rows)
+                per_strength[str(strength)] = _ignited_training_counts(rows, condition, cfg)
+            out[condition] = {"by_strength": per_strength,
+                              "all_strengths": _ignited_training_counts(pooled_rows, condition, cfg)}
+    except KeyError as missing:
+        return {"available": False, "reason": f"ignition record missing ({missing})"}
+    out["available"] = True
+    return out
+
+
 def sensitivity_excluding_ignited(
     outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig", strength: float,
     vs_market: np.ndarray, vs_off: np.ndarray,
@@ -913,6 +963,9 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
             (st for st in cfg.signal_strengths
              if strengths_out[str(st)]["sensitivity_excluding_ignited"].get(
                  "both_lower_bounds_above_zero")), None),
+        # Reported, never gating (pre-stated 2026-10-09): training decisions that
+        # could have taught the circuit from a presentation with an ignited trial.
+        "ignited_training_presentations": ignited_training_presentations(outputs, cfg),
         "strengths": strengths_out,
     }
 

@@ -594,3 +594,32 @@ def test_runner_bins_by_trial_with_the_shared_function_and_no_longer_uses_presen
     assert "_build_population_simulator" in src and "bin_spikes(" in src
     assert "sim = build_sweep_simulator()" in inspect.getsource(runner.main)
     assert "sim.present(" not in inspect.getsource(sm)
+
+
+def test_ignited_training_presentations_are_counted_per_arm_and_strength_and_never_gate() -> None:
+    cfg = small_config()
+    outputs = all_outputs(True, cfg)
+    base = sm.evaluate_signal_requirement(outputs, cfg)
+    seed = cfg.market_seeds[0]
+    for condition in (sm.PROFIT, sm.LEARNING_OFF):
+        row = outputs[(0.8, seed, condition)]["train"][0]
+        side = "ignition_yes" if row["action"] == sm.Action.YES.value else "ignition_no"
+        spread = list(row[side]["spread"])
+        spread[-1] = 0.65  # one ignited trial, in the chosen (taught) framing
+        row[side] = {**row[side], "spread": spread, "ignited_any_trial": True}
+    verdict = sm.evaluate_signal_requirement(outputs, cfg)
+    counts = verdict["ignited_training_presentations"]
+    assert counts["available"] and "never gating" in counts["note"]
+    n_train = cfg.train_count * len(cfg.market_seeds)
+    profit = counts[sm.PROFIT]["by_strength"]["0.8"]
+    assert profit["training_decisions"] == n_train == profit["teaching_decisions"]
+    assert profit["training_decisions_with_ignited_framing"] == 1
+    assert profit["teaching_decisions_with_ignited_framing"] == 1
+    assert profit["teaching_decisions_chosen_framing_ignited"] == 1
+    assert profit["ignited_trials_in_teaching_decisions"] == 1
+    assert counts[sm.PROFIT]["all_strengths"]["teaching_decisions_with_ignited_framing"] == 1
+    off = counts[sm.LEARNING_OFF]["by_strength"]["0.8"]
+    assert off["training_decisions_with_ignited_framing"] == 1 and off["teaching_decisions"] == 0
+    assert counts[sm.ACCURACY]["all_strengths"]["training_decisions_with_ignited_framing"] == 0
+    for key in ("success", "signal_requirement"):
+        assert verdict[key] == base[key]

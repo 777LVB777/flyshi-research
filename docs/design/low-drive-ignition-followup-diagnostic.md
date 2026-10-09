@@ -5,6 +5,9 @@ protocol. The runner, `repro/mushroom_body/run_low_drive_ignition_followup_diagn
 was written alongside this document and has only been dry-run. If anything here
 needs to change, add a dated revision note and keep the original text.
 
+**Run 2026-10-09.** The protocol above ran unchanged (100 of 100 simulations).
+Results are appended under [Results](#results); the protocol text is not edited.
+
 **THIS IS A DIAGNOSTIC, NOT A VALIDATION** (`is_a_validation: false`,
 `has_pass_criterion: false`). It measures and does not judge. The output carries no
 verdict, and none of PASS, FAIL, ACCEPTED or USABLE RANGE (enforced by the shared
@@ -186,3 +189,59 @@ add stimuli or seeds after seeing results.
 ## Results
 
 *None. Append results here after the run; do not edit the protocol above.*
+
+### Results, 2026-10-09 (`is_a_validation: false`, no verdict)
+
+Source: `results/low_drive_followup_summary.json`, from the 100 run files
+(`results/low_drive_followup_<stimulus>_seed_<seed>.json`). All ten stimuli at all
+ten seeds ran; nothing was added or re-run after the results were seen.
+
+**Pooled rates (exact Clopper–Pearson 95% intervals):**
+
+| group | runs ignited (any trial) | trials ignited |
+|---|---:|---:|
+| all ten stimuli | **3/100** (0.006–0.085) | **3/500** (0.001–0.017) |
+| below 25 kHz (6 stimuli) | 1/60 (0.000–0.089) | 1/300 (0.000–0.018) |
+| 25–30 kHz (4 stimuli) | 2/40 (0.006–0.169) | 2/200 (0.001–0.036) |
+
+The trial-mean label agrees with the any-trial label in every run (3/100).
+
+**The three ignited runs.** Each is confined to a **single trial of five**, and
+each is a different market:
+
+| stimulus | presentation (strength, seed, market, framing) | drive Hz | sim seed | ignited trial | spread in that trial | APL, that trial | score (run) | score, other 9 seeds, mean ± SD |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `below25_4` | 0.4, 20261005, 61, NO | 23,073 | 20261205 | 3 | 65.4% | 189.5 Hz | −61.8 | −46.3 ± 2.7 |
+| `band25_30_near26k` | 0.8, 20261004, 56, NO | 25,952 | 20261201 | 3 | 66.5% | 250.0 Hz | −101.5 | −63.4 ± 1.9 |
+| `band25_30_near28k` | 0.8, 20261004, 81, YES | 27,893 | 20261202 | 1 | 64.7% | 172.0 Hz | −88.5 | −83.4 ± 2.8 |
+
+- Each event recruited about two-thirds of non-stimulated KCs on **both** sides,
+  as in the extremes diagnostic's event (65%).
+- APL in non-ignited trials was 144–158 Hz across stimuli.
+- The ignited runs' CIRCUIT-80 scores sit 15.5, 38.1 and 5.1 Hz below the other
+  nine seeds' mean for the same stimulus. The seven stimuli with no event have
+  score SDs of 1.2–2.7 Hz.
+- **The `lowest_drive` market itself (`below25_1`, the extremes diagnostic's
+  stimulus) did not ignite in 10 runs.** The same market ignited once at strength
+  0.4 (`below25_4`). The other four stimuli in that market: 0/40.
+
+**Window against neighbouring drive levels (descriptive).** Readings follow the
+pre-stated rule (one-sided Fisher p < 0.05 means "elevated in the window"):
+
+| band | saved runs ignited | Fisher p, runs | Fisher p, trials | reading |
+|---|---:|---:|---:|---|
+| 0–20 kHz | 0/18 | 0.61 | n/a | not distinguishable |
+| 30–40 kHz | 0/20 (trials 0/100) | 0.58 | 0.58 | not distinguishable |
+| 40–70 kHz | 0/134 (trials 0/640) | 0.077 | 0.084 | not distinguishable |
+
+**On record:**
+
+- The new window rate, 3/100, is below every pre-stated detectability threshold
+  (17/100, 16/100, 4/100). So "not distinguishable" is what a low true rate would
+  produce. It does **not** show that the rate equals the neighbours' rate. Against
+  the largest band (40–70 kHz, 0/134), p is 0.077.
+- The earlier 2/8 in-window estimate (interval 3–65%) is not reproduced at that
+  size. These ten presentations ignite in about 3% of runs (upper bound 8.5%).
+- No mechanism is identified, as pre-stated: no spike times were saved.
+- Scope: baseline weights only; ten presentations in six markets; five of them
+  are one market.

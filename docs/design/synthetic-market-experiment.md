@@ -203,6 +203,9 @@ training markets.
 > *Config hash.* It changes from `3e0cab12f7` to **`688d1064a3`** (new
 > threshold fields and output schema). The run count is unchanged.
 >
+> **CONSIDERED, NOT ADOPTED** (decision 2026-10-09, recorded below). The draft is
+> kept as written.
+>
 > **DRAFT — NOT ADOPTED (2026-10-09). Optional safeguard: no plasticity update on
 > an ignited presentation.** The project owner will decide after the low-drive
 > follow-up diagnostic
@@ -249,6 +252,52 @@ training markets.
 >     the first learning test under which learning was demonstrated.
 >   - **Adoption.** It would need a config field, a config-hash change and a
 >     dated revision **before** the run.
+
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run: the
+> ignition safeguard is NOT adopted.** The drafted text above is kept, marked
+> "considered, not adopted". The learning rule is unchanged: ignited training
+> presentations teach the circuit like any other.
+>
+> *Rationale:*
+>
+> - **Expected impact is small.** The low-drive follow-up
+>   ([`low-drive-ignition-followup-diagnostic.md`](low-drive-ignition-followup-diagnostic.md),
+>   Results) found 3/100 runs ignited (95% interval 0.006–0.085), each in a single
+>   trial (3/500 trials), across three markets, and not distinguishable from
+>   neighbouring drive levels. Applied to the low-drive presentations, that is
+>   roughly 3 affected decisions per arm out of about 2,500, each contaminated in
+>   one of five trials.
+> - **Adopting it would change the validated learning rule.** The rule under
+>   which learning was demonstrated in the first learning test has no such gate.
+> - **What remains:** the per-trial tracking (above), the pre-stated test-market
+>   exclusion analysis (Section 6), and the reported count of ignited training
+>   presentations (next revision).
+>
+> *Config hash.* Unchanged (`688d1064a3`): nothing in the config or the decision
+> loop changes.
+
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run:
+> pre-stated count of ignited training presentations. Reported only, never
+> gating.** Because the safeguard is not adopted, the results report how many
+> decisions could have taught the circuit from a distorted presentation.
+>
+> - *Where.* `ignited_training_presentations` in the verdict, per arm (`profit`,
+>   `accuracy`, `learning_off`, `profit_drift_off`), per signal strength, and
+>   pooled over strengths. It is computed from the per-decision tracking only;
+>   no simulation is added.
+> - *Counts, over training decisions:*
+>   - training decisions, and those with **either framing ignited in any trial**;
+>   - **teaching decisions** (a learning arm and not an abstention: the ones that
+>     ran `record_decision` and the dopamine-gated update), and those with either
+>     framing ignited;
+>   - teaching decisions whose **chosen (taught) framing** ignited. Eligibility
+>     comes from that framing's KCs; the other framing affects only the score and
+>     so the action;
+>   - the number of ignited trials within those teaching decisions.
+> - The learning-off arm teaches nothing; its counts show exposure at baseline
+>   weights.
+> - It does not change the gate, the sensitivity analysis or any run. The config
+>   hash is unchanged.
 
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
