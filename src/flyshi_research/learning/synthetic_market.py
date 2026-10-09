@@ -80,9 +80,14 @@ class Simulator(Protocol):
 
     def baseline_weights(self) -> np.ndarray: ...
     def set_weights(self, weights: np.ndarray) -> None: ...
-    def present(
+    def present_trials(
         self, rates_by_kc_id: Mapping[int, float], seed: int, duration_ms: float, n_trials: int
-    ) -> Tuple[np.ndarray, np.ndarray]: ...
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """``(kc_mean, mbon_mean, kc_per_trial, apl_per_trial)``: trial-mean KC and MBON
+        rates (``kc_ids`` / ``mbon_ids`` order), plus per-trial rates of every KC
+        ``[n_trials, n_kc]`` and of every APL neuron ``[n_trials, n_apl]``. Required
+        since 2026-10-09 for per-decision ignition tracking."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -113,6 +118,13 @@ class SyntheticConfig:
     # far from saturation.
     score_scale: float = 20.0
     decision_margin: float = 0.0
+    # Per-decision ignition tracking (DECIDED 2026-10-09; reported, never gating).
+    # The same thresholds as every left-only diagnostic: a non-stimulated KC is
+    # "recruited" in a trial above ignition_active_hz, and a trial is labelled
+    # ignited when the recruited fraction of non-stimulated KCs exceeds
+    # ignition_spread_fraction.
+    ignition_active_hz: float = 0.5
+    ignition_spread_fraction: float = 0.01
     bootstrap_resamples: int = 2000
     bootstrap_seed: int = 20261099
     confidence_level: float = 0.95
@@ -302,7 +314,8 @@ def _stimuli(
 
 @dataclass(frozen=True)
 class Presentation:
-    """One Option B decision's raw material: KC patterns, per-MBON rates, scores."""
+    """One Option B decision's raw material: KC patterns, per-MBON rates, scores,
+    and the per-trial ignition record of each framing."""
 
     kc_yes: np.ndarray
     kc_no: np.ndarray
@@ -310,6 +323,48 @@ class Presentation:
     mbon_no: np.ndarray
     score_yes: float
     score_no: float
+    ignition_yes: dict
+    ignition_no: dict
+
+
+def ignition_record(
+    kc_ids: Sequence[int],
+    kc_per_trial: np.ndarray,
+    apl_per_trial: np.ndarray,
+    stimulated_kc_ids: Sequence[int],
+    kc_sides: Mapping[int, str],
+    cfg: SyntheticConfig,
+) -> dict:
+    """Per-trial ignition measures of one presentation (decided 2026-10-09).
+
+    Per trial: the recruited fraction of non-stimulated KCs (overall, left, right),
+    the recruited count, the recruited KCs' mean rate (None when none), and the
+    mean APL rate. ``ignited_any_trial`` is true when any trial's overall fraction
+    exceeds ``cfg.ignition_spread_fraction``. Reported, never gating.
+    """
+    ids = np.asarray(kc_ids, dtype=np.int64)
+    rates = np.asarray(kc_per_trial, dtype=float)
+    if rates.ndim != 2 or rates.shape[1] != ids.size:
+        raise ValueError("kc_per_trial must be [n_trials, n_kc] in kc_ids order")
+    free = ~np.isin(ids, np.asarray(list(stimulated_kc_ids), dtype=np.int64))
+    sides = np.array([kc_sides.get(int(i), "unknown") for i in ids.tolist()])
+    masks = {"overall": free, "left": free & (sides == LEFT), "right": free & (sides == "right")}
+    out: dict = {k: [] for k in ("spread", "spread_left", "spread_right",
+                                 "n_recruited", "recruited_mean_hz", "apl_hz")}
+    for t in range(rates.shape[0]):
+        active = rates[t] > cfg.ignition_active_hz
+        for key, mask in (("spread", masks["overall"]), ("spread_left", masks["left"]),
+                          ("spread_right", masks["right"])):
+            n = int(mask.sum())
+            out[key].append(round(float((active & mask).sum() / n), 6) if n else None)
+        recruited = active & free
+        out["n_recruited"].append(int(recruited.sum()))
+        out["recruited_mean_hz"].append(
+            round(float(rates[t][recruited].mean()), 4) if recruited.any() else None)
+        out["apl_hz"].append(round(float(np.mean(apl_per_trial[t])), 4))
+    out["ignited_any_trial"] = any(
+        s is not None and s > cfg.ignition_spread_fraction for s in out["spread"])
+    return out
 
 
 def _score_pair(
@@ -318,13 +373,19 @@ def _score_pair(
     pair: OptionBStimuli,
     seed: int,
     cfg: SyntheticConfig,
+    kc_sides: Mapping[int, str],
 ) -> Presentation:
-    kc_yes, mbon_yes = sim.present(pair.yes.rates_by_kc_id(), seed, cfg.duration_ms, cfg.trials)
-    kc_no, mbon_no = sim.present(pair.no.rates_by_kc_id(), seed, cfg.duration_ms, cfg.trials)
+    shown = {}
+    for name, stim in (("yes", pair.yes), ("no", pair.no)):
+        kc, mbon, kc_trials, apl_trials = sim.present_trials(
+            stim.rates_by_kc_id(), seed, cfg.duration_ms, cfg.trials)
+        shown[name] = (np.asarray(kc), np.asarray(mbon), ignition_record(
+            sim.kc_ids, kc_trials, apl_trials, stim.kc_ids.tolist(), kc_sides, cfg))
+    (kc_yes, mbon_yes, ign_yes), (kc_no, mbon_no, ign_no) = shown["yes"], shown["no"]
     return Presentation(
-        np.asarray(kc_yes), np.asarray(kc_no),
-        np.asarray(mbon_yes), np.asarray(mbon_no),
+        kc_yes, kc_no, mbon_yes, mbon_no,
         readout.score(mbon_yes), readout.score(mbon_no),
+        ign_yes, ign_no,
     )
 
 
@@ -378,7 +439,7 @@ def compute_innate_scores(
     for index, market in enumerate(markets):
         pair = _stimuli(encoder, market, cfg)
         shown = _score_pair(
-            sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
+            sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg, kc_sides
         )
         out.append((shown.score_yes, shown.score_no))
     return out
@@ -437,7 +498,7 @@ def run_dataset(
         sim.set_weights(plastic.weights if condition != LEARNING_OFF else baseline)
         pair = _stimuli(encoder, market, cfg)
         shown = _score_pair(
-            sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg
+            sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg, kc_sides
         )
         innate_yes, innate_no = (innate_scores[index] if innate_scores is not None else (None, None))
         difference = score_difference(
@@ -468,6 +529,11 @@ def run_dataset(
                 # every decision for the innate-policy metric.
                 "drive_yes_hz": float(np.sum(pair.yes.rates_hz)),
                 "drive_no_hz": float(np.sum(pair.no.rates_hz)),
+                # Per-trial ignition record of each framing (decided 2026-10-09):
+                # reported, never gating; used by the pre-stated sensitivity
+                # analysis that excludes test markets with an ignited framing.
+                "ignition_yes": shown.ignition_yes,
+                "ignition_no": shown.ignition_no,
                 # Per-MBON rates are saved for the preregistered left-only POST-HOC
                 # RESCORING (see ``left_only_rescore``), which adds no simulation and
                 # is never an arm or a condition: it rescores these runs as they
@@ -612,6 +678,77 @@ def innate_policy(rows: Sequence[Mapping]) -> dict:
     return out
 
 
+#: arms whose ignition excludes a test market from the sensitivity analysis: the two
+#: simulated arms the pre-stated gate compares (the market price is not simulated)
+SENSITIVITY_ARMS = (PROFIT, LEARNING_OFF)
+#: bootstrap seed offsets of the sensitivity analysis (gate: +0 and +100)
+SENSITIVITY_SEED_OFFSETS = (200, 300)
+
+
+def _ignited(row: Mapping) -> bool:
+    return bool(row["ignition_yes"]["ignited_any_trial"] or row["ignition_no"]["ignited_any_trial"])
+
+
+def ignition_exposure(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig",
+                      strength: float) -> dict:
+    """Decisions with an ignited framing, per arm and split. Reported, never gating."""
+    out = {}
+    for condition in CONDITIONS:
+        rows = {split: [r for seed in cfg.market_seeds
+                        for r in outputs[(strength, seed, condition)][split]]
+                for split in ("train", "test")}
+        try:
+            out[condition] = {f"{split}_decisions_with_ignited_framing": sum(_ignited(r) for r in rs)
+                              for split, rs in rows.items()}
+        except KeyError as missing:
+            return {"available": False, "reason": f"ignition record missing ({missing})"}
+        out[condition]["decisions"] = sum(len(rs) for rs in rows.values())
+    return out
+
+
+def sensitivity_excluding_ignited(
+    outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig", strength: float,
+    vs_market: np.ndarray, vs_off: np.ndarray,
+) -> dict:
+    """PRE-STATED SENSITIVITY ANALYSIS (2026-10-09). REPORTED ONLY, NEVER GATING.
+
+    Re-evaluates the Section 6 gate after excluding every held-out market in which
+    either framing ignited in any trial, in either arm the gate compares (profit or
+    learning-off). Known limits (spec Section 6 revision): the excluded markets are
+    not a random subset (they are low-drive feature combinations), and learning from
+    ignited TRAINING presentations is already in the weights and cannot be removed.
+    """
+    try:
+        excluded = np.zeros(vs_market.size, dtype=bool)
+        for condition in SENSITIVITY_ARMS:
+            rows = [r for seed in cfg.market_seeds for r in outputs[(strength, seed, condition)]["test"]]
+            excluded |= np.array([_ignited(r) for r in rows], dtype=bool)
+    except KeyError as missing:
+        return {"available": False, "reason": f"ignition record missing ({missing})"}
+    keep = ~excluded
+    out = {
+        "note": ("reported only, never gating; excluded markets are not random and learning "
+                 "from ignited training presentations cannot be removed"),
+        "available": True,
+        "n_test_markets": int(vs_market.size),
+        "n_excluded": int(excluded.sum()),
+        "n_remaining": int(keep.sum()),
+    }
+    if keep.sum() < 2:
+        out.update(available=False, reason="fewer than two markets remain")
+        return out
+    i = cfg.signal_strengths.index(strength)
+    cis = [bootstrap_confidence_interval(
+        values[keep], np.mean, confidence_level=cfg.confidence_level,
+        n_resamples=cfg.bootstrap_resamples, seed=cfg.bootstrap_seed + offset + i)
+        for values, offset in ((vs_market, SENSITIVITY_SEED_OFFSETS[0]),
+                               (vs_off, SENSITIVITY_SEED_OFFSETS[1]))]
+    out["profit_improvement_vs_market"] = asdict(cis[0])
+    out["profit_improvement_vs_learning_off"] = asdict(cis[1])
+    out["both_lower_bounds_above_zero"] = bool(cis[0].lower > 0.0 and cis[1].lower > 0.0)
+    return out
+
+
 def _metric_summary(
     probabilities: np.ndarray,
     outcomes: np.ndarray,
@@ -745,6 +882,10 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
             "profit_improvement_vs_market": asdict(market_ci),
             "profit_improvement_vs_learning_off": asdict(off_ci),
             "passes": passes,
+            # Reported, never gating (pre-stated 2026-10-09).
+            "ignition_exposure": ignition_exposure(outputs, cfg, strength),
+            "sensitivity_excluding_ignited": sensitivity_excluding_ignited(
+                outputs, cfg, strength, vs_market, vs_off),
         }
     requirement = min(qualifying) if qualifying else None
     higher_failures = (
@@ -766,6 +907,12 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
         # price, recent change, time to resolution and liquidity are identical at
         # every strength for a given market seed; only the signal feature differs.
         "innate_policy_pooled": innate_policy(innate_rows),
+        # Reported, never gating: the smallest strength whose sensitivity analysis
+        # (ignited test markets excluded) has both lower bounds above zero.
+        "sensitivity_excluding_ignited_smallest_strength": next(
+            (st for st in cfg.signal_strengths
+             if strengths_out[str(st)]["sensitivity_excluding_ignited"].get(
+                 "both_lower_bounds_above_zero")), None),
         "strengths": strengths_out,
     }
 

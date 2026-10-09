@@ -19,6 +19,8 @@ sys.path.insert(0, str(HERE))  # sibling runners; none imports Brian2 at module 
 from flyshi_research.learning import synthetic_market as sm  # noqa: E402
 # The ONE shared definition of "left", as in the fixed graded runners.
 from run_left_only_pool_diagnostic import IDS_PATH, kc_side_map  # noqa: E402
+# Per-trial binning shared with the diagnostics, so ignition is measured identically.
+from run_left_only_realistic_drive_diagnostic import bin_spikes  # noqa: E402
 
 RESULTS_BASE = HERE / "results"
 
@@ -42,6 +44,37 @@ class Paths:
         return self.output(job).exists()
 
 
+def build_sweep_simulator():
+    """The real backend plus per-trial readout (decided 2026-10-09).
+
+    Wraps the population simulator (a ``FastRunnerSimulator`` that also indexes APL)
+    and adds ``present_trials``: one ``run_cue_rates`` call, binned by trial with the
+    diagnostics' ``bin_spikes``. Its trial means equal ``FastRunnerSimulator.present``
+    exactly, so scores and eligibility are unchanged by the tracking. Imports Brian2.
+    """
+    import numpy as np
+    from run_population_scaling_diagnostic import _build_population_simulator
+
+    sim = _build_population_simulator()
+    apl_index = sim.population_index["apl_neurons"]
+
+    def present_trials(rates_by_kc_id, seed, duration_ms, n_trials):
+        sim.bundle["params"]["t_run"] = duration_ms * sim._ms
+        spikes, _ = sim._fr.run_cue_rates(sim.bundle, dict(rates_by_kc_id), n_trials, seed,
+                                          "synthetic_market")
+        if len(spikes):
+            index = np.array([sim.bundle["flyid2i"][f] for f in spikes["flywire_id"]], dtype=int)
+            trial = np.asarray(spikes["trial"], dtype=int)
+        else:
+            index = trial = np.zeros(0, dtype=int)
+        per_trial, mean = bin_spikes(index, trial, sim.bundle["n"], n_trials, duration_ms)
+        return (mean[sim._kc_brian], mean[sim._mbon_brian],
+                per_trial[:, sim._kc_brian], per_trial[:, apl_index])
+
+    sim.present_trials = present_trials
+    return sim
+
+
 def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
     jobs = sm.plan_jobs(cfg)
     return [
@@ -53,6 +86,8 @@ def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
         f"{cfg.encoder.min_rate_hz:g}-{cfg.encoder.max_rate_hz:g} Hz, "
         f"pools of {cfg.encoder.pool_size} KCs (pool seed {cfg.encoder.pool_seed})",
         "  pools: LEFT-hemisphere KCs only; assert_pools_left_only aborts before any presentation",
+        f"  ignition tracking: per trial, per framing (active > {cfg.ignition_active_hz:g} Hz, "
+        f"ignited > {cfg.ignition_spread_fraction:.0%} of non-stimulated KCs); reported, never gating",
         f"  strengths: {list(cfg.signal_strengths)}",
         f"  market seeds: {list(cfg.market_seeds)}",
         f"  markets: {cfg.markets_per_seed}/seed ({cfg.train_count} chronological train, "
@@ -140,11 +175,8 @@ def main(argv=None) -> int:
             raise SystemExit(f"{selected.id} requires {dependency}")
 
     # Lazy import: this is the only branch that loads Brian2/connectome data.
-    from run_first_learning_test import FastRunnerSimulator
-    from flyshi_research.learning.first_learning import ExperimentConfig
-
     kc_sides = kc_side_map(args.ids)
-    sim = FastRunnerSimulator(ExperimentConfig())
+    sim = build_sweep_simulator()
     # Fail before the first presentation (and before any job file exists) if the
     # pools would not be left-only. run_dataset applies the same guard again.
     sm.setup_encoder(sim, cfg, kc_sides)

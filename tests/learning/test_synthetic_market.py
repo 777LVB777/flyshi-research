@@ -70,6 +70,20 @@ class FakeMarketSimulator:
         learned_term = np.array([semantic / 2.0, -semantic / 2.0])
         return kc, np.maximum(0.0, 20.0 + intensity + drive + learned_term + noise)
 
+    #: ``{seed: (trial, kc_ids, rate)}``: inject a single-trial recruitment event
+    events: dict = {}
+
+    def present_trials(self, rates, seed, duration_ms, n_trials):
+        kc, mbon = self.present(rates, seed, duration_ms, n_trials)
+        per_trial = np.tile(kc, (n_trials, 1))
+        if seed in self.events:
+            trial, ids, rate = self.events[seed]
+            for kc_id in ids:
+                per_trial[trial, self._index[kc_id]] = rate
+            kc = per_trial.mean(axis=0)
+        apl = np.full((n_trials, 2), 150.0)
+        return kc, mbon, per_trial, apl
+
 
 def small_config(mitigation=NO_MITIGATION):
     return sm.SyntheticConfig(
@@ -242,9 +256,9 @@ class _RecordingSim(FakeMarketSimulator):
         super().__init__(True)
         self.presented = []
 
-    def present(self, rates, seed, duration_ms, n_trials):
+    def present_trials(self, rates, seed, duration_ms, n_trials):
         self.presented.append(dict(rates))
-        return super().present(rates, seed, duration_ms, n_trials)
+        return super().present_trials(rates, seed, duration_ms, n_trials)
 
 
 def _tiny_config(mitigation=NO_MITIGATION):
@@ -461,3 +475,122 @@ def test_widening_the_clip_leaves_every_other_market_quantity_unchanged() -> Non
     for m in markets:
         assert m.recent_change == pytest.approx(m.quote - prev)
         prev = m.quote
+
+
+
+# ---- per-decision ignition tracking (decided 2026-10-09) ---------------------- #
+def test_ignition_record_measures_each_trial_by_hemisphere() -> None:
+    cfg = sm.SyntheticConfig()
+    kc_ids = list(range(10))
+    sides = {i: ("left" if i < 6 else "right") for i in kc_ids}
+    stimulated = [0, 1]
+    rates = np.zeros((3, 10))
+    rates[:, :2] = 90.0             # stimulated KCs, never counted
+    rates[1, [2, 3, 6]] = [8.0, 6.0, 4.0]  # trial 1: 3 of 8 free KCs (2 left, 1 right)
+    rates[2, 4] = 0.5               # at the threshold: not recruited (strictly above)
+    apl = np.array([[140.0, 150.0], [170.0, 180.0], [145.0, 145.0]])
+    rec = sm.ignition_record(kc_ids, rates, apl, stimulated, sides, cfg)
+    assert rec["spread"] == [0.0, 0.375, 0.0]
+    assert rec["spread_left"] == [0.0, 0.5, 0.0] and rec["spread_right"] == [0.0, 0.25, 0.0]
+    assert rec["n_recruited"] == [0, 3, 0]
+    assert rec["recruited_mean_hz"] == [None, 6.0, None]
+    assert rec["apl_hz"] == [145.0, 175.0, 145.0]
+    assert rec["ignited_any_trial"] is True
+    quiet = sm.ignition_record(kc_ids, rates[[0, 2]], apl[[0, 2]], stimulated, sides, cfg)
+    assert quiet["ignited_any_trial"] is False
+
+
+def test_one_recruited_kc_is_not_ignition_but_a_population_event_is() -> None:
+    """The extremes diagnostic's single steadily-driven KC (1 of ~4,677) must not be
+    labelled ignited; a 1%+ population event in a single trial must."""
+    cfg = sm.SyntheticConfig()
+    kc_ids = list(range(1000))
+    sides = {i: "left" for i in kc_ids}
+    one = np.zeros((5, 1000)); one[:, 999] = 22.0
+    assert not sm.ignition_record(kc_ids, one, np.zeros((5, 1)), [0], sides, cfg)["ignited_any_trial"]
+    event = np.zeros((5, 1000)); event[2, 500:520] = 8.0  # 20 of 999 free KCs, one trial
+    assert sm.ignition_record(kc_ids, event, np.zeros((5, 1)), [0], sides, cfg)["ignited_any_trial"]
+
+
+def test_every_decision_records_both_framings_per_trial() -> None:
+    cfg = _tiny_config()
+    sim = FakeMarketSimulator(True)
+    out = sm.run_dataset(sim, cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT, kc_sides=sim.kc_sides)
+    for row in out["train"] + out["test"]:
+        for key in ("ignition_yes", "ignition_no"):
+            rec = row[key]
+            assert len(rec["spread"]) == len(rec["apl_hz"]) == cfg.trials
+            assert rec["ignited_any_trial"] is False  # the fake drives no free KC
+
+
+def test_an_injected_single_trial_event_is_recorded_on_that_decision() -> None:
+    cfg = replace(_tiny_config(), trials=5)
+    sim = FakeMarketSimulator(True)
+    seed = sm.simulation_seed(cfg, 0.8, sm.MARKET_SEEDS[0], 3)
+    free = [k for k in sim.left_kc_ids if k not in set(sm.setup_encoder(sim, cfg, sim.kc_sides)
+                                                        .balance_pool.tolist())
+            and all(k not in p for p in sm.setup_encoder(sim, cfg, sim.kc_sides).pools.values())]
+    sim.events = {seed: (2, free[:50], 8.0)}
+    out = sm.run_dataset(sim, cfg, 0.8, sm.MARKET_SEEDS[0], sm.PROFIT, kc_sides=sim.kc_sides)
+    rows = out["train"] + out["test"]
+    flagged = [r["sequence"] for r in rows if r["ignition_yes"]["ignited_any_trial"]]
+    assert flagged == [3]
+    rec = rows[3]["ignition_yes"]
+    assert rec["n_recruited"][2] == 50 and rec["n_recruited"][0] == 0
+    assert rec["spread_right"][2] == 0.0 and rec["spread_left"][2] > 0.0
+
+
+def test_ignition_thresholds_are_in_the_config_hash() -> None:
+    base = sm.SyntheticConfig()
+    assert (base.ignition_active_hz, base.ignition_spread_fraction) == (0.5, 0.01)
+    assert replace(base, ignition_spread_fraction=0.02).config_hash() != base.config_hash()
+
+
+def _flag(outputs, condition, seed, sequence):
+    for row in outputs[(0.8, seed, condition)]["test"]:
+        if row["sequence"] == sequence:
+            row["ignition_no"] = {**row["ignition_no"], "ignited_any_trial": True}
+
+
+def test_sensitivity_excludes_markets_ignited_in_either_gate_arm_and_never_gates() -> None:
+    cfg = small_config()
+    outputs = all_outputs(True, cfg)
+    base = sm.evaluate_signal_requirement(outputs, cfg)
+    seed0, seed1 = cfg.market_seeds[0], cfg.market_seeds[1]
+    _flag(outputs, sm.PROFIT, seed0, cfg.train_count)        # excluded (profit arm)
+    _flag(outputs, sm.LEARNING_OFF, seed1, cfg.train_count)  # excluded (learning-off arm)
+    _flag(outputs, sm.ACCURACY, seed1, cfg.train_count + 1)  # not a gate arm: kept
+    verdict = sm.evaluate_signal_requirement(outputs, cfg)
+    sens = verdict["strengths"]["0.8"]["sensitivity_excluding_ignited"]
+    n = cfg.test_count * len(cfg.market_seeds)
+    assert sens["available"] and sens["n_test_markets"] == n
+    assert sens["n_excluded"] == 2 and sens["n_remaining"] == n - 2
+    assert "never gating" in sens["note"]
+    # the gate itself is untouched by ignition flags
+    for key in ("success", "signal_requirement"):
+        assert verdict[key] == base[key]
+    assert verdict["strengths"]["0.8"]["passes"] == base["strengths"]["0.8"]["passes"]
+    exposure = verdict["strengths"]["0.8"]["ignition_exposure"]
+    assert exposure[sm.ACCURACY]["test_decisions_with_ignited_framing"] == 1
+    assert verdict["sensitivity_excluding_ignited_smallest_strength"] in (None, 0.8)
+
+
+def test_sensitivity_without_exclusions_matches_the_gate_markets() -> None:
+    cfg = small_config()
+    verdict = sm.evaluate_signal_requirement(all_outputs(True, cfg), cfg)
+    sens = verdict["strengths"]["0.8"]["sensitivity_excluding_ignited"]
+    assert sens["n_excluded"] == 0
+    gate = verdict["strengths"]["0.8"]["profit_improvement_vs_market"]
+    # same markets, different (pre-stated) bootstrap seeds: same point estimate
+    assert sens["profit_improvement_vs_market"]["estimate"] == pytest.approx(gate["estimate"])
+
+
+def test_runner_bins_by_trial_with_the_shared_function_and_no_longer_uses_present() -> None:
+    import inspect
+    import sys as _sys
+    runner = _load_script(RUNNER_PATH, "synthetic_runner_trials_test")
+    assert runner.bin_spikes is _sys.modules["run_left_only_realistic_drive_diagnostic"].bin_spikes
+    src = inspect.getsource(runner.build_sweep_simulator)
+    assert "_build_population_simulator" in src and "bin_spikes(" in src
+    assert "sim = build_sweep_simulator()" in inspect.getsource(runner.main)
+    assert "sim.present(" not in inspect.getsource(sm)

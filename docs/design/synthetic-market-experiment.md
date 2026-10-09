@@ -171,6 +171,85 @@ there is exact — [`first-learning-test.md`](first-learning-test.md), Section 7
 The left-only decision margin would also have to be calibrated separately on
 training markets.
 
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run:
+> per-decision ignition tracking.** The original text above is kept unchanged.
+>
+> *Why.* The extremes containment diagnostic found a single-trial,
+> population-wide event at the sweep's lowest-drive stimulus (22,759 Hz, 1 of 2
+> seeds). In that trial 65% of free KCs were recruited, on both sides. The event
+> moved that framing's CIRCUIT score by 15 Hz, and made about 2,400
+> non-stimulated KCs eligible for plasticity.
+>
+> *What is recorded, every decision, both framings, per trial (binned exactly as
+> in the diagnostics):*
+>
+> - the recruited fraction of non-stimulated KCs (above 0.5 Hz in that trial):
+>   overall, left and right;
+> - the recruited count;
+> - the recruited KCs' mean rate;
+> - the mean APL rate;
+> - `ignited_any_trial`: true when any trial's overall fraction exceeds 1%.
+>
+> These are the thresholds of every left-only diagnostic. They are now config
+> fields (`ignition_active_hz = 0.5`, `ignition_spread_fraction = 0.01`).
+>
+> *Implementation.* The simulator interface now requires `present_trials`. The
+> real backend wraps the population simulator: one `run_cue_rates` call, binned
+> with the diagnostics' `bin_spikes`. Its trial means equal the former
+> `present` exactly, so scores, actions, eligibility and learning are unchanged.
+> The tracking is **reported, never gating**, and it changes no stimulus, seed or
+> run.
+>
+> *Config hash.* It changes from `3e0cab12f7` to **`688d1064a3`** (new
+> threshold fields and output schema). The run count is unchanged.
+>
+> **DRAFT — NOT ADOPTED (2026-10-09). Optional safeguard: no plasticity update on
+> an ignited presentation.** The project owner will decide after the low-drive
+> follow-up diagnostic
+> ([`low-drive-ignition-followup-diagnostic.md`](low-drive-ignition-followup-diagnostic.md)).
+> Nothing below is implemented; the code has no such switch.
+>
+> - *Rule (draft).* On a **training** market, if either framing has
+>   `ignited_any_trial`, treat the decision like an abstention for learning: no
+>   `record_decision`, no dopamine-gated update and no drift step. This mirrors
+>   the existing rule that an abstention teaches nothing and advances no drift.
+>   The action is still taken and recorded, along with
+>   `learning_skipped_ignition: true`.
+>   - Test markets are unaffected, because weights are already frozen there.
+>   - The learning-off arm is unaffected.
+>   - A narrower variant checks only the chosen framing. That protects
+>     eligibility, but it would still teach from a decision made on a score the
+>     other framing's event distorted.
+> - *Detection threshold.* The tracking label: a trial is ignited when more than
+>   1% of non-stimulated KCs fire above 0.5 Hz in that 1-s trial (at least one
+>   spike).
+>   - Per-trial binning catches single-trial events that a trial mean would
+>     dilute.
+>   - In the saved runs, all 749 contained trials with per-trial data had at
+>     most 0.021% spread (598 exactly zero; the rest were the single γ-lobe KC
+>     below). The one ignited trial had 65%.
+>   - The one steadily driven KC (`KCg-s2`, 1 of about 4,677) is 0.02%, far
+>     below the threshold. False positives are therefore not expected, but that
+>     is unverified under learned weights.
+> - *What it protects against:*
+>   - eligibility spread onto recruited non-stimulated KCs (about 2,400 at about
+>     0.013 each in the observed event, roughly 17% extra eligibility mass);
+>   - reward credited to a decision taken on an event-distorted score (+15 Hz
+>     in the observed event, against a contained score SD of about 1.2 Hz).
+> - *What it costs:*
+>   - **Less learning from low-drive markets.** Up to the 83 training
+>     presentations below 30 kHz, times their actual ignition rate.
+>   - **A selection effect.** The skipped markets are not random: they are
+>     low-drive feature combinations, such as a NO framing at a high price with
+>     short time to resolution and low liquidity. So the learned weights are
+>     systematically under-trained there.
+>   - **A data-dependent drift clock.** Drift then also depends on a stochastic
+>     network event.
+>   - **A new gate on learning.** It is one more data-dependent rule, absent from
+>     the first learning test under which learning was demonstrated.
+>   - **Adoption.** It would need a config field, a config-hash change and a
+>     dated revision **before** the run.
+
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
 > **REVISION 2026-10-09 (project owner), before any synthetic-market run:
@@ -316,6 +395,41 @@ No correction for selecting the minimum across five ordered strengths is applied
 this is a stated limitation. Results need not be monotonic, but any higher strength
 that fails after a lower one passes must be highlighted as instability.
 
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run:
+> pre-stated sensitivity analysis excluding ignited test markets.** The criterion
+> above is unchanged, and this analysis **cannot rescue or overturn it**. It is
+> reported only, never gating.
+>
+> - *Procedure.* At each strength, drop every held-out market (strength, seed,
+>   index) in which **either framing ignited in any trial** (`ignited_any_trial`)
+>   in **either arm the gate compares**: `profit` or `learning_off`. The market
+>   price is not simulated.
+> - *Recompute.* On the remaining markets, recompute both paired Brier
+>   improvements. Use the same 95% percentile bootstrap: 2,000 resamples,
+>   resampling markets, with seeds 20261099 + 200 + i (versus market) and
+>   20261099 + 300 + i (versus learning-off), where i is the strength's index.
+> - *Report:*
+>   - excluded and remaining counts;
+>   - both intervals;
+>   - whether both lower bounds lie above zero;
+>   - the smallest strength at which they do;
+>   - each arm's training and test decisions with an ignited framing.
+>
+> **Known limits, stated before any run:**
+>
+> 1. **The excluded markets are not random.** They are low-drive feature
+>    combinations. The remaining set is a biased subset, and its result describes
+>    those markets, not the sweep.
+> 2. **Learning from ignited training presentations cannot be removed
+>    afterward.** The loop is closed (score → action → teaching). Excluding test
+>    markets does not undo weight changes made during training. Only the drafted
+>    safeguard in Section 3 would prevent them, and it is not adopted.
+> 3. **The comparison arms may differ.** The two arms can, in principle, differ in
+>    which presentations ignite, because their weights differ. The union over both
+>    is excluded.
+> 4. **Removed markets cut the 150 paired markets.** Excluding them widens the
+>    intervals.
+
 Fake verdict tests are required: a simulator whose weights cannot affect output must
 not pass, while a deliberately learnable fake must pass. Fake success validates the
 pipeline and verdict logic only, not the biological model.
@@ -366,6 +480,18 @@ not limit processes by RAM. It used a fixed `--max-procs`, default 1. It now reu
 the first learning launcher's rule: `floor((available − headroom) / 5 GB)`, capped
 at the core count and `--max-procs`, with a memory re-check before each start and
 staggered starts. The 5 GB per process is not measured on the server.]*
+
+> **REVISION 2026-10-09 (with the Section 3 ignition-tracking revision).**
+>
+> - **Per-job output grows** by the per-trial ignition record: about 300 bytes
+>   per framing, about 60 KB per job (an arithmetic estimate, not a measured file
+>   size).
+> - **The backend** is now the population simulator with per-trial binning. One
+>   simulation per framing, as before, so the plan is unchanged: **20,000 runs in
+>   100 jobs**, longest chain 200 runs.
+> - **Config hash:** `688d1064a3`.
+> - **Run order.** The low-drive follow-up diagnostic (100 simulations, about
+>   92 minutes serial) is pre-stated to run before the sweep.
 
 ## Results
 
