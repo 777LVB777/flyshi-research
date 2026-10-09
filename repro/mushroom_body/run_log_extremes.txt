@@ -1,0 +1,22 @@
+[backend] 62261 KC->MBON synapses; build 3.6s
+highest_drive_1 (67,541 Hz), seed 20261101: wrote synthetic_extremes_highest_drive_1_seed_20261101.json
+highest_drive_1 (67,541 Hz), seed 20261102: wrote synthetic_extremes_highest_drive_1_seed_20261102.json
+highest_drive_2 (67,030 Hz), seed 20261101: wrote synthetic_extremes_highest_drive_2_seed_20261101.json
+highest_drive_2 (67,030 Hz), seed 20261102: wrote synthetic_extremes_highest_drive_2_seed_20261102.json
+highest_drive_3 (66,643 Hz), seed 20261101: wrote synthetic_extremes_highest_drive_3_seed_20261101.json
+highest_drive_3 (66,643 Hz), seed 20261102: wrote synthetic_extremes_highest_drive_3_seed_20261102.json
+lowest_price_rate (37,670 Hz), seed 20261101: wrote synthetic_extremes_lowest_price_rate_seed_20261101.json
+lowest_price_rate (37,670 Hz), seed 20261102: wrote synthetic_extremes_lowest_price_rate_seed_20261102.json
+highest_price_rate (58,022 Hz), seed 20261101: wrote synthetic_extremes_highest_price_rate_seed_20261101.json
+highest_price_rate (58,022 Hz), seed 20261102: wrote synthetic_extremes_highest_price_rate_seed_20261102.json
+lowest_drive (22,759 Hz), seed 20261101: wrote synthetic_extremes_lowest_drive_seed_20261101.json
+lowest_drive (22,759 Hz), seed 20261102: wrote synthetic_extremes_lowest_drive_seed_20261102.json
+=== Synthetic extremes containment diagnostic (MEASUREMENT; no verdict, no pass criterion) ===
+stimulus                driveHz  priceHz   ign  spread recruitHz  actMBON     APL
+highest_drive_1          67,541    147.8   0/2    0.0%     21.00     55.5   192.0
+highest_drive_2          67,030    148.8   0/2    0.0%     22.90     56.0   192.2
+highest_drive_3          66,643    146.7   0/2    0.0%     22.50     55.0   192.4
+lowest_price_rate        37,670     31.2   0/2    0.0%        --     52.0   171.4
+highest_price_rate       58,022    148.8   0/2    0.0%     14.50     53.5   186.6
+lowest_drive             22,759     37.0   1/2   31.1%      1.73     60.5   147.8
+Wrote synthetic_extremes_containment_summary.json
