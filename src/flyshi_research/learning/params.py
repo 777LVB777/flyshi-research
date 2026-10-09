@@ -29,8 +29,11 @@ AGG_TYPE_MEAN = "type_mean"  # DEFAULT: mean within each cell type, then one vot
 AGG_INSTANCE_SUM = "instance_sum"  # named variant: plain sum over instances
 AGGREGATIONS = (AGG_TYPE_MEAN, AGG_INSTANCE_SUM)
 
-# Option B stimulus construction. Total-drive balancing is the decided default;
-# the historical construction remains available only as a named ablation.
+# Option B stimulus construction. The encoder-wide default stays total-drive
+# balanced ONLY so historical runners that relied on it reproduce exactly; its
+# balanced graded validation FAILED. Every current experiment names its variant
+# explicitly: the synthetic-market sweep uses OPTION_B_UNBALANCED, the encoder as
+# ACCEPTED (decided 2026-10-09, docs/design/synthetic-market-experiment.md).
 OPTION_B_BALANCED = "total_drive_balanced"
 OPTION_B_UNBALANCED = "unbalanced"
 OPTION_B_VARIANTS = (OPTION_B_BALANCED, OPTION_B_UNBALANCED)
@@ -78,8 +81,10 @@ class FeatureSpec:
 def _default_features() -> Tuple[FeatureSpec, ...]:
     return (
         FeatureSpec("price", 0.0, 1.0, mirror_for_no=True),
-        # change in quoted probability over a lookback window (window: undecided)
-        FeatureSpec("recent_change", -0.2, 0.2, mirror_for_no=True),
+        # change in quoted probability over a lookback window (window: undecided).
+        # Range +-1, the natural range of a probability difference (DECIDED
+        # 2026-10-09 for the synthetic sweep; was +-0.2). 0 still encodes to 90 Hz.
+        FeatureSpec("recent_change", -1.0, 1.0, mirror_for_no=True),
         # days; 0 = resolving now
         FeatureSpec("time_to_resolution", 0.0, 365.0),
         # expects an already-normalised liquidity in [0, 1] (normalisation: undecided)
@@ -91,21 +96,23 @@ def _default_features() -> Tuple[FeatureSpec, ...]:
 
 @dataclass(frozen=True)
 class EncoderParams:
+    # DECIDED 2026-10-09: pool_size and pool_seed are exactly what the ACCEPTED
+    # left-only mirrored graded validation ran (commit c084908); changing either
+    # would mean that validation no longer covers the encoder.
     pool_size: int = 100  # KCs per feature; earlier cue experiments used 100
-    pool_seed: int = 20260401  # arbitrary fixed seed; freeze before prereg
+    pool_seed: int = 20260401
     # Reserved KCs used only to equalise total YES/NO drive. There are three
     # mirrored default features, so 3 * pool_size KCs can absorb the worst-case
     # drive difference without leaving [min_rate_hz, max_rate_hz].
     balance_pool_size: int = 300
     option_b_variant: str = OPTION_B_BALANCED
     # ---- RATE BOUNDS ------------------------------------------------------- #
-    # A feature's min/max value is encoded at min_rate_hz / max_rate_hz. The old
-    # unbalanced, uniform-pool graded test accepted 30-150 Hz, but total-drive
-    # balancing changes the stimulus pattern, so that result is SUPERSEDED for the
-    # current encoder. These remain the nominal endpoints of the pre-stated
-    # replacement test (docs/design/graded-encoding-balanced.md), which is NOT RUN.
-    # They must not be treated as validated balanced-encoder bounds until that test
-    # passes. Consequence of the 30-Hz nominal minimum: no included pool is silent.
+    # A feature's min/max value is encoded at min_rate_hz / max_rate_hz.
+    # DECIDED 2026-10-09: 30-150 Hz is the range under which the left-only,
+    # mirrored, UNBALANCED encoder was ACCEPTED
+    # (docs/design/graded-encoding-left-only-mirrored.md, commit c084908). It is not
+    # a validated range for the balanced variant, whose graded test FAILED.
+    # Consequence of the 30-Hz minimum: no included pool is silent.
     min_rate_hz: float = 30.0  # rate at a feature's min_value
     max_rate_hz: float = 150.0  # rate at a feature's max_value
     features: Tuple[FeatureSpec, ...] = field(default_factory=_default_features)
@@ -230,9 +237,16 @@ class PlasticityParams:
     # calendar-time clock (``advance`` is not driven by elapsed time).
     drift_steps_per_resolution: int = 1
     # KCs at or below this rate (Hz) at decision time are "not recently active".
+    # DECIDED 2026-10-09: in force in the first learning test (LEARNING
+    # DEMONSTRATED; n_eligible_kc = 100, exactly the cue set). In the 60 ACCEPTED
+    # validation runs undriven KCs fired at most 2.8 Hz (at most one KC above 1 Hz
+    # per run) and no driven KC fell to 1 Hz, so 1.0 sits at the bottom of a >30 Hz
+    # gap between silent and driven KCs.
     kc_active_threshold_hz: float = 1.0
-    # KC rate (Hz) at which eligibility saturates at 1. Keep consistent with the
-    # KC activity actually produced by the encoder's max rate.
+    # KC rate (Hz) at which eligibility saturates at 1. DECIDED 2026-10-09: equal to
+    # max_rate_hz; in force in the first learning test (cue at 150 Hz, so only the
+    # saturated end was exercised there). Measured KC output tracks input (142.8 Hz
+    # in -> 140.7 Hz mean out), so eligibility is ~linear across 30-150 Hz.
     kc_rate_ref_hz: float = 150.0
 
     def __post_init__(self) -> None:
@@ -275,12 +289,12 @@ DEC = "decided"
 # (group, field, status, meaning). test_params.py asserts every dataclass field
 # above appears here, so a new parameter cannot be added undocumented.
 PARAMETER_TABLE: Tuple[Tuple[str, str, str, str], ...] = (
-    ("encoder", "pool_size", PH, "KCs per feature pool (100 matches the earlier cue experiments)"),
-    ("encoder", "pool_seed", PH, "seed for pool assignment; arbitrary, freeze before prereg"),
+    ("encoder", "pool_size", DEC, "KCs per feature pool; 100, as run by the ACCEPTED left-only mirrored graded validation (2026-10-09)"),
+    ("encoder", "pool_seed", DEC, "seed for pool assignment; 20260401, as run by the ACCEPTED validation, so its pools are the validated pools (2026-10-09)"),
     ("encoder", "balance_pool_size", DEC, "reserved Option B balancing KCs; at least pool_size times the number of mirrored features (300 for the defaults)"),
-    ("encoder", "option_b_variant", DEC, "total_drive_balanced by default; unbalanced is the named historical ablation"),
-    ("encoder", "min_rate_hz", PH, "nominal KC rate at a feature's min value; 30 Hz pending the balanced graded re-validation"),
-    ("encoder", "max_rate_hz", PH, "nominal KC rate at a feature's max value; 150 Hz pending the balanced graded re-validation"),
+    ("encoder", "option_b_variant", DEC, "encoder-wide default kept total_drive_balanced only so historical runners reproduce; experiments name the variant explicitly, and the synthetic sweep uses unbalanced, the ACCEPTED encoder (2026-10-09)"),
+    ("encoder", "min_rate_hz", DEC, "KC rate at a feature's min value; 30 Hz, the range under which the left-only mirrored unbalanced encoder was ACCEPTED (2026-10-09)"),
+    ("encoder", "max_rate_hz", DEC, "KC rate at a feature's max value; 150 Hz, the range under which the left-only mirrored unbalanced encoder was ACCEPTED (2026-10-09)"),
     ("encoder", "features", PH, "per-feature value range (placeholder) and required flag; NO-framing mirroring flags are DECIDED (see FeatureSpec)"),
     ("readout", "sign_table", PRE, "primary readout: CIRCUIT with 80% dominant-family rule"),
     ("readout", "sensitivity_tables", PRE, "CIRCUIT 70% and 90% sensitivity checks"),
@@ -295,8 +309,8 @@ PARAMETER_TABLE: Tuple[Tuple[str, str, str, str], ...] = (
     ("plasticity", "floor_fraction", DEC, "min weight magnitude as a fraction of the connectome weight; 0.1, carried forward from the first learning test's configuration (2026-09-30)"),
     ("plasticity", "drift_rate", DEC, "fraction of distance back to connectome weight closed per drift step; 0.01, carried forward from the first learning test's configuration (2026-09-30); 0 = preregistered drift-disabled sensitivity check"),
     ("plasticity", "drift_steps_per_resolution", DEC, "drift steps after each acted-on resolved market; 1, one clock for controlled and real-market phases (2026-09-22)"),
-    ("plasticity", "kc_active_threshold_hz", PH, "KC rate at/below which a KC is not 'recently active'"),
-    ("plasticity", "kc_rate_ref_hz", PH, "KC rate at which eligibility saturates at 1"),
+    ("plasticity", "kc_active_threshold_hz", DEC, "KC rate at/below which a KC is not 'recently active'; 1.0 Hz, in force in the first learning test (2026-10-09)"),
+    ("plasticity", "kc_rate_ref_hz", DEC, "KC rate at which eligibility saturates at 1; 150 Hz = max_rate_hz, in force in the first learning test (2026-10-09)"),
 )
 
 

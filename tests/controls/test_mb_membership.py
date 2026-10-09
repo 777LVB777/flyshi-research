@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from flyshi_research.controls.mb_membership import (
+# mb_membership itself is numpy-free, but importing it runs the
+# flyshi_research.controls package __init__, which imports numpy-based modules.
+pytest.importorskip("numpy")
+
+from flyshi_research.controls.mb_membership import (  # noqa: E402
     EXPECTED_COUNTS,
     MEMBERSHIP_RULE,
     canonical_json,

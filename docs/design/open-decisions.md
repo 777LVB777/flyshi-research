@@ -415,3 +415,34 @@ that saved configuration.
   was written.
 - **Backtest details still open.** Date range, market-selection criteria, fee
   schedule and the Polymarket replication protocol are not yet specified.
+
+## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
+
+**DECIDED 2026-10-09 (project owner).** Item 5's list of remaining placeholders is
+superseded by this item for the entries below. Item 5 itself is unchanged.
+
+- **Mitigation: none.** The synthetic-market sweep uses the encoder exactly as
+  ACCEPTED, with the raw CIRCUIT-80 per-type-mean score. The innate policy is
+  reported, not removed. The rationale and scope are recorded as the dated
+  revision of [`synthetic-market-experiment.md`](synthetic-market-experiment.md),
+  Sections 4 and 7.
+- **Now decided:**
+
+  | parameter | value | basis |
+  |---|---:|---|
+  | `min_rate_hz` / `max_rate_hz` | 30 / 150 | the ACCEPTED left-only mirrored validation (`c084908`) |
+  | `pool_size` | 100 | the ACCEPTED validation |
+  | `pool_seed` | 20260401 | the ACCEPTED validation; its pools are the validated pools |
+  | `kc_active_threshold_hz` | 1.0 | in force in the first learning test (LEARNING DEMONSTRATED) |
+  | `kc_rate_ref_hz` | 150 | in force in the first learning test; equals `max_rate_hz` |
+  | `score_scale` (synthetic sweep) | 20 Hz | cannot affect the gate (Platt on `S/20` is exact unless the score exceeds about 690 Hz) |
+
+- **Still placeholders:**
+  - the encoder **feature ranges**, except `recent_change`. Its range was set to
+    ±1 later on 2026-10-09 (Proposal A, in the generator and in `FeatureSpec`).
+    The caveat recorded in the synthetic-market spec, Section 1 revision, applies:
+    in independent synthetic markets the feature is largely a noisy copy of
+    price. A within-market change is deferred to Phase 2;
+  - `dopamine_max_rate_hz` and `ReadoutParams.margin_threshold`. The synthetic
+    sweep uses neither: the first is never given to the network, and the sweep
+    has its own `decision_margin = 0`, fixed by its pre-statement.

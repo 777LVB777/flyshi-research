@@ -158,7 +158,12 @@ def generate_signal_markets(
         outcome = int(rng.random() < true_probability)
         distractor = rng.uniform(0.05, 0.95)
         signal = (1.0 - signal_strength) * distractor + signal_strength * true_probability
-        recent_change = min(0.2, max(-0.2, price - previous_quote))
+        # Bound +-1, the natural range of a difference of two probabilities, so it
+        # never binds (DECIDED 2026-10-09, synthetic-market-experiment.md, Section 1
+        # revision; was +-0.2, which held 57% of markets at the clip). Caveat: the
+        # markets are independent, so this is largely a noisy copy of price
+        # (correlation 0.69), not a price-dynamics feature.
+        recent_change = min(1.0, max(-1.0, price - previous_quote))
         previous_quote = price
         markets.append(
             Market(

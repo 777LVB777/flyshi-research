@@ -24,8 +24,12 @@ def test_statuses_are_known_and_only_readout_tables_are_preregistered():
                    ("readout", "robustness_tables")}
     decided = {(g, n) for g, n, s, _ in P.PARAMETER_TABLE if s == P.DEC}
     assert decided == {
+        ("encoder", "pool_size"),
+        ("encoder", "pool_seed"),
         ("encoder", "balance_pool_size"),
         ("encoder", "option_b_variant"),
+        ("encoder", "min_rate_hz"),
+        ("encoder", "max_rate_hz"),
         ("readout", "aggregation"),
         ("reward", "profit_scale"),
         ("reward", "brier_scale"),
@@ -34,6 +38,8 @@ def test_statuses_are_known_and_only_readout_tables_are_preregistered():
         ("plasticity", "floor_fraction"),
         ("plasticity", "drift_rate"),
         ("plasticity", "drift_steps_per_resolution"),
+        ("plasticity", "kc_active_threshold_hz"),
+        ("plasticity", "kc_rate_ref_hz"),
     }
 
 
@@ -137,11 +143,23 @@ def test_learning_package_never_imports_brian2():
     subprocess.run([sys.executable, "-c", code], check=True)
 
 
-def test_encoder_rate_bound_placeholders_are_pending_balanced_revalidation():
+def test_encoder_rate_bounds_are_the_accepted_left_only_mirrored_range():
+    """Decided 2026-10-09: 30-150 Hz is the range under which the left-only,
+    mirrored, unbalanced encoder was ACCEPTED (commit c084908)."""
     e = P.EncoderParams()
     assert (e.min_rate_hz, e.max_rate_hz) == (30.0, 150.0)  # min was 0 before 2026-09-21
-    rows = {(g, n): m for g, n, _, m in P.PARAMETER_TABLE}
+    rows = {(g, n): (st, m) for g, n, st, m in P.PARAMETER_TABLE}
     for key in (("encoder", "min_rate_hz"), ("encoder", "max_rate_hz")):
-        assert "pending the balanced graded re-validation" in rows[key]
-    assert "placeholder" in [st for g, n, st, _ in P.PARAMETER_TABLE
-                             if (g, n) == ("encoder", "min_rate_hz")][0]
+        status, meaning = rows[key]
+        assert status == P.DEC and "ACCEPTED" in meaning
+        assert "pending" not in meaning
+
+
+def test_owner_decisions_of_2026_10_09_encoder_and_eligibility():
+    """Validated (ACCEPTED graded test) or in force in a passed test (first learning)."""
+    e, pl = P.EncoderParams(), P.PlasticityParams()
+    assert (e.pool_size, e.pool_seed) == (100, 20260401)
+    assert (pl.kc_active_threshold_hz, pl.kc_rate_ref_hz) == (1.0, 150.0)
+    assert pl.kc_rate_ref_hz == e.max_rate_hz
+    # feature ranges stay placeholders: not decided on 2026-10-09
+    assert [st for g, n, st, _ in P.PARAMETER_TABLE if (g, n) == ("encoder", "features")] == [P.PH]

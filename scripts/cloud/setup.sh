@@ -192,4 +192,4 @@ printf '\nSETUP COMPLETE in %s\n' "$ROOT"
 printf '  repo %s | upstream %s | annotations %s\n' \
   "$(git rev-parse --short HEAD)" "${UPSTREAM_COMMIT:0:7}" "$ANNOT_TAG"
 printf '  RAM %s | cores %s\n' "$(free -h | awk '/^Mem:/ {print $2 " total, " $7 " available"}')" "$(nproc)"
-printf 'Next: start tmux, then\n  .venv-shiu/bin/python repro/mushroom_body/launch_first_learning_parallel.py --dry-run\n'
+printf 'Next: start tmux, then\n  .venv-shiu/bin/python repro/mushroom_body/launch_synthetic_market_parallel.py --dry-run\n'

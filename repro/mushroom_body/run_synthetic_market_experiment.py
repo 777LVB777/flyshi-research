@@ -10,11 +10,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from flyshi_research.learning import synthetic_market as sm
-
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))  # sibling runners; none imports Brian2 at module level
+
+from flyshi_research.learning import synthetic_market as sm  # noqa: E402
+# The ONE shared definition of "left", as in the fixed graded runners.
+from run_left_only_pool_diagnostic import IDS_PATH, kc_side_map  # noqa: E402
+
 RESULTS_BASE = HERE / "results"
 
 
@@ -41,7 +46,13 @@ def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
     jobs = sm.plan_jobs(cfg)
     return [
         "Synthetic-market experiment: PLAN (dry run; nothing is simulated)",
-        f"  mitigation: {cfg.mitigation}",
+        f"  mitigation: {cfg.mitigation}"
+        + ("  (decided 2026-10-09: none; raw CIRCUIT-80 per-type-mean score)"
+           if cfg.mitigation == sm.NO_MITIGATION else "  (NAMED HISTORICAL ALTERNATIVE, not the decided sweep)"),
+        f"  encoder: {sm.option_b_variant(cfg)} Option B, mirrored NO framing, "
+        f"{cfg.encoder.min_rate_hz:g}-{cfg.encoder.max_rate_hz:g} Hz, "
+        f"pools of {cfg.encoder.pool_size} KCs (pool seed {cfg.encoder.pool_seed})",
+        "  pools: LEFT-hemisphere KCs only; assert_pools_left_only aborts before any presentation",
         f"  strengths: {list(cfg.signal_strengths)}",
         f"  market seeds: {list(cfg.market_seeds)}",
         f"  markets: {cfg.markets_per_seed}/seed ({cfg.train_count} chronological train, "
@@ -52,19 +63,22 @@ def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
         f"  ESTIMATED SIMULATION RUNS: {sm.estimated_run_count(cfg)}",
         f"  simulated trial-seconds: {sm.estimated_run_count(cfg) * cfg.duration_ms / 1000 * cfg.trials:g}",
         f"  results: {sm.results_dir_for(results_base, cfg)}",
-        "  Wall-clock time is UNVERIFIED.",
-        "  Fast-runner equivalence and real run_cue_rates execution remain UNVERIFIED prerequisites.",
+        f"  per job: {2 * cfg.markets_per_seed} strictly sequential runs (70 train markets, then 30 test)",
+        "  Wall-clock time and memory per process on the server are UNVERIFIED.",
     ]
 
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--mitigation", choices=sm.MITIGATIONS,
-                   default=sm.TOTAL_DRIVE_BALANCING,
-                   help="Default: the selected total-drive-balancing encoder."
-                   " Innate subtraction is retained only for historical comparison.")
+                   default=sm.NO_MITIGATION,
+                   help="Default 'none' (decided 2026-10-09): the ACCEPTED encoder and the raw"
+                   " score. total_drive_balancing and innate_score_subtraction are retained"
+                   " only as named historical alternatives.")
     p.add_argument("--dry-run", action="store_true", help="Print plans only; simulate nothing.")
     p.add_argument("--results-base", type=Path, default=RESULTS_BASE)
+    p.add_argument("--ids", type=Path, default=IDS_PATH,
+                   help="Frozen neuron-ID table giving each KC's hemisphere.")
     group = p.add_mutually_exclusive_group()
     group.add_argument("--job", help="Run one job ID.")
     group.add_argument("--list-jobs", action="store_true")
@@ -129,9 +143,14 @@ def main(argv=None) -> int:
     from run_first_learning_test import FastRunnerSimulator
     from flyshi_research.learning.first_learning import ExperimentConfig
 
+    kc_sides = kc_side_map(args.ids)
     sim = FastRunnerSimulator(ExperimentConfig())
+    # Fail before the first presentation (and before any job file exists) if the
+    # pools would not be left-only. run_dataset applies the same guard again.
+    sm.setup_encoder(sim, cfg, kc_sides)
     if selected.kind == "innate":
-        scores = sm.compute_innate_scores(sim, cfg, selected.strength, selected.market_seed)
+        scores = sm.compute_innate_scores(sim, cfg, selected.strength, selected.market_seed,
+                                          kc_sides=kc_sides)
         output = {"strength": selected.strength, "market_seed": selected.market_seed, "scores": scores}
     else:
         innate = None
@@ -144,6 +163,7 @@ def main(argv=None) -> int:
             selected.strength,
             selected.market_seed,
             selected.condition,
+            kc_sides=kc_sides,
             innate_scores=innate,
         )
     _write_json(paths.output(selected), output)

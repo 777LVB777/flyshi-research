@@ -38,13 +38,20 @@ from flyshi_research.simulator import Action, Market, MarketObservation, generat
 from .bias_mitigation import (
     INNATE_SCORE_SUBTRACTION,
     MITIGATIONS,
+    NO_MITIGATION,
     TOTAL_DRIVE_BALANCING,
     score_difference,
 )
-from .encoder import KCEncoder, OptionBStimuli
+from .encoder import BALANCE_FEATURE, KCEncoder, OptionBStimuli
 from .first_learning import Readout
 from .mbon_sides import LEFT, side_mask
-from .params import OPTION_B_UNBALANCED, EncoderParams, PlasticityParams, RewardParams
+from .params import (
+    OPTION_B_BALANCED,
+    OPTION_B_UNBALANCED,
+    EncoderParams,
+    PlasticityParams,
+    RewardParams,
+)
 from .plasticity import CompartmentMap, PlasticKCMBON
 from .readout import load_dopamine_counts
 from .reward import brier_improvement_reward, dopamine_signal, profit_reward
@@ -80,9 +87,14 @@ class Simulator(Protocol):
 
 @dataclass(frozen=True)
 class SyntheticConfig:
-    """Pre-stated sweep settings; total-drive balancing is the selected default."""
+    """Pre-stated sweep settings.
 
-    mitigation: str = TOTAL_DRIVE_BALANCING
+    ``mitigation`` defaults to ``NO_MITIGATION`` (decided 2026-10-09): the
+    validated encoder exactly as ACCEPTED - left-only pools, mirrored NO framing,
+    no balancing - read by the raw CIRCUIT-80 per-type-mean score.
+    """
+
+    mitigation: str = NO_MITIGATION
     signal_strengths: Tuple[float, ...] = SIGNAL_STRENGTHS
     market_seeds: Tuple[int, ...] = MARKET_SEEDS
     markets_per_seed: int = 100
@@ -92,6 +104,13 @@ class SyntheticConfig:
     trials: int = 5
     simulation_seed_base: int = 20270000
     exploration_seed: int = 20261090
+    # DECIDED 2026-10-09 (was a placeholder). It cannot affect the pre-stated gate:
+    # Platt calibration acts on logit(sigmoid(S / scale)) = S / scale, which it
+    # rescales exactly unless |S| exceeds ~690 Hz (the 1e-15 probability clip), and
+    # actions depend only on the sign of S. It sets only the accuracy arm's raw
+    # forecast (hence its teaching signal) and the uncalibrated metrics. The
+    # ACCEPTED validation's seed-mean scores (-3.7 to -29.1 Hz) map to 0.45-0.19,
+    # far from saturation.
     score_scale: float = 20.0
     decision_margin: float = 0.0
     bootstrap_resamples: int = 2000
@@ -227,16 +246,58 @@ def simulation_seed(cfg: SyntheticConfig, strength: float, market_seed: int, ind
     )
 
 
+def option_b_variant(cfg: SyntheticConfig) -> str:
+    """Stimulus construction for the configured mitigation, always named explicitly
+    so the encoder-wide default (kept for historical runners) can never leak in."""
+    return OPTION_B_BALANCED if cfg.mitigation == TOTAL_DRIVE_BALANCING else OPTION_B_UNBALANCED
+
+
+def assert_pools_left_only(encoder: KCEncoder, kc_sides: Mapping[int, str]) -> None:
+    """Abort unless every KC in every feature pool and the balance pool is
+    annotated left-hemisphere. Port of the graded runners' ``_assert_pools_left_only``
+    (docs/design/graded-encoding-left-only-mirrored.md, 3.1). Defence in depth: the
+    encoder is given only left KCs to draw from, but this checks the drawn pools
+    directly rather than trusting that alone. An unannotated KC counts as not left."""
+    all_pool_ids = [int(i) for pool in encoder.pools.values() for i in pool]
+    all_pool_ids += [int(i) for i in encoder.balance_pool]
+    wrong = [i for i in all_pool_ids if kc_sides.get(i) != LEFT]
+    if wrong:
+        raise RuntimeError(
+            f"{len(wrong)} pool KC(s) are not left-hemisphere: {sorted(wrong)[:5]}..."
+        )
+
+
+def setup_encoder(sim: Simulator, cfg: SyntheticConfig, kc_sides: Mapping[int, str]) -> KCEncoder:
+    """The ACCEPTED encoder: pools drawn from the simulator's LEFT-hemisphere KCs
+    only (the same draw as the graded validation), then guarded."""
+    left = [int(k) for k in sim.kc_ids if kc_sides.get(int(k)) == LEFT]
+    if not left:
+        raise RuntimeError("no left-hemisphere KCs among the simulator's KCs")
+    encoder = KCEncoder(left, params=cfg.encoder)
+    assert_pools_left_only(encoder, kc_sides)
+    return encoder
+
+
 def _stimuli(
     encoder: KCEncoder,
     market: Market,
     cfg: SyntheticConfig,
 ) -> OptionBStimuli:
-    # Total-drive balancing now belongs to the encoder and is its default.
-    # The retained innate-subtraction comparison must use the historical raw
-    # stimuli or it would silently receive both mitigations.
-    variant = None if cfg.mitigation == TOTAL_DRIVE_BALANCING else OPTION_B_UNBALANCED
-    return encoder.option_b_stimuli(market_features(market), variant=variant)
+    pair = encoder.option_b_stimuli(market_features(market), variant=option_b_variant(cfg))
+    if cfg.mitigation != TOTAL_DRIVE_BALANCING:
+        # The ACCEPTED encoder: the five feature pools only. The balance pool is
+        # drawn by the constructor but must never be presented.
+        feature_kcs = sum(pool.size for pool in encoder.pools.values())
+        for stimulus in (pair.yes, pair.no):
+            if BALANCE_FEATURE in stimulus.feature_rates_hz or np.isin(
+                stimulus.kc_ids, encoder.balance_pool
+            ).any():
+                raise RuntimeError("balance pool present in an unbalanced stimulus; aborting")
+            if stimulus.kc_ids.size != feature_kcs:
+                raise RuntimeError(
+                    f"stimulus drives {stimulus.kc_ids.size} KCs, expected {feature_kcs}"
+                )
+    return pair
 
 
 @dataclass(frozen=True)
@@ -298,18 +359,19 @@ def _teaching(
     return dopamine_signal(value, cfg.reward).strengths()
 
 
-def setup_encoder(sim: Simulator, cfg: SyntheticConfig) -> KCEncoder:
-    return KCEncoder(sim.kc_ids, params=cfg.encoder)
-
-
 def compute_innate_scores(
-    sim: Simulator, cfg: SyntheticConfig, strength: float, market_seed: int
+    sim: Simulator,
+    cfg: SyntheticConfig,
+    strength: float,
+    market_seed: int,
+    *,
+    kc_sides: Mapping[int, str],
 ) -> list[Tuple[float, float]]:
     """Exact per-stimulus scores at baseline weights (two runs per market)."""
     markets = generate_signal_markets(
         cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
     )
-    encoder = setup_encoder(sim, cfg)
+    encoder = setup_encoder(sim, cfg, kc_sides)
     readout = Readout(sim.mbon_labels, _first_learning_config())
     sim.set_weights(sim.baseline_weights())
     out = []
@@ -336,9 +398,14 @@ def run_dataset(
     market_seed: int,
     condition: str,
     *,
+    kc_sides: Mapping[int, str],
     innate_scores: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> dict:
-    """Run one strength/seed/condition chain on an injected simulator."""
+    """Run one strength/seed/condition chain on an injected simulator.
+
+    ``kc_sides`` (``{kc_root_id: "left" | "right"}``, from the frozen neuron-ID
+    table) is required: encoder pools are drawn from left-hemisphere KCs only and
+    guarded by :func:`assert_pools_left_only` before anything is presented."""
     if strength not in cfg.signal_strengths or market_seed not in cfg.market_seeds:
         raise ValueError("strength and market_seed must belong to the configured sweep")
     if condition not in CONDITIONS:
@@ -350,7 +417,7 @@ def run_dataset(
     markets = generate_signal_markets(
         cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
     )
-    encoder = setup_encoder(sim, cfg)
+    encoder = setup_encoder(sim, cfg, kc_sides)
     readout = Readout(sim.mbon_labels, _first_learning_config())
     baseline = np.asarray(sim.baseline_weights(), dtype=float)
     cmap = CompartmentMap.from_dopamine_counts(
@@ -396,6 +463,11 @@ def run_dataset(
                 "raw_probability": raw_probability,
                 "action": action.value,
                 "score_difference": difference,
+                # Exact presented drive (sum of KC rates) of each framing. Under
+                # no mitigation D_YES - D_NO is the drive confound, reported with
+                # every decision for the innate-policy metric.
+                "drive_yes_hz": float(np.sum(pair.yes.rates_hz)),
+                "drive_no_hz": float(np.sum(pair.no.rates_hz)),
                 # Per-MBON rates are saved for the preregistered left-only POST-HOC
                 # RESCORING (see ``left_only_rescore``), which adds no simulation and
                 # is never an arm or a condition: it rescores these runs as they
@@ -474,6 +546,72 @@ def left_only_rescore(output: Mapping, cfg: SyntheticConfig, side: str = LEFT,
     }
 
 
+#: equal-width price bins for the innate-policy report
+INNATE_POLICY_PRICE_BINS = 10
+
+
+def _slope_and_r(x: np.ndarray, y: np.ndarray) -> Tuple[Optional[float], Optional[float]]:
+    if x.size < 2 or np.ptp(x) == 0.0:
+        return None, None
+    slope = float(np.polyfit(x, y, 1)[0])
+    r = None if np.ptp(y) == 0.0 else float(np.corrcoef(x, y)[0, 1])
+    return slope, r
+
+
+def innate_policy(rows: Sequence[Mapping]) -> dict:
+    """The learning-off arm's decision pattern versus price. REPORTED, NEVER GATING.
+
+    Decided 2026-10-09: under no mitigation the drive confound gives the untouched
+    circuit an innate policy (expected: a tendency to bet against the higher-priced
+    side), which must be measured and reported, not removed. ``rows`` are
+    learning-off records. Learning-off never changes weights, so every row - train
+    and test - is a baseline-weight decision; the innate choice is the sign of the
+    raw score difference (an exact tie is ``tie``). This equals the held-out action
+    exactly (margin 0, ties abstain) and differs from a training action only where
+    training-only exploration broke a tie.
+    """
+    price = np.asarray([r["quote"] for r in rows], dtype=float)
+    diff = np.asarray([r["score_difference"] for r in rows], dtype=float)
+    choice = np.where(diff > 0, 1, np.where(diff < 0, -1, 0))  # YES, NO, tie
+    out: dict = {
+        "note": "reported, never gating; innate choice = sign of the raw learning-off score",
+        "n_decisions": int(price.size),
+        "fraction_yes": float(np.mean(choice == 1)) if price.size else None,
+        "fraction_no": float(np.mean(choice == -1)) if price.size else None,
+        "fraction_tie": float(np.mean(choice == 0)) if price.size else None,
+    }
+    # Higher-priced side: YES when price > 0.5, NO when price < 0.5 (0.5 excluded).
+    sided = (price != 0.5) & (choice != 0)
+    backs_higher = np.where(price > 0.5, choice == 1, choice == -1)
+    out["n_sided_decisions"] = int(sided.sum())
+    out["fraction_backing_higher_priced_side"] = (
+        float(np.mean(backs_higher[sided])) if sided.any() else None
+    )
+    out["score_vs_price_slope_hz"], out["score_vs_price_r"] = _slope_and_r(price, diff)
+    if rows and "drive_yes_hz" in rows[0]:
+        drive = np.asarray([r["drive_yes_hz"] - r["drive_no_hz"] for r in rows]) / 1000.0
+        out["score_vs_drive_difference_slope_hz_per_khz"], out["score_vs_drive_difference_r"] = (
+            _slope_and_r(drive, diff)
+        )
+    edges = np.linspace(0.0, 1.0, INNATE_POLICY_PRICE_BINS + 1)
+    which = np.clip(np.digitize(price, edges[1:-1]), 0, INNATE_POLICY_PRICE_BINS - 1)
+    bins = []
+    for b in range(INNATE_POLICY_PRICE_BINS):
+        m = which == b
+        n = int(m.sum())
+        bins.append({
+            "price_low": float(edges[b]),
+            "price_high": float(edges[b + 1]),
+            "n": n,
+            "fraction_yes": float(np.mean(choice[m] == 1)) if n else None,
+            "fraction_no": float(np.mean(choice[m] == -1)) if n else None,
+            "fraction_tie": float(np.mean(choice[m] == 0)) if n else None,
+            "mean_score_difference": float(np.mean(diff[m])) if n else None,
+        })
+    out["by_price_bin"] = bins
+    return out
+
+
 def _metric_summary(
     probabilities: np.ndarray,
     outcomes: np.ndarray,
@@ -513,6 +651,7 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
     """Evaluate complete job outputs and apply the pre-stated paired-bootstrap gate."""
     strengths_out: Dict[str, dict] = {}
     qualifying = []
+    innate_rows: list = []
     for strength in cfg.signal_strengths:
         circuit: Dict[str, dict] = {}
         condition_vectors: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, list[Action]]] = {}
@@ -592,9 +731,17 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
         passes = market_ci.lower > 0.0 and off_ci.lower > 0.0
         if passes:
             qualifying.append(strength)
+        off_rows = [
+            row
+            for seed in cfg.market_seeds
+            for split in ("train", "test")
+            for row in outputs[(strength, seed, LEARNING_OFF)][split]
+        ]
+        innate_rows.extend(off_rows)
         strengths_out[str(strength)] = {
             "circuit": circuit,
             "baselines": baseline_summary,
+            "innate_policy": innate_policy(off_rows),
             "profit_improvement_vs_market": asdict(market_ci),
             "profit_improvement_vs_learning_off": asdict(off_ci),
             "passes": passes,
@@ -615,6 +762,10 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
         "success": bool(qualifying),
         "signal_requirement": requirement,
         "higher_strength_failures": higher_failures,
+        # Reported, never gating (decided 2026-10-09). Pooled across strengths:
+        # price, recent change, time to resolution and liquidity are identical at
+        # every strength for a given market seed; only the signal feature differs.
+        "innate_policy_pooled": innate_policy(innate_rows),
         "strengths": strengths_out,
     }
 

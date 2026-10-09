@@ -1,9 +1,15 @@
-"""Legacy helpers for the Option-B input-intensity-bias alternatives.
+"""Option-B input-intensity-bias alternatives.
 
-Total-drive balancing is now selected and implemented directly by
-``KCEncoder.option_b_stimuli``. The standalone pool functions remain for tests
-and historical comparison; new code should use the encoder default. Innate-score
-subtraction is not selected. Behavior on the real model remains unverified.
+DECIDED 2026-10-09 (docs/design/synthetic-market-experiment.md, revision of
+sections 4 and 7): the synthetic-market sweep uses ``NO_MITIGATION`` - the
+validated encoder exactly as ACCEPTED (left-only pools, mirrored NO framing, no
+balancing) and the raw CIRCUIT-80 per-type-mean score difference. The innate,
+drive-driven policy is measured and reported, not removed.
+
+``TOTAL_DRIVE_BALANCING`` (implemented by ``KCEncoder.option_b_stimuli``; its
+balanced graded validation FAILED) and ``INNATE_SCORE_SUBTRACTION`` are retained
+as named historical alternatives only. The standalone pool functions remain for
+tests and historical comparison.
 """
 
 from __future__ import annotations
@@ -15,9 +21,10 @@ import numpy as np
 
 from .encoder import OptionBStimuli, Stimulus
 
+NO_MITIGATION = "none"
 TOTAL_DRIVE_BALANCING = "total_drive_balancing"
 INNATE_SCORE_SUBTRACTION = "innate_score_subtraction"
-MITIGATIONS = (TOTAL_DRIVE_BALANCING, INNATE_SCORE_SUBTRACTION)
+MITIGATIONS = (NO_MITIGATION, TOTAL_DRIVE_BALANCING, INNATE_SCORE_SUBTRACTION)
 
 
 def select_balance_pool(
@@ -94,7 +101,7 @@ def score_difference(
     innate_no_score: float | None = None,
 ) -> float:
     """Return the Option-B score difference after the named mitigation."""
-    if mitigation == TOTAL_DRIVE_BALANCING:
+    if mitigation in (NO_MITIGATION, TOTAL_DRIVE_BALANCING):
         return float(yes_score - no_score)
     if mitigation != INNATE_SCORE_SUBTRACTION:
         raise ValueError(f"unknown intensity-bias mitigation {mitigation!r}")

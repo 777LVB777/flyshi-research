@@ -352,7 +352,7 @@ def test_default_encoder_never_emits_a_rate_below_the_lowest_tested_rate():
 def test_at_the_default_minimum_value_a_pool_fires_at_30_hz_not_zero():
     """Consequence of the 30 Hz floor: no feature pool is silent, even at its minimum value."""
     enc = KCEncoder(KC_IDS, seed=1)
-    st = enc.encode({"price": 0.0, "recent_change": -0.2, "time_to_resolution": 0.0,
+    st = enc.encode({"price": 0.0, "recent_change": -1.0, "time_to_resolution": 0.0,
                      "liquidity": 0.0, "signal": 0.0})
     assert set(st.feature_rates_hz.values()) == {30.0}
     ids, rates = st.driven()
