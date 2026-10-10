@@ -14,6 +14,22 @@ verdict, and none of PASS, FAIL, ACCEPTED or USABLE RANGE (enforced by the share
 `check_no_verdict`). Its result does not authorise or block anything. Whether to
 run the sweep afterwards is the project owner's decision.
 
+> **NOTE 2026-10-09: design revision of the sweep.** This diagnostic was selected
+> from, and run against, the **pre-revision** sweep design (5,000
+> presentations). Every count in this document that refers to "the sweep"
+> describes that design. The runner pins it
+> (`synthetic_market.pre_revision_config()`), so the frozen table still
+> reproduces.
+>
+> - **All six stimuli** are still presentations of the revised design (b′).
+> - **The revised sweep's** per-framing drive runs from 19.3 to 70.7 kHz, so it
+>   extends past this diagnostic's range. 24 presentations lie above 67,541 Hz,
+>   and 25 lie below the lowest drive any diagnostic presented (22,759 Hz). Their
+>   containment is untested. 1,225 presentations (3.06%) exceed 60 kHz.
+> - **The protocol and any results** are unchanged. See
+>   [`synthetic-market-experiment.md`](synthetic-market-experiment.md), Section 3
+>   revision on ignition figures under design (b′).
+
 ## 1. Question
 
 The synthetic-market sweep ([`synthetic-market-experiment.md`](synthetic-market-experiment.md))

@@ -89,7 +89,7 @@ def small_config(mitigation=NO_MITIGATION):
     return sm.SyntheticConfig(
         mitigation=mitigation,
         signal_strengths=(0.8,),
-        market_seeds=sm.MARKET_SEEDS,
+        market_seeds=sm.MARKET_SEEDS[:5],  # test cost; the decided sweep has 20
         markets_per_seed=300,
         price_deviation=0.40,
         trials=1,
@@ -143,21 +143,23 @@ def test_verdict_logic_still_holds_for_the_historical_alternatives(mitigation) -
 
 
 def test_job_plans_and_run_counts_for_every_mitigation() -> None:
-    """Four training conditions since 2026-09-22: the drift-off sensitivity check is
-    its own condition, so the decided plan (no mitigation, 2026-10-09) is 100 jobs /
-    20,000 runs, each one 200-run chain."""
+    """Four training conditions since 2026-09-22. Design (b-prime), DECIDED 2026-10-09:
+    4 strengths x 20 seeds x 4 arms = 320 jobs, each a 500-run chain (250 markets x 2
+    framings), 160,000 runs. (Before the revision: 100 jobs / 20,000 runs / 200.)"""
     none = sm.SyntheticConfig()
     assert none.mitigation == NO_MITIGATION
-    assert len(sm.plan_jobs(none)) == 100
-    assert sm.estimated_run_count(none) == 20_000
-    assert sm.critical_path_runs(none) == 200
+    assert len(sm.plan_jobs(none)) == 320
+    assert sm.estimated_run_count(none) == 160_000
+    assert sm.critical_path_runs(none) == 500
     assert not any(job.deps for job in sm.plan_jobs(none))
     balanced = sm.SyntheticConfig(mitigation=TOTAL_DRIVE_BALANCING)
     innate = sm.SyntheticConfig(mitigation=INNATE_SCORE_SUBTRACTION)
-    assert len(sm.plan_jobs(balanced)) == 100
-    assert sm.estimated_run_count(balanced) == 20_000
-    assert len(sm.plan_jobs(innate)) == 125
-    assert sm.estimated_run_count(innate) == 25_000
+    assert len(sm.plan_jobs(balanced)) == 320
+    assert sm.estimated_run_count(balanced) == 160_000
+    assert len(sm.plan_jobs(innate)) == 400
+    assert sm.estimated_run_count(innate) == 200_000
+    old = sm.pre_revision_config()
+    assert (len(sm.plan_jobs(old)), sm.estimated_run_count(old), sm.critical_path_runs(old)) == (100, 20_000, 200)
     assert all(job.deps for job in sm.plan_jobs(innate) if job.kind == "condition")
 
 
@@ -173,7 +175,8 @@ def test_runner_dry_run_defaults_to_no_mitigation_and_writes_nothing(tmp_path, c
     runner = _load_script(RUNNER_PATH, "synthetic_runner_test")
     assert runner.main(["--dry-run", "--results-base", str(tmp_path)]) == 0
     output = capsys.readouterr().out
-    assert "20000" in output and "mitigation: none" in output
+    assert "160000" in output and "mitigation: none" in output
+    assert "500 strictly sequential runs (70 train markets, then 180 test)" in output
     assert "unbalanced Option B" in output and "LEFT-hemisphere KCs only" in output
     assert "total_drive_balancing" not in output and "25000" not in output
     # stale claims removed 2026-10-09
@@ -188,7 +191,7 @@ def test_parallel_launcher_dry_run_starts_no_process(tmp_path, capsys) -> None:
         "--gb-per-proc", "0.001", "--headroom-gb", "0",  # independent of this machine's RAM
     ]) == 0
     output = capsys.readouterr().out
-    assert "jobs: 100" in output and "mitigation: none" in output
+    assert "jobs: 320" in output and "mitigation: none" in output
     assert "concurrency: floor(" in output and "-> " in output
     assert not any(tmp_path.iterdir())
 
@@ -367,7 +370,8 @@ def test_launcher_uses_the_first_learning_ram_rule() -> None:
     assert launcher.plan_slots(ccx43, 5.0, first.default_headroom_gb(64.0)) == 11
     cfg = sm.SyntheticConfig()
     hours = launcher.estimate_makespan(sm.plan_jobs(cfg), 11, 55 / 60) / 60
-    assert hours == pytest.approx(10 * 200 * 55 / 3600)  # 10 waves of 200-run chains
+    # 320 jobs on 11 slots: 30 waves of 500-run chains (cost-estimate.md: ~229 h)
+    assert hours == pytest.approx(30 * 500 * 55 / 3600)
 
 
 def test_launcher_waits_for_memory_and_staggers_starts(tmp_path) -> None:
@@ -623,3 +627,111 @@ def test_ignited_training_presentations_are_counted_per_arm_and_strength_and_nev
     assert counts[sm.ACCURACY]["all_strengths"]["training_decisions_with_ignited_framing"] == 0
     for key in ("success", "signal_requirement"):
         assert verdict[key] == base[key]
+
+
+# ---- design (b-prime), comparator, null control (DECIDED 2026-10-09) --------- #
+def test_decided_design_b_prime() -> None:
+    cfg = sm.SyntheticConfig()
+    assert cfg.signal_strengths == (0.0, 0.4, 0.8, 1.0)
+    assert cfg.market_seeds == tuple(range(20261001, 20261021))
+    assert (cfg.markets_per_seed, cfg.train_count, cfg.test_count) == (250, 70, 180)
+    assert cfg.market_comparator == sm.PRICE_ONLY_POSTERIOR
+    assert len(cfg.market_seeds) * cfg.test_count == 3600
+    with pytest.raises(ValueError, match="market_comparator"):
+        replace(cfg, market_comparator="platt_market_price")
+
+
+def test_price_only_posterior_is_exact_for_the_generator() -> None:
+    from flyshi_research.simulator import generate_signal_markets, price_only_posterior_mean as post
+    assert post(0.5) == pytest.approx(0.5)
+    assert post(0.2) == pytest.approx(0.25)  # uniform on [0.1, 0.4]
+    assert post(0.8) == pytest.approx(0.75)  # uniform on [0.6, 0.9]
+    assert post(0.01) == pytest.approx(0.1 + 0.11 / 3)  # linear likelihood on [0.1, 0.21]
+    assert post(0.99) == pytest.approx(0.9 - 0.11 / 3)
+    with pytest.raises(ValueError):
+        post(0.005)
+    # empirical check: the mean truth among markets with a given clipped/edge price
+    ms = [m for seed in range(200) for m in generate_signal_markets(250, 7_000_000 + seed, 0.0)]
+    low = [m.latent_probability for m in ms if m.quote <= 0.01]
+    assert abs(np.mean(low) - post(0.01)) < 0.01
+    band = [(m.quote, m.latent_probability) for m in ms if 0.15 <= m.quote < 0.2]
+    assert abs(np.mean([p for _, p in band]) - np.mean([post(q) for q, _ in band])) < 0.005
+
+
+def _two_strength_outputs():
+    cfg = replace(small_config(), signal_strengths=(0.0, 0.8), markets_per_seed=60, bootstrap_resamples=200)
+    return cfg, all_outputs(True, cfg)
+
+
+def _set_test_forecast(outputs, cfg, strength, condition, fn):
+    for seed in cfg.market_seeds:
+        for row in outputs[(strength, seed, condition)]["test"]:
+            row["calibrated_probability"] = fn(row)
+
+
+def test_a_pass_at_strength_zero_is_a_null_control_failure_not_a_finding() -> None:
+    cfg, outputs = _two_strength_outputs()
+    for strength in cfg.signal_strengths:  # a profit arm that knows every outcome
+        _set_test_forecast(outputs, cfg, strength, sm.PROFIT, lambda r: 0.01 + 0.98 * r["outcome"])
+    verdict = sm.evaluate_signal_requirement(outputs, cfg)
+    assert verdict["strengths"]["0.0"]["passes"] and verdict["strengths"]["0.8"]["passes"]
+    assert verdict["null_control"]["passes"] is True
+    assert "pipeline or generator problem" in verdict["null_control"]["interpretation"]
+    assert verdict["success"] is False and verdict["signal_requirement"] is None
+
+
+def test_strength_zero_never_sets_the_requirement_and_secondary_is_reported() -> None:
+    cfg, outputs = _two_strength_outputs()
+    _set_test_forecast(outputs, cfg, 0.8, sm.PROFIT, lambda r: 0.01 + 0.98 * r["outcome"])
+    for seed in cfg.market_seeds:  # at strength 0 the profit arm equals learning-off
+        for p, o in zip(outputs[(0.0, seed, sm.PROFIT)]["test"], outputs[(0.0, seed, sm.LEARNING_OFF)]["test"]):
+            p["calibrated_probability"] = o["calibrated_probability"]
+    verdict = sm.evaluate_signal_requirement(outputs, cfg)
+    assert verdict["null_control"]["passes"] is False
+    assert verdict["success"] is True and verdict["signal_requirement"] == 0.8
+    s08 = verdict["strengths"]["0.8"]
+    assert s08["role"] == "test" and verdict["strengths"]["0.0"]["role"] == "null control"
+    assert s08["market_comparator"] == sm.PRICE_ONLY_POSTERIOR == verdict["market_comparator"]
+    assert s08["comparison_labels"]["profit_improvement_vs_learning_off"] == "learning effect, any source"
+    secondary = s08["secondary_profit_vs_strength0"]
+    assert secondary["available"] and secondary["lower_bound_above_zero"] and "never gating" in secondary["note"]
+    assert "secondary_profit_vs_strength0" not in verdict["strengths"]["0.0"]
+
+
+def test_gate_compares_against_the_price_only_posterior() -> None:
+    cfg, outputs = _two_strength_outputs()
+    # a profit arm that reports exactly the comparator cannot beat it
+    from flyshi_research.simulator import price_only_posterior_mean as post
+    _set_test_forecast(outputs, cfg, 0.8, sm.PROFIT, lambda r: post(r["quote"], cfg.price_deviation))
+    verdict = sm.evaluate_signal_requirement(outputs, cfg)
+    ci = verdict["strengths"]["0.8"]["profit_improvement_vs_market"]
+    assert ci["estimate"] == pytest.approx(0.0, abs=1e-12) and not verdict["strengths"]["0.8"]["passes"]
+
+
+def test_underpowered_strength_is_pre_stated() -> None:
+    assert "undetermined, not absent" in sm.UNDERPOWERED_STRENGTHS[0.4]
+    assert set(sm.UNDERPOWERED_STRENGTHS) <= set(sm.SIGNAL_STRENGTHS)
+
+
+def test_profit_by_price_region_and_the_price_only_reference_trader() -> None:
+    from flyshi_research.simulator import generate_signal_markets
+    cfg = sm.SyntheticConfig()
+    markets = [m for seed in cfg.market_seeds[:5] for m in generate_signal_markets(250, seed, 0.0)]
+    q = np.array([m.quote for m in markets])
+    y = np.array([m.outcome for m in markets])
+    always_yes = [sm.Action.YES] * q.size
+    report = sm.profit_by_price_region({sm.PROFIT: (q, y, q, always_yes)}, cfg)
+    assert sum(report["regions"].values()) == q.size
+    assert report["regions"]["clipped"] == int(np.sum((q <= 0.01) | (q >= 0.99)))
+    ref = report["price_only_bayes_trader_reference"]
+    # in the interior the posterior equals the price: the reference never trades there
+    assert ref["interior"]["pnl_after_costs"] == 0.0
+    assert ref["all"]["pnl_after_costs"] == pytest.approx(
+        sum(ref[r]["pnl_after_costs"] for r in sm.PRICE_REGIONS))
+    assert "never gating" in report["note"]
+
+
+def test_pre_revision_design_is_kept_for_the_completed_diagnostics() -> None:
+    old = sm.pre_revision_config()
+    assert old.signal_strengths == (0.0, 0.1, 0.2, 0.4, 0.8) and len(old.market_seeds) == 5
+    assert (old.train_count, old.test_count) == (70, 30)

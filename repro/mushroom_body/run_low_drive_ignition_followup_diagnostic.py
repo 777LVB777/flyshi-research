@@ -167,7 +167,7 @@ def select(rows: Sequence[dict]) -> List[Tuple[Selected, dict]]:
 
 def build_stimuli(ids_path: Path = IDS_PATH) -> Dict[str, dict]:
     encoder, _ = sweep_encoder(ids_path)
-    chosen = select(sweep_presentations(sm.SyntheticConfig(), encoder))
+    chosen = select(sweep_presentations(sm.pre_revision_config(), encoder))  # pre-revision design
     got = tuple((s.name, s.strength, s.market_seed, s.index, s.framing) for s, _ in chosen)
     if got != EXPECTED_SELECTION:
         raise RuntimeError("the selection rule no longer reproduces the pre-stated table "

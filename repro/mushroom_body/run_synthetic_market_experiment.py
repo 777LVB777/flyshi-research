@@ -98,7 +98,7 @@ def plan_lines(cfg: sm.SyntheticConfig, results_base: Path) -> list[str]:
         f"  ESTIMATED SIMULATION RUNS: {sm.estimated_run_count(cfg)}",
         f"  simulated trial-seconds: {sm.estimated_run_count(cfg) * cfg.duration_ms / 1000 * cfg.trials:g}",
         f"  results: {sm.results_dir_for(results_base, cfg)}",
-        f"  per job: {2 * cfg.markets_per_seed} strictly sequential runs (70 train markets, then 30 test)",
+        f"  per job: {2 * cfg.markets_per_seed} strictly sequential runs ({cfg.train_count} train markets, then {cfg.test_count} test)",
         "  Wall-clock time and memory per process on the server are UNVERIFIED.",
     ]
 

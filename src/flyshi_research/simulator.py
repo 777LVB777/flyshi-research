@@ -10,6 +10,12 @@ from statistics import fmean
 from typing import Protocol
 
 EPSILON = 1e-15
+# Ground-truth constants of ``generate_signal_markets`` (named 2026-10-09 so the
+# price-only Bayes posterior below uses exactly the generator's values).
+TRUE_PROBABILITY_LOW = 0.1
+TRUE_PROBABILITY_HIGH = 0.9
+PRICE_FLOOR = 0.01
+PRICE_CEILING = 0.99
 
 
 @dataclass(frozen=True)
@@ -153,8 +159,8 @@ def generate_signal_markets(
     markets: list[Market] = []
     previous_quote = 0.5
     for sequence in range(count):
-        true_probability = rng.uniform(0.1, 0.9)
-        price = min(0.99, max(0.01, true_probability + rng.uniform(-price_deviation, price_deviation)))
+        true_probability = rng.uniform(TRUE_PROBABILITY_LOW, TRUE_PROBABILITY_HIGH)
+        price = min(PRICE_CEILING, max(PRICE_FLOOR, true_probability + rng.uniform(-price_deviation, price_deviation)))
         outcome = int(rng.random() < true_probability)
         distractor = rng.uniform(0.05, 0.95)
         signal = (1.0 - signal_strength) * distractor + signal_strength * true_probability
@@ -178,6 +184,48 @@ def generate_signal_markets(
             )
         )
     return markets
+
+
+def price_only_posterior_mean(quote: float, price_deviation: float = 0.20) -> float:
+    """Exact E[true probability | price] under ``generate_signal_markets``.
+
+    DECIDED 2026-10-09 as the synthetic sweep's market comparator
+    (synthetic-market-experiment.md, Section 6 revision): the best forecast any
+    method can make from the price alone. The prior is uniform on
+    [TRUE_PROBABILITY_LOW, TRUE_PROBABILITY_HIGH]; the price is the truth plus
+    uniform error in [-price_deviation, +price_deviation], clipped to
+    [PRICE_FLOOR, PRICE_CEILING]. An unclipped price gives a uniform posterior on
+    an interval; a clipped price gives a piecewise-linear one (the probability
+    that truth plus error falls beyond the clip). Uses the generator's known
+    ground truth, so it is a property of this synthetic environment only.
+    """
+    if not 0.0 <= price_deviation <= 0.9:
+        raise ValueError("price_deviation must be in [0, 0.9]")
+    q = float(quote)
+    if not PRICE_FLOOR <= q <= PRICE_CEILING:
+        raise ValueError("quote outside the generator's price range")
+    lo_p, hi_p, d = TRUE_PROBABILITY_LOW, TRUE_PROBABILITY_HIGH, price_deviation
+    if d == 0.0:
+        return min(hi_p, max(lo_p, q))
+    # Likelihood pieces (a, b, c0, c1): value c0 + c1 * p on [a, b].
+    if q <= PRICE_FLOOR:
+        edge = PRICE_FLOOR
+        pieces = [(lo_p, edge - d, 1.0, 0.0), (edge - d, edge + d, (edge + d) / (2 * d), -1 / (2 * d))]
+    elif q >= PRICE_CEILING:
+        edge = PRICE_CEILING
+        pieces = [(edge + d, hi_p, 1.0, 0.0), (edge - d, edge + d, (d - edge) / (2 * d), 1 / (2 * d))]
+    else:
+        pieces = [(q - d, q + d, 1.0, 0.0)]
+    mass = moment = 0.0
+    for a, b, c0, c1 in pieces:
+        a, b = max(a, lo_p), min(b, hi_p)
+        if b <= a:
+            continue
+        mass += c0 * (b - a) + c1 * (b * b - a * a) / 2
+        moment += c0 * (b * b - a * a) / 2 + c1 * (b ** 3 - a ** 3) / 3
+    if mass <= 0.0:
+        raise ValueError("quote is impossible under the generator")
+    return moment / mass
 
 
 def observe_market(market: Market) -> MarketObservation:

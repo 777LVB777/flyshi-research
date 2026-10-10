@@ -334,6 +334,23 @@ document.
 
 ### 4.5 Synthetic-market signal-requirement experiment — **NOT YET RUN.**
 
+> **NOTE 2026-10-09: revised before any run.** The quotations below are the
+> original pre-statement and are kept as the record. Dated revisions in
+> SYNTH-MARKET ([`design/synthetic-market-experiment.md`](design/synthetic-market-experiment.md))
+> now govern; they were all made before any synthetic-market run. They are:
+>
+> - no intensity mitigation (Section 4);
+> - `recent_change` bounded at ±1 (Section 1);
+> - strengths 0, 0.4, 0.8, 1.0, with 0 as the null control and 1.0 as the
+>   positive control (Section 1);
+> - 20 seeds × 250 markets, 70 train / 180 test (Section 2);
+> - the exact price-only Bayes posterior as the market comparator, replacing the
+>   Platt-calibrated price (Section 6);
+> - 160,000 runs in 320 jobs (Section 7).
+>
+> A summary is in [`design/open-decisions.md`](design/open-decisions.md), items 7
+> and 8.
+
 **Question, quoted (SYNTH-MARKET, header):** "how much controlled extra
 information must the engineered signal feature contain before the learned
 circuit improves held-out probability forecasts?"

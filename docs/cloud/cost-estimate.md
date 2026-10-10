@@ -110,3 +110,66 @@ time `--smoke` or a single job on the server before committing to a machine size
 - **Minimum charge** for a server that exists for less than an hour.
 
 None of these were checked for this estimate.
+
+---
+
+## Synthetic-market sweep, design (b′): estimate dated 2026-10-09
+
+**Status: estimate, written 2026-10-09 before renting.** Nothing has been measured
+on a server. The design is recorded in
+[`../design/synthetic-market-experiment.md`](../design/synthetic-market-experiment.md),
+Section 7 revision. The first-learning-test estimate above is unchanged.
+
+### What is being run
+
+| | |
+|---|---|
+| Structure | 4 strengths (0, 0.4, 0.8, 1.0) × 20 market seeds × 4 arms × 250 markets × 2 framings |
+| Runs | **160,000** |
+| Jobs | **320**, all independent; no innate jobs |
+| Job length | **500 runs**, strictly sequential (70 training markets, then 180 test markets) |
+| Simulated time per run | 1000 ms × 5 trials |
+
+### Assumptions
+
+- **Run time:** 55 s per run (`PLANNING_SECONDS_PER_RUN` in
+  `launch_synthetic_market_parallel.py`). **Not measured on a server.**
+- **Memory:** 5 GB per process, using the launcher's rule
+  `floor((available − headroom) / 5 GB)`, capped by cores. On **CCX43** (64 GB,
+  about 62.5 GB available; 16 dedicated vCPU) that gives **11 processes**.
+  **Memory per process is not measured.**
+- **Price:** **$0.53/h** for CCX43, as given for this estimate. Hetzner prices
+  changed in 2026 and differ by location and VAT; check before renting.
+- **Scheduling:** `estimate_makespan`, the same function the launcher prints.
+
+### Time and cost
+
+| Case | Processes | Wall-clock | Cost at $0.53/h |
+|---|---:|---:|---:|
+| **Planned** | 11 | **229 h (about 9.6 days)**: 30 waves of 500-run chains | **about $121** |
+| plus 2 min network build per job | 11 | 230 h | about $122 |
+| 6 GB per process | 9 | about 275 h | about $146 |
+| 7 GB per process | 8 | about 306 h | about $162 |
+| 70 s per run instead of 55 | 11 | about 292 h | about $155 |
+
+Setup and copying results back add a few billed hours. They are not included.
+
+### Budget
+
+The total budget is **about $170**. The planned run uses about $121. The
+remaining **about $50 (about 94 server hours) is held as contingency** for
+unmeasured run time, memory per process and restarts. It is not planned
+compute.
+
+### Risks
+
+- **Restarts are job-granular.** A crash or reboot loses up to one 500-run chain
+  (about 7.6 h of one process). Finished jobs are kept.
+- **Measure first.** Start one job on the server
+  (`run_synthetic_market_experiment.py --job <id>`; the IDs are listed by
+  `--list-jobs`). Time its first runs and read its resident memory **before**
+  starting all 320 jobs. A whole job is 500 runs, about 7.6 h, so stop it once
+  the figures are stable. Then re-run the launcher's `--dry-run` with the
+  measured `--gb-per-proc`.
+- **Delete the server afterwards.** A forgotten CCX43 bills about $13 per day at
+  $0.53/h.

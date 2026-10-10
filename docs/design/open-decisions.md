@@ -446,3 +446,30 @@ superseded by this item for the entries below. Item 5 itself is unchanged.
   - `dopamine_max_rate_hz` and `ReadoutParams.margin_threshold`. The synthetic
     sweep uses neither: the first is never given to the network, and the sweep
     has its own `decision_margin = 0`, fixed by its pre-statement.
+
+## 8. Synthetic sweep: comparator, null control and power design
+
+**DECIDED 2026-10-09 by the project owner, before any synthetic-market run.** The
+dated revisions are in [`synthetic-market-experiment.md`](synthetic-market-experiment.md),
+Sections 1, 2, 3, 6 and 7.
+
+- **Market comparator:** the exact price-only Bayes posterior, replacing the
+  Platt-calibrated price. With the old comparator the gate could pass at
+  strength 0 without signal.
+- **Strength 0 is the null control.** A pass there is a pipeline or generator
+  problem, not a finding.
+- **Strengths 0, 0.4, 0.8, 1.0.**
+  - 1.0 is the positive control.
+  - 0.4 is pre-stated as underpowered: a non-pass there is undetermined.
+  - 0.1 and 0.2 are dropped.
+- **Design (b′):** seeds 20261001–20261020, 250 markets per seed (70 train /
+  180 test), all four arms. That is 160,000 runs in 320 jobs with 500-run chains,
+  about $121 on CCX43, with about $50 held as contingency.
+- **Reporting:**
+  - the profit arm against learning-off is labelled "learning effect, any
+    source";
+  - profit is reported by price region next to a price-only Bayes trader;
+  - the strength-s versus strength-0 comparison is a non-gating secondary
+    report.
+- **Considered, not adopted:** making that comparison part of the gate, and
+  changing the generator.

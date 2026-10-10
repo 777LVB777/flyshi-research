@@ -76,6 +76,53 @@ The fixed sweep is **0, 0.1, 0.2, 0.4, 0.8**. The five market seeds are
 **20261001–20261005**, giving 500 markets per strength and 2,500 market instances in
 the complete sweep.
 
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run:
+> strengths, seeds and the power design (b′).** The original text above is kept
+> unchanged; it no longer describes the sweep.
+>
+> *Strengths: 0, 0.4, 0.8 and 1.0.*
+>
+> - **0 is the null control** (Section 6 revision).
+> - **0.1 and 0.2 are dropped.** Against the best price-only forecast, an ideal
+>   forecaster's signal edge there is 0.0002 and 0.0005 Brier. Detecting even
+>   that ideal forecaster at 80% power would take about 42,000 and 21,000 test
+>   markets, beyond any affordable budget.
+> - **0.4 is kept but is underpowered.** Its ideal signal edge is 0.0014, and an
+>   ideal forecaster passes the market comparison with power about **0.70** at
+>   3,600 test markets. **A non-pass at 0.4 means undetermined, not absent.**
+> - **1.0 is the positive control.** At strength 1 the signal *is* the hidden
+>   probability, which is the most information the generator can express. Ideal
+>   signal edge 0.0100 (0.0074 at 0.8), with ideal power above 0.999.
+> - **Why no strength above 1.** The signal is
+>   `(1 − s)·distractor + s·truth`. Above 1 the distractor enters with a negative
+>   weight, so the signal gets noisier, not cleaner, and a growing share leaves
+>   the feature's declared range [0, 1] and is clipped by the encoder. As the
+>   encoder would clip it, the ideal signal edge is 0.0086 at 1.2, 0.0054 at 1.6
+>   (24% clipped), 0.0037 at 2.0 (39%) and 0.0023 at 3.0 (59%). The generator
+>   also rejects strengths above 1.
+>
+> *Market seeds: **20261001–20261020** (20 seeds), 250 markets each.* That gives
+> 5,000 markets per strength and 20,000 market instances in the complete sweep.
+> The generator draws each market in sequence, so the first 100 markets of seeds
+> 20261001–20261005 are exactly the former sweep's markets.
+>
+> *Figures.* All come from the generator's ground truth, not from any model run:
+> exact posteriors over 540,000 held-out markets. The "MDE" assumes a learner
+> whose per-market noise matches the ideal forecaster's:
+>
+> | strength | ideal signal edge (Brier) | ideal power, 3,600 test markets | MDE as a multiple of the ideal edge |
+> |---|---:|---:|---:|
+> | 0 | 0 | — | — |
+> | 0.4 | 0.0014 | 0.70 | 1.13 |
+> | 0.8 | 0.0074 | >0.999 | 0.50 |
+> | 1.0 | 0.0100 | >0.999 | 0.42 |
+>
+> **On record.** How detectable a learner reaching 25% of the ideal edge would
+> be depends entirely on its noise. With the ideal forecaster's noise, its power
+> is at most 0.38, at 1.0. A learner that shrinks the ideal forecast toward the
+> price is detectable at every strength from 0.4 up. A real circuit lies between
+> these, at an unknown point.
+
 ## 2. Chronological split and leakage controls
 
 Within each 100-market sequence, markets 0–69 are training markets and 70–99 are
@@ -90,6 +137,17 @@ from its training forecasts and training outcomes. Calibrated and uncalibrated
 forecast metrics are both retained. Using online, changing-weight training forecasts
 to fit the circuit calibrator is an **unverified choice** and a limitation: their
 distribution may differ from frozen-weight test forecasts.
+
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run: split
+> under design (b′).** The original text above is kept unchanged.
+>
+> - Within each **250-market** sequence, markets **0–69** are training markets
+>   and **70–249** are held-out test markets. That is 180 test markets per seed,
+>   and **3,600 per strength**. The order is never shuffled.
+> - Training is the same 70 markets per seed as before, and as in the first
+>   learning test. Only the held-out set grows.
+> - In code: `markets_per_seed = 250`, `train_fraction = 0.28`, so
+>   `train_count = 70`, pinned by a test.
 
 ## 3. Circuit presentation and learning
 
@@ -299,6 +357,40 @@ training markets.
 > - It does not change the gate, the sensitivity analysis or any run. The config
 >   hash is unchanged.
 
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run:
+> ignition figures under design (b′).** The figures in the safeguard draft and in
+> the not-adopted decision above ("83 training presentations below 30 kHz";
+> "roughly 3 affected decisions per arm out of about 2,500") **belong to the
+> pre-revision design** (5,000 presentations). They are kept as written.
+> Recomputed for design (b′) from the encoder alone (no simulation):
+>
+> | | pre-revision | design (b′) |
+> |---|---:|---:|
+> | presentations (per arm) | 5,000 | 40,000 |
+> | decisions per arm (training) | 2,500 (1,750) | 20,000 (5,600) |
+> | presentations below 25 kHz | 6 | 111 |
+> | presentations below 30 kHz (training) | 106, 2.12% (83) | 1,226, 3.06% (324) |
+> | presentations above 60 kHz | 106, 2.12% | 1,225, 3.06% |
+> | per-framing drive range | 22.8–67.5 kHz | 19.3–70.7 kHz |
+>
+> - **Expected ignition exposure.** The low-drive follow-up measured 3% of runs
+>   ignited (95% interval 0.6–8.5%) at 22.8–29 kHz. Applied to 1,226
+>   presentations below 30 kHz, that is roughly **37 affected decisions per arm
+>   (7–104), about 10 of them training (2–28)**, out of 20,000. As a fraction,
+>   about 0.2% as before. The not-adopted decision stands.
+> - **Outside every tested drive level.** 25 presentations lie below the lowest
+>   drive any diagnostic has presented (22,759 Hz; 3 are below 20 kHz) and 24 lie
+>   above the highest (67,541 Hz). Their containment is **untested**. The
+>   per-trial tracking records them. No further diagnostic is pre-stated here.
+> - **Completed diagnostics.** The extremes containment and low-drive follow-up
+>   selected their stimuli from the pre-revision design. Their runners now pin
+>   that design (`synthetic_market.pre_revision_config()`) so the frozen tables
+>   still reproduce.
+>   - All 6 containment stimuli remain presentations of the new sweep.
+>   - 6 of the 10 low-drive stimuli remain. The four at strengths 0.1 and 0.2
+>     (`below25_2`, `below25_3`, `band25_30_near27k`, `band25_30_near29k`) are no
+>     longer presented.
+
 ## 4. Intensity-bias mitigation — SELECTED 2026-09-22
 
 > **REVISION 2026-10-09 (project owner), before any synthetic-market run:
@@ -479,6 +571,89 @@ that fails after a lower one passes must be highlighted as instability.
 > 4. **Removed markets cut the 150 paired markets.** Excluding them widens the
 >    intervals.
 
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run: market
+> comparator, null control, secondary comparison and profit report.** The text
+> above is kept unchanged. Where it conflicts, this revision governs.
+>
+> *1. Comparator: the exact price-only Bayes posterior.*
+>
+> - The **market improvement** is now the posterior's squared error minus the
+>   profit arm's. The posterior is E[truth | price] under the generator's known
+>   ground truth (`simulator.price_only_posterior_mean`): the best forecast any
+>   method can make from the price alone.
+> - **Why.** The Platt-calibrated price (Section 5) is fitted on logit(price).
+>   The clipped prices at 0.01 and 0.99 have extreme logits, which pull the slope
+>   to about 0.6 and over-shrink the middle half of markets. Its expected Brier
+>   score is 0.2142, against 0.2093 for the raw price and 0.2064 for the
+>   posterior.
+> - **Consequence of the old comparator.** A forecaster with **no** signal beat
+>   it by 0.0078 at strength 0. At 3,600 test markets that would pass almost
+>   surely, so the "signal requirement" would have read 0.
+> - The Platt-calibrated price **remains a reported baseline** (Section 5). It is
+>   no longer the gate's comparator.
+> - The profit-arm-versus-learning-off comparison is unchanged.
+> - Bootstrap seeds are unchanged.
+> - Pooled held-out markets per strength: **3,600** (180 per seed × 20 seeds),
+>   not 150.
+>
+> *2. Strength 0 is the null control.*
+>
+> - Under this comparator, no forecaster without signal can beat the market
+>   comparison in expectation. A pass at strength 0 therefore **indicates a
+>   pipeline or generator problem, not a finding**.
+> - In code: strength 0 never sets the signal requirement. If it passes, the
+>   verdict reports `NULL CONTROL FAILED`, `success = false`, and no signal
+>   requirement.
+> - The signal requirement is the smallest passing strength among **0.4, 0.8 and
+>   1.0**. The uncorrected-minimum limitation now applies to three strengths.
+>   With none passing, the result is "no signal requirement demonstrated within
+>   0.4–1.0". A non-pass at 0.4 is "undetermined", as pre-stated in the Section 1
+>   revision.
+>
+> *3. Secondary, never gating: profit arm at strength s against strength 0.*
+>
+> - For each s > 0, the paired Brier improvement of the profit arm at s over the
+>   profit arm at 0, on the **same** held-out markets. Prices and outcomes are
+>   identical across strengths; only the signal differs.
+> - Same bootstrap, seeds 20261099 + 400 + i (i = the strength's index).
+> - Reported as `secondary_profit_vs_strength0`.
+>
+> *4. Labels.*
+>
+> - The learning-off comparison is labelled **"learning effect, any source"**.
+> - The market comparison is labelled "signal edge over the best price-only
+>   forecast".
+> - **Why.** At strength 0, outcomes are still partly predictable from price
+>   beyond the innate circuit. The truth is bounded to [0.1, 0.9], so a price
+>   within 0.2 of either bound overstates how extreme the outcome is. The profit
+>   reward is positive on average there: an ideal price-only trader earns about
+>   $0.023 per market. Learning can therefore sharpen the price mapping and beat
+>   learning-off **without signal**. The gate is protected because it also
+>   requires the market comparison.
+>
+> *5. Profit by price region (reported, never gating).*
+>
+> - Held-out P/L after costs per arm in three regions:
+>   - **clipped** (price 0.01 or 0.99; 3.8% of markets, 18% of the price-only
+>     profit);
+>   - **outer** (unclipped, below 0.3 or above 0.7; 46%, 82%);
+>   - **interior** (0.3–0.7; 50%, where the posterior equals the price and
+>     nothing is earned).
+> - Reported next to the **price-only Bayes trader**: it trades only when the
+>   posterior differs from the price by more than the 0.02 cost. This is the
+>   reference P/L that price alone earns.
+>
+> *Considered, not adopted:*
+>
+> - **Making the strength-s versus strength-0 comparison part of the gate.** It
+>   would change the gate. It has the same low power as the signal-only figures
+>   in Section 1, and it compares two learned arms, which adds noise. It is kept
+>   as the secondary report above.
+> - **Changing the generator so the price is unbiased.** It would change every
+>   stimulus, invalidating the ignition statistics measured on the current
+>   presentations. The new market comparator already blocks a pass without
+>   signal.
+
 Fake verdict tests are required: a simulator whose weights cannot affect output must
 not pass, while a deliberately learnable fake must pass. Fake success validates the
 pipeline and verdict logic only, not the biological model.
@@ -541,6 +716,31 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 > - **Config hash:** `688d1064a3`.
 > - **Run order.** The low-drive follow-up diagnostic (100 simulations, about
 >   92 minutes serial) is pre-stated to run before the sweep.
+
+> **REVISION 2026-10-09 (project owner), before any synthetic-market run: plan
+> and budget under design (b′).** The plan above (20,000 runs in 100 jobs) is
+> kept as the record. It no longer describes the sweep.
+>
+> - **Plan:** 4 strengths × 20 seeds × 4 arms × 250 markets × 2 framings =
+>   **160,000 runs in 320 jobs**. Each job is a **500-run** chain: 70 training
+>   markets, then 180 test markets with frozen weights. There are no innate
+>   jobs.
+> - **Time on CCX43** (11 processes by the launcher's memory rule, 55 s per run):
+>   30 waves of 500-run chains, **about 229 h (about 9.6 days)**, or about 230 h
+>   with 2-minute network builds.
+> - **Budget:** **about $121 at $0.53/h**. The remaining **about $50 is held as
+>   contingency** for unmeasured run time, memory per process and restarts. That
+>   is about 94 more server hours. For example, at 6 GB per process the rule
+>   gives 9 processes and about 275 h ($146); at 7 GB, 8 processes and about
+>   306 h ($162).
+> - **Restarts** are job-granular. A crash loses up to one 500-run chain (about
+>   7.6 h of one process).
+> - **Output:** about 2.5× per job (250 markets), roughly 0.5 MB per job and
+>   170 MB in total. This is an arithmetic estimate.
+> - **Config hash:** `688d1064a3` → **`a325e6b206`**. The strengths, seeds,
+>   markets per seed, split, and the new `market_comparator` field all changed.
+> - **Details:** [`../cloud/cost-estimate.md`](../cloud/cost-estimate.md), the
+>   section dated 2026-10-09.
 
 ## Results
 

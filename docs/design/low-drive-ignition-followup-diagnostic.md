@@ -8,6 +8,23 @@ needs to change, add a dated revision note and keep the original text.
 **Run 2026-10-09.** The protocol above ran unchanged (100 of 100 simulations).
 Results are appended under [Results](#results); the protocol text is not edited.
 
+> **NOTE 2026-10-09: design revision of the sweep.** This diagnostic was selected
+> from, and run against, the **pre-revision** sweep design (strengths 0, 0.1,
+> 0.2, 0.4, 0.8; 5 seeds; 100 markets per seed; 5,000 presentations). Every
+> count in this document that refers to "the sweep" describes that design,
+> including "the other 96 presentations below 30 kHz". The runner pins it
+> (`synthetic_market.pre_revision_config()`), so the frozen table still
+> reproduces.
+>
+> - **Under the revised design (b′),** 6 of these 10 stimuli are still presented.
+>   The four at strengths 0.1 and 0.2 (`below25_2`, `below25_3`,
+>   `band25_30_near27k`, `band25_30_near29k`) are not.
+> - **The revised sweep presents** 111 presentations below 25 kHz and 1,226 below
+>   30 kHz (3.06%) per arm, with drive from 19.3 to 70.7 kHz.
+> - **The protocol and results above are unchanged.** See
+>   [`synthetic-market-experiment.md`](synthetic-market-experiment.md), Section 3
+>   revision on ignition figures under design (b′).
+
 **THIS IS A DIAGNOSTIC, NOT A VALIDATION** (`is_a_validation: false`,
 `has_pass_criterion: false`). It measures and does not judge. The output carries no
 verdict, and none of PASS, FAIL, ACCEPTED or USABLE RANGE (enforced by the shared

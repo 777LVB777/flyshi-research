@@ -215,7 +215,7 @@ def check_selection(chosen: Sequence[Tuple[Selected, dict]]) -> None:
 
 def build_stimuli(ids_path: Path = IDS_PATH) -> Dict[str, dict]:
     encoder, _ = sweep_encoder(ids_path)
-    chosen = select(sm.SyntheticConfig(), encoder)
+    chosen = select(sm.pre_revision_config(), encoder)  # the design these stimuli came from
     check_selection(chosen)
     pool_ids = {name: sorted(int(i) for i in ids) for name, ids in encoder.pools.items()}
     built = {}

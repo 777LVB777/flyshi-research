@@ -33,7 +33,18 @@ from flyshi_research.evaluation.metrics import (
     reliability_diagram,
     turnover,
 )
-from flyshi_research.simulator import Action, Market, MarketObservation, generate_signal_markets, observe_market
+from flyshi_research.simulator import (
+    PRICE_CEILING,
+    PRICE_FLOOR,
+    TRUE_PROBABILITY_HIGH,
+    TRUE_PROBABILITY_LOW,
+    Action,
+    Market,
+    MarketObservation,
+    generate_signal_markets,
+    observe_market,
+    price_only_posterior_mean,
+)
 
 from .bias_mitigation import (
     INNATE_SCORE_SUBTRACTION,
@@ -69,8 +80,30 @@ PROFIT_DRIFT_OFF = "profit_drift_off"
 CONDITIONS = (PROFIT, ACCURACY, LEARNING_OFF, PROFIT_DRIFT_OFF)
 #: conditions whose teaching signal is the profit reward
 PROFIT_LIKE = (PROFIT, PROFIT_DRIFT_OFF)
-SIGNAL_STRENGTHS = (0.0, 0.1, 0.2, 0.4, 0.8)
-MARKET_SEEDS = (20261001, 20261002, 20261003, 20261004, 20261005)
+# DECIDED 2026-10-09 (synthetic-market-experiment.md, Sections 1, 2 and 6
+# revisions; was strengths 0, 0.1, 0.2, 0.4, 0.8 and seeds 20261001-20261005 with
+# 100 markets per seed, 70 train / 30 test). 0 is the null control, 1.0 the
+# positive control (the signal equals the hidden probability); 0.4 is
+# pre-stated as underpowered.
+SIGNAL_STRENGTHS = (0.0, 0.4, 0.8, 1.0)
+MARKET_SEEDS = tuple(range(20261001, 20261021))
+NULL_CONTROL_STRENGTH = 0.0
+#: strength -> pre-stated note; a non-pass there reads "undetermined", not "absent"
+UNDERPOWERED_STRENGTHS = {
+    0.4: "ideal-forecaster power about 0.70 at 3,600 test markets; a non-pass is undetermined, not absent",
+}
+#: the gate's market comparator (DECIDED 2026-10-09; was the Platt-calibrated price)
+PRICE_ONLY_POSTERIOR = "price_only_bayes_posterior"
+MARKET_COMPARATORS = (PRICE_ONLY_POSTERIOR,)
+#: the design before the 2026-10-09 power revision. Kept so the completed extremes
+#: containment and low-drive follow-up diagnostics, whose stimuli were selected
+#: from that design's presentations, still reproduce their frozen tables.
+PRE_REVISION_DESIGN = {
+    "signal_strengths": (0.0, 0.1, 0.2, 0.4, 0.8),
+    "market_seeds": (20261001, 20261002, 20261003, 20261004, 20261005),
+    "markets_per_seed": 100,
+    "train_fraction": 0.70,
+}
 
 
 class Simulator(Protocol):
@@ -102,8 +135,10 @@ class SyntheticConfig:
     mitigation: str = NO_MITIGATION
     signal_strengths: Tuple[float, ...] = SIGNAL_STRENGTHS
     market_seeds: Tuple[int, ...] = MARKET_SEEDS
-    markets_per_seed: int = 100
-    train_fraction: float = 0.70
+    # DECIDED 2026-10-09: 250 markets per seed, markets 0-69 train, 70-249 test
+    # (train_count = int(250 * 0.28) = 70; pinned by a test).
+    markets_per_seed: int = 250
+    train_fraction: float = 0.28
     price_deviation: float = 0.20
     duration_ms: float = 1000.0
     trials: int = 5
@@ -130,6 +165,7 @@ class SyntheticConfig:
     confidence_level: float = 0.95
     fee_per_trade: float = 0.01
     spread: float = 0.02
+    market_comparator: str = PRICE_ONLY_POSTERIOR
     encoder: EncoderParams = field(default_factory=EncoderParams)
     plasticity: PlasticityParams = field(default_factory=PlasticityParams)
     reward: RewardParams = field(default_factory=RewardParams)
@@ -138,6 +174,8 @@ class SyntheticConfig:
     def __post_init__(self) -> None:
         if self.mitigation not in MITIGATIONS:
             raise ValueError(f"mitigation must be one of {MITIGATIONS}")
+        if self.market_comparator not in MARKET_COMPARATORS:
+            raise ValueError(f"market_comparator must be one of {MARKET_COMPARATORS}")
         if self.markets_per_seed < 10:
             raise ValueError("markets_per_seed must be >= 10")
         if not 0.0 < self.train_fraction < 1.0:
@@ -164,6 +202,11 @@ class SyntheticConfig:
 
     def config_hash(self) -> str:
         return hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True).encode()).hexdigest()[:10]
+
+
+def pre_revision_config() -> "SyntheticConfig":
+    """The sweep design before the 2026-10-09 power revision (historical only)."""
+    return replace(SyntheticConfig(), **PRE_REVISION_DESIGN)
 
 
 @dataclass(frozen=True)
@@ -834,11 +877,69 @@ def _metric_summary(
     }
 
 
+#: Price regions of the profit report (DECIDED 2026-10-09; reported, never gating).
+#: "clipped": the price sits at PRICE_FLOOR or PRICE_CEILING. "outer": unclipped,
+#: but within price_deviation of the bounded truth range, where the price alone is
+#: a biased forecast. "interior": the price-only posterior mean equals the price.
+PRICE_REGIONS = ("clipped", "outer", "interior")
+#: Labels of the gate's two comparisons (DECIDED 2026-10-09).
+COMPARISON_LABELS = {
+    "profit_improvement_vs_market": "signal edge over the best price-only forecast",
+    "profit_improvement_vs_learning_off": "learning effect, any source",
+}
+
+
+def market_comparator_forecast(quotes: np.ndarray, cfg: SyntheticConfig) -> np.ndarray:
+    """The gate's market comparator: the exact price-only Bayes posterior mean."""
+    if cfg.market_comparator != PRICE_ONLY_POSTERIOR:
+        raise ValueError(f"unknown market comparator {cfg.market_comparator!r}")
+    return np.array([price_only_posterior_mean(float(q), cfg.price_deviation) for q in quotes])
+
+
+def price_region(quote: float, cfg: SyntheticConfig) -> str:
+    if quote <= PRICE_FLOOR or quote >= PRICE_CEILING:
+        return "clipped"
+    if quote < TRUE_PROBABILITY_LOW + cfg.price_deviation or quote > TRUE_PROBABILITY_HIGH - cfg.price_deviation:
+        return "outer"
+    return "interior"
+
+
+def price_only_reference_actions(quotes: np.ndarray, cfg: SyntheticConfig) -> list:
+    """The price-only Bayes trader: trades only when the posterior clears the cost."""
+    cost = cfg.fee_per_trade + 0.5 * cfg.spread
+    posterior = market_comparator_forecast(quotes, cfg)
+    return [Action.YES if f - q > cost else Action.NO if q - f > cost else Action.ABSTAIN
+            for f, q in zip(posterior, quotes)]
+
+
+def profit_by_price_region(
+    condition_vectors: Mapping[str, Tuple[np.ndarray, np.ndarray, np.ndarray, list]], cfg: SyntheticConfig
+) -> dict:
+    """REPORTED ONLY, NEVER GATING (DECIDED 2026-10-09). Held-out P/L after costs per
+    arm and per price region, next to the price-only Bayes trader, which earns from
+    the price alone wherever the bounded truth range makes the price biased."""
+    _, outcomes, quotes, _ = next(iter(condition_vectors.values()))
+    regions = np.array([price_region(float(q), cfg) for q in quotes])
+    traders = {c: v[3] for c, v in condition_vectors.items()}
+    traders["price_only_bayes_trader_reference"] = price_only_reference_actions(quotes, cfg)
+    out = {"note": "reported only, never gating; the reference trader uses no signal",
+           "regions": {r: int(np.sum(regions == r)) for r in PRICE_REGIONS}}
+    for name, actions in traders.items():
+        pnl = per_market_pnl(quotes, outcomes, actions, fee_per_trade=cfg.fee_per_trade, spread=cfg.spread)
+        out[name] = {"all": {"pnl_after_costs": float(pnl.sum()), "pnl_per_market": float(pnl.mean())}}
+        for r in PRICE_REGIONS:
+            mask = regions == r
+            out[name][r] = {"pnl_after_costs": float(pnl[mask].sum()),
+                            "pnl_per_market": float(pnl[mask].mean()) if mask.any() else None}
+    return out
+
+
 def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig) -> dict:
     """Evaluate complete job outputs and apply the pre-stated paired-bootstrap gate."""
     strengths_out: Dict[str, dict] = {}
     qualifying = []
     innate_rows: list = []
+    profit_by_strength: Dict[float, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     for strength in cfg.signal_strengths:
         circuit: Dict[str, dict] = {}
         condition_vectors: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, list[Action]]] = {}
@@ -898,7 +999,15 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
         off_p, off_y, _, _ = condition_vectors[LEARNING_OFF]
         if not np.array_equal(profit_y, y) or not np.array_equal(off_y, y):
             raise ValueError("circuit and baseline test markets are not aligned")
-        market_p = np.asarray(baseline_rows[MARKET_PRICE]["calibrated"])
+        # DECIDED 2026-10-09: the comparator is the exact price-only Bayes posterior
+        # (was the Platt-calibrated price, baseline_rows[MARKET_PRICE]["calibrated"],
+        # still reported among the baselines). Platt on logit(price) is pulled flat by
+        # the clipped prices and lost to the raw price, so a forecaster with no
+        # signal could pass at strength 0.
+        if not np.array_equal(condition_vectors[PROFIT][2], q):
+            raise ValueError("circuit and baseline test quotes are not aligned")
+        market_p = market_comparator_forecast(q, cfg)
+        profit_by_strength[strength] = (profit_p, y, q)
         vs_market = (market_p - y) ** 2 - (profit_p - y) ** 2
         vs_off = (off_p - y) ** 2 - (profit_p - y) ** 2
         market_ci = bootstrap_confidence_interval(
@@ -916,7 +1025,9 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
             seed=cfg.bootstrap_seed + 100 + cfg.signal_strengths.index(strength),
         )
         passes = market_ci.lower > 0.0 and off_ci.lower > 0.0
-        if passes:
+        # Strength 0 is the null control (DECIDED 2026-10-09): it never sets the
+        # signal requirement; a pass there is a pipeline or generator problem.
+        if passes and strength != NULL_CONTROL_STRENGTH:
             qualifying.append(strength)
         off_rows = [
             row
@@ -929,15 +1040,44 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
             "circuit": circuit,
             "baselines": baseline_summary,
             "innate_policy": innate_policy(off_rows),
+            "market_comparator": cfg.market_comparator,
             "profit_improvement_vs_market": asdict(market_ci),
             "profit_improvement_vs_learning_off": asdict(off_ci),
+            "comparison_labels": dict(COMPARISON_LABELS),
             "passes": passes,
+            "role": ("null control" if strength == NULL_CONTROL_STRENGTH
+                     else "positive control" if strength == 1.0 else "test"),
+            "prestated_power_note": UNDERPOWERED_STRENGTHS.get(strength),
+            # Reported, never gating (DECIDED 2026-10-09).
+            "profit_by_price_region": profit_by_price_region(condition_vectors, cfg),
             # Reported, never gating (pre-stated 2026-10-09).
             "ignition_exposure": ignition_exposure(outputs, cfg, strength),
             "sensitivity_excluding_ignited": sensitivity_excluding_ignited(
                 outputs, cfg, strength, vs_market, vs_off),
         }
-    requirement = min(qualifying) if qualifying else None
+    null = strengths_out.get(str(NULL_CONTROL_STRENGTH))
+    null_failed = bool(null and null["passes"])
+    # Secondary, non-gating (DECIDED 2026-10-09): the profit arm at strength s
+    # against the profit arm at strength 0 on the same held-out markets. Prices
+    # and outcomes are identical across strengths; only the signal differs.
+    for strength in cfg.signal_strengths:
+        if strength == NULL_CONTROL_STRENGTH:
+            continue
+        entry: dict = {"note": "secondary, never gating; same markets, only the signal differs"}
+        if NULL_CONTROL_STRENGTH not in profit_by_strength:
+            entry.update(available=False, reason="strength 0 not in the sweep")
+        else:
+            p0, y0, q0 = profit_by_strength[NULL_CONTROL_STRENGTH]
+            ps, ys, qs = profit_by_strength[strength]
+            if not (np.array_equal(y0, ys) and np.array_equal(q0, qs)):
+                raise ValueError("strength-0 and strength-s test markets are not identical")
+            ci = bootstrap_confidence_interval(
+                (p0 - ys) ** 2 - (ps - ys) ** 2, np.mean,
+                confidence_level=cfg.confidence_level, n_resamples=cfg.bootstrap_resamples,
+                seed=cfg.bootstrap_seed + 400 + cfg.signal_strengths.index(strength))
+            entry.update(available=True, improvement=asdict(ci), lower_bound_above_zero=ci.lower > 0.0)
+        strengths_out[str(strength)]["secondary_profit_vs_strength0"] = entry
+    requirement = min(qualifying) if qualifying and not null_failed else None
     higher_failures = (
         [
             strength
@@ -950,9 +1090,19 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
     return {
         "prestated_test": cfg.prestated,
         "mitigation": cfg.mitigation,
-        "success": bool(qualifying),
+        "market_comparator": cfg.market_comparator,
+        "success": bool(qualifying) and not null_failed,
         "signal_requirement": requirement,
         "higher_strength_failures": higher_failures,
+        # DECIDED 2026-10-09: a pass at strength 0 under the price-only posterior
+        # comparator indicates a pipeline or generator problem, not a finding.
+        "null_control": None if null is None else {
+            "strength": NULL_CONTROL_STRENGTH,
+            "passes": null_failed,
+            "interpretation": ("NULL CONTROL FAILED: a pipeline or generator problem, not a finding; "
+                               "no signal requirement is reported" if null_failed
+                               else "null control did not pass, as expected"),
+        },
         # Reported, never gating (decided 2026-10-09). Pooled across strengths:
         # price, recent change, time to resolution and liquidity are identical at
         # every strength for a given market seed; only the signal feature differs.
@@ -961,7 +1111,8 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
         # (ignited test markets excluded) has both lower bounds above zero.
         "sensitivity_excluding_ignited_smallest_strength": next(
             (st for st in cfg.signal_strengths
-             if strengths_out[str(st)]["sensitivity_excluding_ignited"].get(
+             if st != NULL_CONTROL_STRENGTH
+             and strengths_out[str(st)]["sensitivity_excluding_ignited"].get(
                  "both_lower_bounds_above_zero")), None),
         # Reported, never gating (pre-stated 2026-10-09): training decisions that
         # could have taught the circuit from a presentation with an ignited trial.
