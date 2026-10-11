@@ -742,6 +742,51 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 > - **Details:** [`../cloud/cost-estimate.md`](../cloud/cost-estimate.md), the
 >   section dated 2026-10-09.
 
+> **REVISION 2026-10-11 (project owner), before any synthetic-market run:
+> two-phase run order.** Nothing above changes: no arm, strength, seed, market,
+> criterion, statistic or configuration value. The config hash stays
+> **`a325e6b206`**. The sweep runs on a CCX33 (8 dedicated vCPUs, 32 GB), the
+> largest server the account can create for several weeks.
+>
+> - **Phase 1: the gate arms.** `profit` and `learning_off`, at all 4 strengths ×
+>   20 seeds: **160 jobs, 80,000 runs**.
+> - **Phase 2: the reported arms.** `accuracy` and `profit_drift_off`, same
+>   strengths and seeds: **160 jobs, 80,000 runs**.
+> - **An order, not a stopping point.** The launcher starts every phase 1 job
+>   before any phase 2 job. Run on the whole sweep, phase 2 jobs take slots as
+>   phase 1 drains, so no slot idles between the phases. `--phase` and `--arms`
+>   run a subset when needed.
+> - **Phase 2 runs regardless of phase 1 results.** No phase 1 outcome may
+>   cancel, shorten, reorder or change phase 2.
+> - **Phase 1 results are not analysed until phase 2 is complete.** Before all
+>   320 job files exist, no verdict, gate interval, Brier score, P/L, forecast,
+>   action or score of any job is computed or looked at. In code, the launcher
+>   computes the verdict only when all 320 job files exist, and `--finish`
+>   refuses while any is missing.
+> - **Why not read the gate early, although its arms are independent.** The
+>   independence is computational. A job's output depends only on its strength,
+>   seed, arm and the configuration. It is the same file whether its arm runs
+>   with the others or apart (tested). Reading phase 1 early therefore cannot
+>   change any phase 2 number. It can change decisions: whether phase 2 still
+>   seems worth paying for, and how the accuracy and drift-off arms are
+>   described. The commitment to run phase 2 is credible only if the gate is
+>   unseen while phase 2 runs. The cost is waiting for phase 2, about as long as
+>   phase 1.
+> - **Allowed while the sweep runs (operational, not analysis):** jobs done,
+>   running and failed; run time; memory; disk; whether job files are whole; and
+>   the number of decisions with an ignited framing, which is pre-stated as
+>   reported and never gating. `monitor_sweep.py` shows only these.
+> - **The one exception, stated now.** If phase 2 cannot be completed, because
+>   the budget is exhausted or no server can be obtained to finish it, the
+>   project owner records that decision and its reason in this document, dated,
+>   **before** any phase 1 result is analysed. Phase 1 is then analysed and the
+>   gate reported, with the accuracy and drift-off arms marked "not run". The
+>   gate-only evaluation this needs is not implemented now. It would be written
+>   then and labelled as such.
+> - **Time and cost** are measured, not estimated: `calibrate_server.py` in the
+>   first hour on the server, then `server_eta.py`. See
+>   [`../cloud/ccx33-run-plan.md`](../cloud/ccx33-run-plan.md).
+
 ## Results
 
 *None. Append results here after the selected mitigation has completed;

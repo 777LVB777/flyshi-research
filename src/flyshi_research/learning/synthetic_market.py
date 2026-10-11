@@ -232,7 +232,45 @@ def condition_job_id(condition: str, strength: float, seed: int) -> str:
     return f"condition:{condition}:{_strength_key(strength)}:{seed}"
 
 
-def plan_jobs(cfg: SyntheticConfig) -> list[Job]:
+#: Two-phase run order (pre-stated 2026-10-11, synthetic-market-experiment.md
+#: Section 7): phase 1 is the two arms the gate compares, phase 2 the reported
+#: arms. Not part of SyntheticConfig: the order changes no job's output, so the
+#: config hash is unchanged. Phase 2 runs regardless of phase 1, and no phase 1
+#: result is analysed until phase 2 is complete.
+GATE_ARMS = (PROFIT, LEARNING_OFF)
+RUN_PHASES = {1: GATE_ARMS, 2: (ACCURACY, PROFIT_DRIFT_OFF)}
+assert sorted(a for arms in RUN_PHASES.values() for a in arms) == sorted(CONDITIONS)
+
+
+def phase_of(condition: str) -> int:
+    return next(phase for phase, arms in RUN_PHASES.items() if condition in arms)
+
+
+def plan_jobs(cfg: SyntheticConfig, arms: Optional[Sequence[str]] = None) -> list[Job]:
+    """Every job of the sweep, or only those of the named arms (plus the innate jobs
+    they depend on). Selecting arms changes which jobs exist, never their contents."""
+    jobs = _plan_all_jobs(cfg)
+    if arms is None:
+        return jobs
+    unknown = set(arms) - set(CONDITIONS)
+    if unknown:
+        raise ValueError(f"unknown arm(s) {sorted(unknown)}; arms are {CONDITIONS}")
+    selected = [j for j in jobs if j.kind == "condition" and j.condition in arms]
+    needed = {d for j in selected for d in j.deps}
+    return [j for j in jobs if j in selected or j.id in needed]
+
+
+def run_order(jobs: Sequence[Job]) -> list[Job]:
+    """Jobs in the pre-stated run order: innate jobs, then phase 1, then phase 2;
+    plan order within each. A launcher started on the whole sweep therefore starts
+    every phase 1 job before any phase 2 job, and phase 2 fills slots as phase 1
+    drains, with no idle tail between the phases."""
+    def key(job: Job) -> int:
+        return 0 if job.kind == "innate" else phase_of(job.condition)
+    return sorted(jobs, key=key)  # stable: plan order within a phase
+
+
+def _plan_all_jobs(cfg: SyntheticConfig) -> list[Job]:
     jobs: list[Job] = []
     if cfg.mitigation == INNATE_SCORE_SUBTRACTION:
         jobs += [

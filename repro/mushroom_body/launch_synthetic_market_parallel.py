@@ -17,8 +17,17 @@ available RAM and waits if it has dropped, and it staggers starts so network bui
 (which load the connectome) do not all peak at once.
 
 Restartable per job: finished job files are skipped; an interrupted job restarts its
-100-market chain (no per-market checkpoint). A lock file stops two launchers from
-working on the same results directory. Each worker gets OMP/OPENBLAS/MKL_NUM_THREADS=1.
+250-market chain from market 0 (no per-market checkpoint) and, being seeded per
+presentation, reproduces exactly what an uninterrupted run would have written. A
+lock file stops two launchers from working on the same results directory; a lock
+left by a launcher from before the last reboot is discarded. Each worker gets
+OMP/OPENBLAS/MKL_NUM_THREADS=1.
+
+Run order (pre-stated 2026-10-11, spec Section 7): every phase 1 job (the gate arms
+profit, learning_off) starts before any phase 2 job (accuracy, profit_drift_off).
+--phase N or --arms A,B runs a subset; a job's output is the same file whether its
+arm runs with the others or apart. The verdict is computed only once all 320 jobs
+of the sweep exist: phase 1 alone is never evaluated.
 
 RUNNING THIS WITHOUT --dry-run STARTS BRIAN2 SIMULATIONS. Run it on the server inside
 tmux (docs/cloud/server-setup.md). --dry-run prints the plan and a time estimate and
@@ -30,11 +39,12 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import time as _time
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Sequence, Set
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))  # sibling scripts; none imports Brian2 at module level
@@ -60,6 +70,39 @@ RESULTS_BASE = HERE / "results"
 PLANNING_SECONDS_PER_RUN = 55.0
 
 
+def boot_time() -> Optional[float]:
+    """Unix time of the last boot (Linux /proc/stat btime); None elsewhere."""
+    try:
+        for line in Path("/proc/stat").read_text().splitlines():
+            if line.startswith("btime "):
+                return float(line.split()[1])
+    except OSError:
+        pass
+    return None
+
+
+def discard_lock_from_before_boot(lock: Path, booted: Optional[float] = None) -> bool:
+    """A lock written before the last boot belongs to a launcher the reboot killed.
+    Its PID may since have been reused by an unrelated process, which would make
+    ``acquire_lock`` refuse to start; remove it. Returns True if removed."""
+    booted = boot_time() if booted is None else booted
+    try:
+        stale = booted is not None and lock.stat().st_mtime < booted
+    except FileNotFoundError:
+        return False
+    if stale:
+        lock.unlink(missing_ok=True)
+    return stale
+
+
+def select_arms(phase: Optional[int], arms: Optional[Sequence[str]]) -> Optional[tuple]:
+    if phase is not None and arms:
+        raise SystemExit("give --phase or --arms, not both")
+    if phase is not None:
+        return sm.RUN_PHASES[phase]
+    return tuple(arms) if arms else None
+
+
 def worker_argv(job: sm.Job, mitigation: str, results_base: Path,
                 python: str = sys.executable) -> List[str]:
     return [python, str(RUNNER), "--mitigation", mitigation, "--job", job.id,
@@ -73,7 +116,8 @@ class Launcher:
                  argv_for: Optional[Callable[[sm.Job], List[str]]] = None,
                  mem_reader: Callable[[], Optional[float]] = available_gb,
                  log: Callable[[str], None] = print,
-                 finish: Optional[Callable[[], dict]] = None) -> None:
+                 finish: Optional[Callable[[], dict]] = None,
+                 arms: Optional[Sequence[str]] = None) -> None:
         if slots < 1:
             raise ValueError("slots must be >= 1")
         # Imported here, not at module level, so --dry-run stays as light as possible.
@@ -85,11 +129,13 @@ class Launcher:
         self.argv_for = argv_for or (lambda j: worker_argv(j, cfg.mitigation, self.base))
         self.paths = runner.Paths(sm.results_dir_for(self.base, cfg))
         self.finish = finish or (lambda: runner.finish(cfg, self.base))
-        self.log_dir = self.paths.directory / "logs"
-        self.jobs = sm.plan_jobs(cfg)
+        self.log_dir = self.paths.logs
+        self.arms = tuple(arms) if arms else None
+        self.jobs = sm.run_order(sm.plan_jobs(cfg, self.arms))
+        self.all_jobs = sm.plan_jobs(cfg)
 
     def _log_path(self, job: sm.Job) -> Path:
-        return self.log_dir / (job.id.replace(":", "_") + ".log")
+        return self.paths.log(job)
 
     def _memory_ok(self) -> bool:
         avail = self.mem_reader()
@@ -99,6 +145,8 @@ class Launcher:
         """Run every unfinished job; returns {"done", "failed", "blocked", "verdict"}."""
         self.log_dir.mkdir(parents=True, exist_ok=True)
         lock = self.log_dir / "launcher.lock"
+        if discard_lock_from_before_boot(lock):
+            self.log(f"[launcher] removed a lock left from before the last reboot: {lock}")
         acquire_lock(lock)
         try:
             return self._run()
@@ -138,6 +186,8 @@ class Launcher:
                         pending.remove(j)
                         self._log_path(j).parent.mkdir(parents=True, exist_ok=True)
                         fh = open(self._log_path(j), "a")
+                        fh.write(f"[launcher] start {j.id} at {_time.strftime('%Y-%m-%d %H:%M:%S %Z')}\n")
+                        fh.flush()
                         env = {**os.environ, **THREAD_ENV}
                         running[j.id] = (subprocess.Popen(self.argv_for(j), stdout=fh,
                                                           stderr=subprocess.STDOUT, env=env), j, fh)
@@ -160,9 +210,12 @@ class Launcher:
                 fh.close()
             raise
         result = {"done": sorted(done), "failed": sorted(failed), "blocked": sorted(blocked),
-                  "verdict": None}
+                  "verdict": None, "sweep_complete": False}
         if not failed and not blocked and len(done) == len(self.jobs):
-            result["verdict"] = self.finish()
+            # The verdict needs every arm. A subset run (e.g. phase 1) never triggers it.
+            result["sweep_complete"] = all(self.paths.done(j) for j in self.all_jobs)
+            if result["sweep_complete"]:
+                result["verdict"] = self.finish()
         return result
 
 
@@ -174,6 +227,11 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--mitigation", default=sm.NO_MITIGATION, choices=sm.MITIGATIONS,
                    help="Default 'none' (decided 2026-10-09).")
     p.add_argument("--dry-run", action="store_true", help="Print resources, plan and time estimate; run nothing.")
+    p.add_argument("--phase", type=int, choices=sorted(sm.RUN_PHASES),
+                   help="Run one phase only: 1 = profit, learning_off (the gate arms); "
+                   "2 = accuracy, profit_drift_off. Default: both, phase 1 first.")
+    p.add_argument("--arms", type=lambda v: tuple(a for a in v.split(",") if a),
+                   help=f"Run only these arms (comma-separated, from {','.join(sm.CONDITIONS)}).")
     p.add_argument("--results-base", type=Path, default=RESULTS_BASE)
     p.add_argument("--gb-per-proc", type=float, default=DEFAULT_GB_PER_PROC,
                    help="RAM budget per simulation process in GB (default 5; not measured on the server).")
@@ -190,10 +248,15 @@ def main(argv=None) -> int:
     if args.max_procs is not None and args.max_procs < 1:
         raise SystemExit("--max-procs must be >= 1")
     cfg = sm.SyntheticConfig(mitigation=args.mitigation)
+    arms = select_arms(args.phase, args.arms)
+    try:
+        sm.plan_jobs(cfg, arms)
+    except ValueError as error:
+        raise SystemExit(str(error))
     res = detect_resources()
     head = default_headroom_gb(res.total_gb) if args.headroom_gb is None else args.headroom_gb
     slots = plan_slots(res, args.gb_per_proc, head, args.max_procs)
-    jobs = sm.plan_jobs(cfg)
+    jobs = sm.run_order(sm.plan_jobs(cfg, arms))
     import run_synthetic_market_experiment as runner  # simulation-free paths helper
 
     paths = runner.Paths(sm.results_dir_for(args.results_base, cfg))
@@ -203,22 +266,34 @@ def main(argv=None) -> int:
     print(f"concurrency: floor(({res.available_gb:.1f} - {head:.1f} headroom) / {args.gb_per_proc:g} GB) "
           f"capped at {res.cores} cores{f' and --max-procs {args.max_procs}' if args.max_procs else ''} "
           f"-> {slots} processes")
-    print(f"mitigation: {cfg.mitigation}; jobs: {len(jobs)} ({len(done)} done); "
-          f"{sm.estimated_run_count(cfg)} runs; longest chain {sm.critical_path_runs(cfg)} runs")
+    print(f"mitigation: {cfg.mitigation}; arms: {', '.join(arms) if arms else 'all, phase 1 first'}; "
+          f"jobs: {len(jobs)} ({len(done)} done); {sum(j.n_runs for j in jobs)} runs; "
+          f"longest chain {sm.critical_path_runs(cfg)} runs")
     if slots >= 1:
-        m = estimate_makespan(jobs, slots, PLANNING_SECONDS_PER_RUN / 60.0, done=done)
+        minutes = PLANNING_SECONDS_PER_RUN / 60.0
+        m = estimate_makespan(jobs, slots, minutes, done=done)
+        phase1 = [j for j in jobs if j.kind == "condition" and sm.phase_of(j.condition) == 1]
+        p1 = estimate_makespan(phase1, slots, minutes, done=done) if phase1 else None
         print(f"estimate at {PLANNING_SECONDS_PER_RUN:g} s/run (UNVERIFIED on the server; "
-              f"network builds not counted): {m / 60:.1f} h")
+              f"network builds not counted): {m / 60:.1f} h"
+              + (f" (phase 1 done after {p1 / 60:.1f} h)" if p1 is not None and len(phase1) < len(jobs) else "")
+              + "; measured figures: calibrate_server.py, then server_eta.py")
     else:
         print("NOT ENOUGH RAM for one process under these settings; nothing will be started.")
         return 2
     if args.dry_run:
         print("dry run: no process started, nothing written.")
         return 0
-    launcher = Launcher(cfg, args.results_base, slots, args.gb_per_proc, head, args.stagger_s)
+    launcher = Launcher(cfg, args.results_base, slots, args.gb_per_proc, head, args.stagger_s,
+                        arms=arms)
     result = launcher.run()
     if result["verdict"] is not None:
         print(f"signal requirement: {result['verdict']['signal_requirement']}")
+        return 0
+    if not result["failed"] and not result["blocked"]:
+        print(f"[launcher] every selected job is done ({len(result['done'])}); the sweep is not "
+              "complete, so no verdict was computed. Pre-stated (spec Section 7, 2026-10-11): "
+              "phase 2 runs regardless, and phase 1 results are not analysed until it is done.")
         return 0
     print(f"[launcher] not finished: failed {result['failed']}, blocked {result['blocked']}. "
           "Fix the cause (see the logs) and re-run this command; finished jobs are skipped.")

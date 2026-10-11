@@ -173,3 +173,17 @@ compute.
   measured `--gb-per-proc`.
 - **Delete the server afterwards.** A forgotten CCX43 bills about $13 per day at
   $0.53/h.
+
+---
+
+## Synthetic-market sweep on a CCX33: note dated 2026-10-11
+
+The CCX43 above cannot be created on this account for several weeks. The sweep
+runs on a **CCX33** (8 dedicated vCPUs, 32 GB) at **$0.266/h**, in two phases
+(spec Section 7, revision 2026-10-11). At the unmeasured planning figures (55 s
+per run, 5 processes by the memory rule), phase 1 takes about 244 h ($65), and
+the whole sweep takes about 489 h, or 20.4 days ($130). **These are not
+measured.** The first hour on the server measures them (`calibrate_server.py`),
+and `server_eta.py` prints the measured finish dates and costs. See
+[`ccx33-run-plan.md`](ccx33-run-plan.md). The CCX43 section above is kept as the
+record.

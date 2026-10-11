@@ -596,7 +596,7 @@ def test_runner_bins_by_trial_with_the_shared_function_and_no_longer_uses_presen
     assert runner.bin_spikes is _sys.modules["run_left_only_realistic_drive_diagnostic"].bin_spikes
     src = inspect.getsource(runner.build_sweep_simulator)
     assert "_build_population_simulator" in src and "bin_spikes(" in src
-    assert "sim = build_sweep_simulator()" in inspect.getsource(runner.main)
+    assert "sim = build_sweep_simulator(progress_printer(" in inspect.getsource(runner.main)
     assert "sim.present(" not in inspect.getsource(sm)
 
 

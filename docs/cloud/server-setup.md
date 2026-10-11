@@ -208,6 +208,10 @@ cause and run the same command again; finished steps are skipped.
 
 ## Step 9 — Run the learning test inside tmux *(agent can do; on the server)*
 
+**For the synthetic-market sweep**, follow [`ccx33-run-plan.md`](ccx33-run-plan.md)
+instead of Steps 9–11. It adds a cross-platform check, calibration, backups,
+monitoring and recovery. Steps 9–11 below describe the first learning test.
+
 **tmux** keeps programs running on the server after you disconnect: closing the
 laptop or losing Wi-Fi does not stop the run.
 
