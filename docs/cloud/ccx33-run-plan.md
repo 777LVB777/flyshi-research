@@ -14,6 +14,59 @@ fakes or dry runs only.
 Setup follows [`server-setup.md`](server-setup.md) Steps 1–8 unchanged. This
 document replaces Steps 9–11 for the sweep.
 
+> **UPDATE 2026-10-11, later the same day: phase 1 only.** The project budget
+> is $200 in total, including the Kalshi experiment, so phase 2 is dropped
+> ([spec, Section 7, second revision dated 2026-10-11](../design/synthetic-market-experiment.md)).
+> The rest of this document is kept as the record. Where it says "whole
+> sweep", read "phase 1".
+>
+> **Measured figures** (calibration `calibration_flyshi-sweep_20261011T211257Z.json`):
+>
+> | N | s/run | runs/h | peak GB/proc | fits in RAM |
+> |---:|---:|---:|---:|---|
+> | 1 | 66.0 | 55 | 3.07 | yes |
+> | **4** | **67.6** | **213** | 3.07 | yes |
+> | 8 | 128.8 | 224 | 3.09 | no (7 fit at 3.6 GB) |
+>
+> **Phase 1 at 4 processes:** 160 jobs, 40 waves of 500-run chains, about
+> **376 h (15.7 days)**. If it restarts at 2026-10-11 23:50 UTC, it ends about
+> **2026-10-27 15:30 UTC**, at a cost of about **$100** at $0.266/h. That is
+> server time from the restart only. Setup, calibration and the 1.5 h before
+> the restart add about $2. About $98 is left for the Kalshi experiment.
+> Re-run the estimate at any time:
+>
+> ```bash
+> .venv-shiu/bin/python repro/mushroom_body/server_eta.py --phase 1 --budget 100
+> ```
+>
+> **Switching the running launcher to phase 1** (it was started without
+> `--phase`). Run inside the launcher's tmux session (`ssh flyshi`,
+> `tmux attach -t setup`):
+>
+> 1. Press **Ctrl+C once** in the launcher's pane. tmux sends SIGINT to the
+>    launcher and its workers. The workers stop, the launcher stops what is
+>    left, waits for them, removes its lock and exits. Wait for the shell
+>    prompt.
+> 2. Check that no worker is left:
+>    `pgrep -af run_synthetic_market_experiment.py` should print nothing.
+> 3. Do a dry run:
+>    `.venv-shiu/bin/python repro/mushroom_body/launch_synthetic_market_parallel.py --max-procs 4 --gb-per-proc 3.6 --phase 1 --dry-run`.
+>    It should report `arms: profit, learning_off`, `jobs: 160 (0 done)` and
+>    4 processes.
+> 4. Start the run: the same command without `--dry-run`.
+>
+> **Do not stop it with `kill <launcher pid>`.** The launcher handles only
+> Ctrl+C (SIGINT). SIGTERM ends it at once. Its workers keep running as
+> orphans and its lock file stays behind. A new launcher would then start the
+> same four jobs a second time.
+>
+> **At the end** the launcher prints "every selected job is done (160)" and
+> exits. It starts no phase 2 job. Its closing message still says "phase 2 runs
+> regardless". That line was written before this decision and does not
+> apply. Check the monitor (160 done, 0 running), then back up, copy and
+> check the results on the Mac. Then delete the server (`server-setup.md`
+> Step 12). An idle CCX33 costs about $6.40 a day.
+
 ## 0. First session, in order
 
 All commands run on the server inside tmux (`tmux new -s fly`), from `~/flyshi-research`.

@@ -7,7 +7,8 @@ in memory under the launcher's rule, using the measured peak per process plus a
 margin, then schedules the remaining sweep jobs exactly as the launcher does
 (``estimate_makespan``, phase 1 first) at that N's measured seconds per run plus its
 measured build time. Prints, per N and for the best N: when phase 1 and phase 2
-finish, and what each costs at --price-per-hour.
+finish, and what each costs at --price-per-hour. ``--phase 1`` schedules and prices
+phase 1 only (phase 2 dropped for budget, spec Section 7, revision 2026-10-11).
 
 "Best" = the most runs per hour among the N that fit in memory; an N within 2% of
 the best throughput but with fewer processes is preferred (less memory risk).
@@ -87,18 +88,20 @@ def choose(plans: Sequence[dict]) -> Optional[dict]:
 
 
 def report(calibration: dict, done: Sequence[str], price: float, start: dt.datetime,
-           budget: Optional[float] = None) -> List[str]:
+           budget: Optional[float] = None, phase: Optional[int] = None) -> List[str]:
     cfg = sm.SyntheticConfig()
     if calibration.get("config_hash") not in (None, cfg.config_hash()):
         raise SystemExit(f"calibration was for config {calibration['config_hash']}, "
                          f"this sweep is {cfg.config_hash()}")
-    jobs = sm.run_order(sm.plan_jobs(cfg))
+    jobs = sm.run_order(sm.plan_jobs(cfg, sm.RUN_PHASES[phase] if phase else None))
+    done = [d for d in done if d in {j.id for j in jobs}]
     machine = calibration["machine"]
     lines = [f"calibration: {calibration['environment'].get('hostname')}, "
              f"{machine['total_gb']:.1f} GB RAM, {machine['available_gb_at_start']:.1f} GB available, "
              f"{machine['logical_cpus']} logical CPUs; price ${price:g}/h; start {start:%Y-%m-%d %H:%M} UTC",
              f"jobs: {len(jobs)} ({len(done)} already done); phase 1 = {len(phase_jobs(jobs, 1))} "
-             f"(profit, learning_off), phase 2 = {len(phase_jobs(jobs, 2))} (accuracy, profit_drift_off)",
+             f"(profit, learning_off), phase 2 = {len(phase_jobs(jobs, 2))} (accuracy, profit_drift_off)"
+             + (f"; phase {phase} only" if phase else ""),
              "",
              "| N | s/run | runs/h | peak GB/proc | fits in RAM | phase 1 done | all done | "
              "phase 1 cost | phase 2 cost | total |",
@@ -132,11 +135,12 @@ def report(calibration: dict, done: Sequence[str], price: float, start: dt.datet
         f"({best['seconds_per_run']:.1f} s per run per process)",
         f"  phase 1 (gate arms) complete: {_date(start, best['phase1_hours'])} "
         f"(+{best['phase1_hours']:.0f} h), cost ${best['phase1_cost']:.2f}",
-        f"  phase 2 complete (whole sweep): {_date(start, best['total_hours'])} "
-        f"(+{best['total_hours']:.0f} h), phase 2 cost ${best['phase2_cost']:.2f}",
-        f"  total ${best['total_cost']:.2f} at ${price:g}/h, server time only "
-        "(setup, calibration and copying not included)",
     ]
+    if not phase:
+        lines.append(f"  phase 2 complete (whole sweep): {_date(start, best['total_hours'])} "
+                     f"(+{best['total_hours']:.0f} h), phase 2 cost ${best['phase2_cost']:.2f}")
+    lines.append(f"  total ${best['total_cost']:.2f} at ${price:g}/h, server time only "
+                 "(setup, calibration and copying not included)")
     if budget is not None:
         lines.append(f"  budget ${budget:g}: {'within' if best['total_cost'] <= budget else 'EXCEEDED'}, "
                      f"${budget - best['total_cost']:.2f} left")
@@ -147,7 +151,8 @@ def report(calibration: dict, done: Sequence[str], price: float, start: dt.datet
         "",
         "launcher command (inside tmux):",
         f"  .venv-shiu/bin/python repro/mushroom_body/launch_synthetic_market_parallel.py "
-        f"--max-procs {best['procs']} --gb-per-proc {gb_budget(best['peak_gb']):g}",
+        f"--max-procs {best['procs']} --gb-per-proc {gb_budget(best['peak_gb']):g}"
+        + (f" --phase {phase}" if phase else ""),
         f"  (--gb-per-proc = measured peak {best['peak_gb']:.2f} GB x {MEMORY_MARGIN}; add --dry-run "
         "first and check it reports the same process count)",
     ]
@@ -171,6 +176,8 @@ def parser() -> argparse.ArgumentParser:
                    help="calibrate_server.py output (default: newest in results/server_calibration).")
     p.add_argument("--price-per-hour", type=float, default=PRICE_PER_HOUR)
     p.add_argument("--budget", type=float, default=None, help="Optional total budget in USD.")
+    p.add_argument("--phase", type=int, choices=sorted(sm.RUN_PHASES), default=None,
+                   help="Schedule and price this phase only (default: both, phase 1 first).")
     p.add_argument("--start", default=None,
                    help="Start time, ISO 8601 UTC (default: now).")
     p.add_argument("--results-base", type=Path, default=RESULTS_BASE,
@@ -186,7 +193,7 @@ def main(argv=None) -> int:
              else dt.datetime.now(dt.timezone.utc).replace(tzinfo=None, second=0, microsecond=0))
     print(f"from {path}")
     print("\n".join(report(calibration, done_jobs(args.results_base), args.price_per_hour,
-                           start, args.budget)))
+                           start, args.budget, args.phase)))
     return 0
 
 

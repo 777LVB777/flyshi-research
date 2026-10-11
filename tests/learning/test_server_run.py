@@ -299,6 +299,17 @@ def test_eta_prefers_fewer_processes_within_two_percent_and_subtracts_done_jobs(
     assert full["total_cost"] == pytest.approx(full["phase1_cost"] + full["phase2_cost"])
 
 
+def test_eta_phase_1_only_schedules_and_prices_phase_1_alone():
+    start = ETA.dt.datetime(2026, 10, 12, 9, 0)
+    cal = calibration([(4, 60.0, 3.0)])
+    text = "\n".join(ETA.report(cal, [], 0.266, start, budget=100, phase=1))
+    assert "phase 1 only" in text and "phase 2 complete" not in text
+    assert "--max-procs 4 --gb-per-proc 3.5 --phase 1" in text
+    both = ETA.plan(cal["levels"][0], sm.run_order(sm.plan_jobs(sm.SyntheticConfig())), [], 0.266)
+    assert f"+{both['phase1_hours']:.0f} h), cost ${both['phase1_cost']:.2f}" in text
+    assert f"total ${both['phase1_cost']:.2f}" in text and "budget $100: within" in text
+
+
 def test_eta_rejects_a_calibration_for_another_configuration():
     cal = calibration([(4, 60.0, 3.0)])
     cal["config_hash"] = "0000000000"

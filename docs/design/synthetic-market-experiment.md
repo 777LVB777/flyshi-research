@@ -787,6 +787,56 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 >   first hour on the server, then `server_eta.py`. See
 >   [`../cloud/ccx33-run-plan.md`](../cloud/ccx33-run-plan.md).
 
+> **REVISION 2026-10-11, later the same day (project owner), before any phase 1
+> result exists: phase 2 is dropped for budget.** The revision above is kept as
+> the record. This revision uses its pre-stated exception.
+>
+> - **When.** Recorded on 2026-10-11, about 1.5 h after the sweep started
+>   (22:22 UTC). No job had finished, so no job file existed. Nothing from any
+>   job had been computed or looked at beyond what the revision above allows
+>   (progress lines, memory).
+> - **Decision.** The total project budget is **$200**, including the future
+>   Kalshi experiment. Phase 2 (`accuracy`, `profit_drift_off`: 160 jobs,
+>   80,000 runs) is **not run**.
+> - **Reason: budget.** Measured on the CCX33 (`calibrate_server.py`,
+>   2026-10-11): 4 processes at 67.6 s per run, 213 runs/h. At $0.266/h the
+>   whole sweep needs about 751 h and **$200**, which is the entire project
+>   budget. Phase 1 alone needs about 376 h and **$100**.
+> - **The exception applies.** Phase 2 cannot be finished because of the
+>   budget. The decision is recorded here before any phase 1 result is analysed.
+> - **Unchanged.** Phase 1 itself does not change: arms `profit` and
+>   `learning_off`, 4 strengths × 20 seeds, 250 markets, the Section 6
+>   criterion and config hash **`a325e6b206`**. The phase 1 job files are the
+>   same files they would have been with phase 2 (tested).
+> - **What changes in the run.** The launcher is restarted with `--phase 1`.
+>   The four jobs in progress restart from market 0, which costs about 1.5 h.
+>   The launcher exits after the last phase 1 job, and the server is then
+>   deleted.
+> - **When phase 1 is analysed.** Not before all 160 phase 1 job files exist.
+>   Until then the rule above still holds, applied to phase 1: only the
+>   operational figures listed above may be looked at.
+> - **How the gate is reported.** The gate is reported as the pre-stated
+>   exception describes, with `accuracy` and `profit_drift_off` marked "not run".
+>   The gate-only evaluation is still not implemented. It will be written
+>   before any phase 1 file is read, and labelled as written after this
+>   decision. `--finish` and the launcher's verdict still need all 320 files,
+>   so they will never run for this sweep.
+> - **What the paper loses.**
+>   - **The accuracy-reward comparison.** Training on Brier improvement over the
+>     price, against training on paper P&L, with the same markets and seeds. The
+>     paper can no longer say whether the type of teaching signal matters. It
+>     reports only what the profit signal does.
+>   - **The forgetting-off comparison.** The pre-registered drift sensitivity
+>     check (`drift_rate = 0`). The paper can no longer say whether a gate
+>     result depends on forgetting (`drift_rate = 0.01`), so any result holds
+>     only with that drift rate.
+>   - Neither was ever part of the gate (Section 6). The primary criterion and
+>     the signal requirement are unaffected.
+> - **Remaining budget.** About **$100** for everything else, including the
+>   Kalshi experiment. **The Kalshi experiment must be designed to fit roughly
+>   $100.** Phase 1 has no contingency: any restart, idle server hour or
+>   failed job is paid out of that same $100.
+
 ## Results
 
 *None. Append results here after the selected mitigation has completed;
