@@ -1,0 +1,354 @@
+"""Polymarket loader: network refusal, rate and log, selection, freezing, look-ahead guard,
+split and output format.
+
+Only RECORDED FAKE responses (tests/fixtures/polymarket, hand-written to the documented
+schema) are used, through an injected fake transport. No test makes a network request:
+the real transport is never constructed (``_no_real_transport`` makes sure of it).
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import math
+import random
+import sys
+import urllib.parse
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from flyshi_research.realdata import polymarket as pm
+from flyshi_research.simulator import Market
+
+REPO = Path(__file__).resolve().parents[2]
+FIX = REPO / "tests" / "fixtures" / "polymarket"
+CLI = REPO / "repro" / "polymarket" / "load_polymarket.py"
+
+
+@pytest.fixture(autouse=True)
+def _no_real_transport(monkeypatch):
+    def refuse(*a, **k):
+        raise AssertionError("a test tried to build the real network transport")
+    monkeypatch.setattr(pm, "urllib_transport", refuse)
+
+
+class FakeServer:
+    """Serves the recorded fake responses; records every call."""
+
+    def __init__(self, status_sequence=None):
+        self.calls = []
+        self.status_sequence = list(status_sequence or [])
+
+    def __call__(self, url, headers):
+        self.calls.append((url, dict(headers)))
+        if self.status_sequence:
+            status = self.status_sequence.pop(0)
+            if status != 200:
+                return status, b'{"error":"rate limited"}', {}
+        parsed = urllib.parse.urlparse(url)
+        q = dict(urllib.parse.parse_qsl(parsed.query))
+        if parsed.netloc == "gamma-api.polymarket.com" and parsed.path == "/markets/keyset":
+            name = "gamma_markets_keyset_page2.json" if q.get("after_cursor") == "FAKECURSOR1" \
+                else "gamma_markets_keyset_page1.json"
+        elif parsed.netloc == "clob.polymarket.com" and parsed.path == "/prices-history":
+            name = f"clob_prices_history_{q['market']}.json"
+        else:
+            return 404, b"{}", {}
+        return 200, (FIX / name).read_bytes(), {}
+
+
+def permission(tmp_path, endpoints=pm.ALLOWED_ENDPOINTS, requests=100, per_seconds=10):
+    path = tmp_path / "permission.json"
+    path.write_text(json.dumps({
+        "recorded_on": "2026-10-12", "recorded_by": "test",
+        "endpoints": [{"endpoint": e, "basis": "TEST ONLY",
+                       "published_limit": {"requests": requests, "per_seconds": per_seconds, "source": "test"}}
+                      for e in endpoints]}))
+    return pm.Permission.load(path)
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 1000.0
+        self.slept = []
+
+    def now(self):
+        return self.t
+
+    def sleep(self, s):
+        self.slept.append(s)
+        self.t += s
+
+
+def client(tmp_path, server, allow=True, perm="all", rate=0.5, clock=None):
+    p = permission(tmp_path) if perm == "all" else perm
+    clock = clock or FakeClock()
+    pol = pm.NetworkPolicy(allow_network=allow, permission=p, requests_per_second=rate)
+    return pm.PolymarketClient(pol, server, tmp_path / "log.jsonl", raw_dir=tmp_path / "raw",
+                               clock=clock.now, sleep=clock.sleep, wallclock=lambda: 1.76e9)
+
+
+# ---- network refusal ------------------------------------------------------------------- #
+def test_network_is_refused_without_the_flag_even_with_a_permission(tmp_path):
+    server = FakeServer()
+    c = client(tmp_path, server, allow=False)
+    with pytest.raises(pm.NetworkRefused, match="network is disabled"):
+        c.get(pm.GAMMA_MARKETS, {"closed": "true"})
+    assert server.calls == [] and not (tmp_path / "log.jsonl").exists()
+
+
+def test_network_is_refused_with_the_flag_but_no_or_partial_permission(tmp_path):
+    server = FakeServer()
+    with pytest.raises(pm.NetworkRefused, match="no permission file"):
+        client(tmp_path, server, perm=None).get(pm.GAMMA_MARKETS, {})
+    gamma_only = permission(tmp_path, endpoints=(pm.GAMMA_MARKETS,))
+    c = client(tmp_path, server, perm=gamma_only)
+    with pytest.raises(pm.NetworkRefused, match="does not cover"):
+        c.get(pm.CLOB_PRICES_HISTORY, {"market": "1"})
+    assert server.calls == []
+
+
+def test_only_the_two_coded_endpoints_exist_and_a_permission_cannot_add_more(tmp_path):
+    extra = ("GET https://data-api.polymarket.com/trades", "GET https://clob.polymarket.com/book",
+             "POST https://clob.polymarket.com/batch-prices-history", "GET https://gamma-api.polymarket.com/markets")
+    server = FakeServer()
+    c = client(tmp_path, server, perm=permission(tmp_path, endpoints=pm.ALLOWED_ENDPOINTS + extra))
+    for ep in extra:
+        with pytest.raises(pm.NetworkRefused, match="not one of the allowed endpoints"):
+            c.get(ep, {})
+    assert pm.ALLOWED_ENDPOINTS == ("GET https://gamma-api.polymarket.com/markets/keyset",
+                                    "GET https://clob.polymarket.com/prices-history")
+    assert server.calls == []
+
+
+def test_rate_must_stay_under_a_quarter_of_the_published_limit(tmp_path):
+    p = permission(tmp_path, requests=10, per_seconds=10)  # 1 req/s published -> at most 0.25 req/s
+    with pytest.raises(pm.NetworkRefused, match="exceeds"):
+        client(tmp_path, FakeServer(), perm=p, rate=0.5).get(pm.GAMMA_MARKETS, {})
+    client(tmp_path, FakeServer(), perm=p, rate=0.25).get(pm.GAMMA_MARKETS, {})
+
+
+def test_requests_are_read_only_unauthenticated_throttled_and_logged(tmp_path):
+    server, clock = FakeServer(), FakeClock()
+    c = client(tmp_path, server, rate=0.5, clock=clock)
+    pages = pm.fetch_closed_markets(c)
+    assert len(pages) == 13 and len(server.calls) == 2
+    for url, headers in server.calls:
+        assert url.startswith("https://gamma-api.polymarket.com/markets/keyset?")
+        assert not {h.lower() for h in headers} & {"authorization", "cookie", "x-api-key", "poly_api_key"}
+    assert clock.slept == [pytest.approx(2.0)]  # 0.5 req/s: second request waits 2 s
+    log = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
+    assert [e["status"] for e in log] == [200, 200] and all(len(e["sha256"]) == 64 for e in log)
+    assert len(list((tmp_path / "raw").iterdir())) == 2  # stored privately
+    assert not hasattr(c, "post") and not hasattr(c, "put") and not hasattr(c, "delete")
+
+
+def test_429_backs_off_and_is_logged(tmp_path):
+    server, clock = FakeServer(status_sequence=[429, 429, 200]), FakeClock()
+    c = client(tmp_path, server, clock=clock)
+    c.get(pm.GAMMA_MARKETS, {"closed": "true"})
+    log = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
+    assert [e["status"] for e in log] == [429, 429, 200] and 2.0 in clock.slept and 4.0 in clock.slept
+
+
+def test_redirects_are_refused():
+    handler = pm._NoRedirect()
+    with pytest.raises(pm.NetworkRefused, match="redirect"):
+        handler.redirect_request(None, None, 302, "Found", {}, "https://elsewhere.example/")
+
+
+# ---- selection and freezing ------------------------------------------------------------ #
+def _raw():
+    return (json.loads((FIX / "gamma_markets_keyset_page1.json").read_text())["markets"]
+            + json.loads((FIX / "gamma_markets_keyset_page2.json").read_text())["markets"])
+
+
+def test_selection_counts_every_exclusion_and_keeps_one_market_per_event():
+    sel = pm.select_markets(_raw())
+    c = sel.counts
+    assert c["raw"] == 13 and c["duplicate_id"] == 1 and c["not_closed"] == 1 and c["not_binary"] == 1
+    assert c["missing_token_ids"] == 1 and c["void_50_50"] == 1 and c["unresolved_or_ambiguous"] == 1
+    assert c["below_min_volume"] == 1 and c["no_decision_window"] == 1 and c["closed_before_decision"] == 1
+    assert c["eligible_before_event_choice"] == 4 and c["dropped_one_per_event"] == 1
+    assert c["selected"] == 3 and c["archived_selected"] == 1
+    ids = {m.market_id for m in sel.markets}
+    assert {"106", "110"} <= ids and len(ids & {"101", "102"}) == 1
+    # counted at the volume step, i.e. among markets that passed every earlier filter
+    assert sel.volume_sensitivity == {">=1000": 7, ">=100000": 0, ">=10000": 6}
+    assert {m.event_id for m in sel.markets if m.market_id == "110"} == {"market:110"}
+
+
+def test_selection_and_decision_times_are_blind_to_outcome_and_price():
+    raw = _raw()
+    flipped = json.loads(json.dumps(raw))
+    for m in flipped:
+        if m["outcomePrices"] in ('["1", "0"]', '["0", "1"]'):
+            m["outcomePrices"] = '["0", "1"]' if m["outcomePrices"] == '["1", "0"]' else '["1", "0"]'
+        m["lastTradePrice"] = 0.123
+    a, b = pm.select_markets(raw), pm.select_markets(flipped)
+    assert a.markets == b.markets and a.counts == b.counts
+    assert all(a.outcomes[k] != b.outcomes[k] for k in a.outcomes)
+
+
+def test_decision_time_is_inside_the_scheduled_life_with_margins():
+    for m in pm.select_markets(_raw()).markets:
+        td, start, end = (pm.parse_time(x) for x in (m.decision_time, m.start, m.end))
+        assert start + timedelta(hours=24) <= td <= end - timedelta(hours=24)
+        assert td < pm.parse_time(m.closed_time)
+
+
+def test_freeze_writes_a_hash_without_outcomes_and_refuses_a_different_list(tmp_path):
+    sel = pm.select_markets(_raw())
+    path = tmp_path / "frozen.json"
+    digest = pm.freeze_selection(sel, path)
+    assert (tmp_path / "frozen.json.sha256").read_text().strip() == digest
+    frozen_fields = {k for m in json.loads(path.read_text())["markets"] for k in m}
+    assert frozen_fields == set(pm.SelectedMarket.__dataclass_fields__) and "outcome" not in frozen_fields
+    frozen, d2 = pm.load_frozen(path)
+    assert d2 == digest and frozen == sel.markets
+    assert pm.freeze_selection(sel, path) == digest  # same list: fine (restart)
+    other = pm.select_markets(_raw(), min_volume=1_000.0)
+    with pytest.raises(RuntimeError, match="different frozen list"):
+        pm.freeze_selection(other, path)
+    payload = json.loads(path.read_text())
+    payload["markets"][0]["decision_time"] = "2099-01-01T00:00:00+00:00"
+    path.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        pm.load_frozen(path)
+
+
+# ---- look-ahead guard ---------------------------------------------------------------- #
+TD = datetime(2025, 3, 10, 12, 0, tzinfo=timezone.utc)
+END = datetime(2025, 4, 1, tzinfo=timezone.utc)
+
+
+def _history(rng, n=200):
+    t0 = int((TD - timedelta(days=5)).timestamp())
+    return sorted((t0 + rng.randrange(0, 10 * 86400), round(rng.random(), 4)) for _ in range(n))
+
+
+def test_no_feature_uses_data_at_or_after_the_decision_time():
+    """Fails if any feature reads a point timestamped at or after t_d: every such point is
+    replaced, removed or added in bulk, and the features must not change."""
+    rng = random.Random(20261012)
+    cut = int(TD.timestamp())
+    checked = 0
+    for _ in range(300):
+        h = _history(rng)
+        base, why = pm.decision_features(h, TD, END)
+        past = [pt for pt in h if pt[0] < cut]
+        variants = [
+            past,                                                         # everything at/after t_d removed
+            past + [(t, 1.0 - p) for t, p in h if t >= cut],              # every later price inverted
+            past + [(cut, 0.999), (cut + 1, 0.001), (cut + 86400, 0.5)],  # points exactly at and after t_d
+        ]
+        for v in variants:
+            assert pm.decision_features(v, TD, END) == (base, why)
+        checked += base is not None
+    assert checked > 100  # the property was exercised on markets that produced features
+
+
+def test_a_point_exactly_at_the_decision_time_is_not_used():
+    cut = int(TD.timestamp())
+    h = [(cut - 2 * 86400, 0.40), (cut - 3600, 0.50), (cut, 0.99)]
+    f, why = pm.decision_features(h, TD, END)
+    assert why is None and f.price == 0.50 and f.price_time == cut - 3600
+    assert f.recent_change == pytest.approx(0.10)
+    assert f.time_to_resolution == pytest.approx((END - TD).total_seconds() / 86400)
+
+
+def test_stale_and_too_young_histories_are_excluded_with_a_reason():
+    cut = int(TD.timestamp())
+    assert pm.decision_features([], TD, END) == (None, "no_price_before_decision")
+    assert pm.decision_features([(cut - 3 * 86400, 0.5)], TD, END) == (None, "stale_price")
+    assert pm.decision_features([(cut - 3600, 0.5)], TD, END) == (None, "no_price_before_window")
+
+
+def test_history_requests_end_at_the_decision_time(tmp_path):
+    server = FakeServer()
+    c = client(tmp_path, server)
+    for m in pm.select_markets(_raw()).markets:
+        pm.fetch_price_history(c, m)
+    for url, _ in server.calls:
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))
+        m = next(x for x in pm.select_markets(_raw()).markets if x.yes_token_id == q["market"])
+        assert int(q["endTs"]) == int(pm.parse_time(m.decision_time).timestamp())
+        assert int(q["startTs"]) < int(q["endTs"])
+
+
+# ---- split and output -------------------------------------------------------------- #
+def _end_to_end(tmp_path, cutoff="2025-06-01"):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    server = FakeServer()
+    c = client(tmp_path, server)
+    sel = pm.select_markets(pm.fetch_closed_markets(c))
+    digest = pm.freeze_selection(sel, tmp_path / "frozen.json")
+    frozen, _ = pm.load_frozen(tmp_path / "frozen.json")
+    hist = {m.market_id: pm.fetch_price_history(c, m) for m in frozen}
+    built, counts = pm.build_markets(frozen, hist, sel.outcomes)
+    cut = pm.parse_time(cutoff + "T00:00:00Z")
+    train, test, split = pm.split_train_test(built, cut)
+    out = tmp_path / "markets.json"
+    pm.write_market_file(out, train, test, digest, cut, pm.DEFAULT_SPLIT_GAP, {**counts, **split})
+    return out, train, test, split, counts
+
+
+def test_split_trains_only_on_markets_resolved_before_the_cutoff_with_a_gap(tmp_path):
+    _, train, test, split, counts = _end_to_end(tmp_path)
+    cut = pm.parse_time("2025-06-01T00:00:00Z")
+    assert counts["built"] == 3 and split == {"train": 2, "test": 1, "straddling_excluded": 0}
+    assert all(pm.parse_time(b.market.closed_time) < cut for b in train)
+    assert all(pm.parse_time(b.market.decision_time) >= cut + timedelta(days=7) for b in test)
+    assert [b.market.closed_time for b in train] == sorted(b.market.closed_time for b in train)
+    _, train2, test2, split2, _ = _end_to_end(tmp_path / "late", cutoff="2025-04-20")
+    assert split2["straddling_excluded"] == 1  # 106 resolves after, but is decided before cutoff + gap
+
+
+def test_output_is_the_market_type_the_synthetic_runner_consumes(tmp_path):
+    from flyshi_research.learning import synthetic_market as sm
+    out, train, test, _, _ = _end_to_end(tmp_path)
+    tr, te = pm.load_market_file(out)
+    assert all(isinstance(m, Market) for m in tr + te)
+    assert [m.sequence for m in tr] == list(range(len(tr))) and [m.sequence for m in te] == [0]
+    for m in tr + te:
+        assert m.signal == 0.5 and m.liquidity == 0.5 and math.isnan(m.latent_probability)
+        assert 0.0 <= m.quote <= 1.0 and -1.0 <= m.recent_change <= 1.0 and m.time_to_resolution > 0
+        assert m.outcome in (0, 1)
+    assert sm.feature_matrix(tr + te).shape == (3, 5)
+    payload = json.loads(out.read_text())
+    assert payload["format"] == pm.MARKET_FILE_FORMAT and len(payload["frozen_list_sha256"]) == 64
+
+
+# ---- CLI refuses by default ------------------------------------------------------------ #
+def _cli():
+    spec = importlib.util.spec_from_file_location("load_polymarket_cli_test", CLI)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_cli_network_steps_refuse_without_flag_and_permission(tmp_path, capsys):
+    cli, server = _cli(), FakeServer()
+    assert cli.main(["select", "--data-dir", str(tmp_path)], transport=server) == 2
+    assert cli.main(["select", "--allow-network", "--data-dir", str(tmp_path)], transport=server) == 2
+    assert server.calls == [] and not (tmp_path / "frozen_market_list.json").exists()
+    assert "REFUSED" in capsys.readouterr().err
+    cli.main(["check"])
+    assert capsys.readouterr().out.count("REFUSED") == 2
+
+
+def test_cli_runs_end_to_end_on_the_fake_server_when_both_are_given(tmp_path, capsys):
+    cli, server = _cli(), FakeServer()
+    p = tmp_path / "perm.json"
+    permission(tmp_path)  # writes tmp_path/permission.json
+    (tmp_path / "permission.json").rename(p)
+    args = ["--allow-network", "--permission", str(p), "--data-dir", str(tmp_path / "d")]
+    assert cli.main(["select", *args], transport=server) == 0
+    assert cli.main(["history", *args], transport=server) == 0
+    assert cli.main(["build", "--data-dir", str(tmp_path / "d"), "--cutoff", "2025-06-01"]) == 0
+    out = next((tmp_path / "d").glob("markets_*_cutoff_2025-06-01.json"))
+    tr, te = pm.load_market_file(out)
+    assert (len(tr), len(te)) == (2, 1)

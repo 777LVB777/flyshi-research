@@ -1,0 +1,120 @@
+{
+ "_note": "FAKE response, hand-written to the documented Gamma/CLOB schema for tests; not real Polymarket data",
+ "next_cursor": "FAKECURSOR1",
+ "markets": [
+  {
+   "id": "101",
+   "question": "Fake market 101?",
+   "closed": true,
+   "archived": false,
+   "outcomes": "[\"Yes\", \"No\"]",
+   "outcomePrices": "[\"1\", \"0\"]",
+   "volumeNum": 50000.0,
+   "startDate": "2025-01-01T00:00:00Z",
+   "endDate": "2025-03-01T00:00:00Z",
+   "closedTime": "2025-03-01 12:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1010001\", \"1010002\"]",
+   "events": [
+    {
+     "id": "9001"
+    }
+   ]
+  },
+  {
+   "id": "102",
+   "question": "Fake market 102?",
+   "closed": true,
+   "archived": false,
+   "outcomes": "[\"Yes\", \"No\"]",
+   "outcomePrices": "[\"0\", \"1\"]",
+   "volumeNum": 20000.0,
+   "startDate": "2025-01-01T00:00:00Z",
+   "endDate": "2025-03-01T00:00:00Z",
+   "closedTime": "2025-03-01 12:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1020001\", \"1020002\"]",
+   "events": [
+    {
+     "id": "9001"
+    }
+   ]
+  },
+  {
+   "id": "103",
+   "question": "Fake market 103?",
+   "closed": true,
+   "archived": false,
+   "outcomes": "[\"Yes\", \"No\"]",
+   "outcomePrices": "[\"0.5\", \"0.5\"]",
+   "volumeNum": 30000.0,
+   "startDate": "2025-01-01T00:00:00Z",
+   "endDate": "2025-03-01T00:00:00Z",
+   "closedTime": "2025-03-01 12:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1030001\", \"1030002\"]",
+   "events": [
+    {
+     "id": "9002"
+    }
+   ]
+  },
+  {
+   "id": "104",
+   "question": "Fake market 104?",
+   "closed": true,
+   "archived": false,
+   "outcomes": "[\"A\", \"B\", \"C\"]",
+   "outcomePrices": "[\"1\", \"0\", \"0\"]",
+   "volumeNum": 50000.0,
+   "startDate": "2025-01-01T00:00:00Z",
+   "endDate": "2025-03-01T00:00:00Z",
+   "closedTime": "2025-03-01 12:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1040001\", \"1040002\"]",
+   "events": [
+    {
+     "id": "9003"
+    }
+   ]
+  },
+  {
+   "id": "105",
+   "question": "Fake market 105?",
+   "closed": true,
+   "archived": false,
+   "outcomes": "[\"Yes\", \"No\"]",
+   "outcomePrices": "[\"0\", \"1\"]",
+   "volumeNum": 5000.0,
+   "startDate": "2025-01-01T00:00:00Z",
+   "endDate": "2025-03-01T00:00:00Z",
+   "closedTime": "2025-03-01 12:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1050001\", \"1050002\"]",
+   "events": [
+    {
+     "id": "9004"
+    }
+   ]
+  },
+  {
+   "id": "106",
+   "question": "Fake market 106?",
+   "closed": true,
+   "archived": true,
+   "outcomes": "[\"Yes\", \"No\"]",
+   "outcomePrices": "[\"1\", \"0\"]",
+   "volumeNum": 15000.0,
+   "startDate": "2025-02-01T00:00:00Z",
+   "endDate": "2025-05-01T00:00:00Z",
+   "closedTime": "2025-05-02 08:00:00+00",
+   "umaResolutionStatus": "resolved",
+   "clobTokenIds": "[\"1060001\", \"1060002\"]",
+   "events": [
+    {
+     "id": "9005"
+    }
+   ]
+  }
+ ]
+}

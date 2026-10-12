@@ -12,6 +12,9 @@ Section 9.
   the owner chose option (i): CLOB `/prices-history` is allowed alongside Gamma
   under the same conditions, pending Polymarket's confirmation (Section 1). The
   rest of the design stays venue-neutral.
+- **Update 2026-10-12 (later).** Decisions on signal, comparator, liquidity and
+  size, a draft Polymarket loader, and three proposals awaiting confirmation are
+  in Section 10. Section 10 governs where it differs from earlier sections.
 - **What was done.** No market data has been downloaded and no simulation was
   run.
 - **Unverified figures.** Every figure marked **unverified** comes from
@@ -598,3 +601,219 @@ At 213 runs/h and $0.266/h, server time only:
 - `iemweb.biz.uiowa.edu`: About, Research, FAQ, Historical Data and Recent
   Markets;
 - the Kalshi documents as listed in open-decisions item 6.
+
+## 10. Decisions of 2026-10-12 and the Polymarket loader
+
+**Status.** The project owner decided items 1–4 below on 2026-10-12. Sections 2–9
+above are kept as the record of what was weighed. Where they conflict with this
+section, this section governs. The whole file remains DRAFT. Three items are
+**PROPOSED** and await the owner's confirmation: the calibration method (10.2),
+the decision-time rule (10.5) and the volume threshold (10.6).
+
+### 10.1 Signal: none (decision 1)
+
+- **No outside signal.** The `signal` pool is held at the encoder midpoint, 0.5
+  (90 Hz in both framings), so total drive stays in the validated range
+  (Section 3).
+- **The question.** *Can the circuit beat the market using only market-internal
+  features: price, recent_change and time_to_resolution?*
+- **What the paper can claim.** This is option (a) of Section 4, with its claims
+  and limits. The synthetic signal requirement does not transfer.
+- **Deferred.** Cross-venue signal (option (b)) is deferred to a follow-up.
+
+### 10.2 Comparator: the market price, calibrated on training markets only (decision 2)
+
+**PROPOSED method: isotonic calibration of the raw price, with shrinkage, plus a
+training-only guard.**
+
+1. **Fit.** Fit isotonic regression (pool-adjacent-violators) of the outcome on
+   the raw price at `t_d`, **on the probability scale**, using training markets
+   only. Tied prices are pooled.
+2. **Shrinkage.** Shrink each isotonic block toward the block's own mean price
+   with a pseudo-count m = 20: (Σy + m·p̄)/(n + m). A sparse block at an extreme
+   price can then never output exactly 0 or 1.
+3. **Prediction.** Interpolate linearly between block centres. Prices beyond the
+   training range take the nearest end value.
+4. **Guard, fixed before any test market is scored.** Run a 5-fold
+   cross-validation on training markets, with folds assigned by a seeded hash of
+   market ID, comparing the Brier score of the raw price with that of the
+   calibrated price. The comparator is whichever is lower. Report both.
+
+**Why this avoids the earlier artifact.**
+
+- **What went wrong before.** Platt scaling fits a line on logit(price). In the
+  synthetic sweep the clipped prices (0.01, 0.99) had extreme logits. They pulled
+  the slope to about 0.6 and over-shrank the middle, so the "calibrated" price
+  was worse than the raw price (Brier 0.2142 against 0.2093). A no-signal
+  forecaster could then beat the comparator.
+- **Isotonic does not have that problem.**
+  - It works on the price itself, so an extreme price influences only its own
+    block.
+  - It is monotone, so it never reverses the market's ranking.
+  - It can follow a favourite-longshot curve without assuming a shape.
+- **Shrinkage** removes the remaining risk of 0/1 outputs from thin tails.
+- **Precedent.** Isotonic calibration is generally as good as or better than
+  Platt once about 1,000 or more calibration examples are available
+  (Niculescu-Mizil & Caruana, 2005). Design A has thousands of training markets.
+- **The guard.** A comparator weaker than the raw price makes the market
+  comparison easier to pass, which was exactly the synthetic failure. Taking the
+  better of raw and calibrated on training data keeps the comparator at least as
+  strong as the raw price in expectation.
+
+**Alternative:** 20 equal-count price bins with the same shrinkage. It is
+simpler, but it is a step function and its edges are arbitrary.
+
+### 10.3 Liquidity (decision 3)
+
+- **As an input:** held at the encoder midpoint, 0.5.
+- **Final volume** (Gamma `volumeNum`) is used **only as a selection criterion**,
+  never as an input (10.6).
+
+### 10.4 Size (decision 4)
+
+- **Design A** (Section 7): `profit`, `learning_off`, and `null_permuted`, the
+  shuffled-outcome null control.
+- **Shape:** 40 chains × 250 markets (70 training, 180 test), 60,000 runs, about
+  282 h.
+- **Cost:** about **$75** at the measured CCX33 rate ($0.266/h, 213 runs/h).
+- **Budget:** Phase 1 about $100, plus about $75 here, leaves about **$25 buffer**
+  within the $200 total.
+- **Market count needed:** about 10,000 distinct qualifying markets, one per
+  event. **Unverified until the metadata count (10.7).**
+
+### 10.5 Decision time and features (PROPOSED)
+
+- **Decision time `t_d`.** A seeded uniform draw over the market's
+  **scheduled** life, [start + 24 h, scheduled end − 24 h].
+  - The seed is the SHA-256 of `flyshi-phase2-td-20261012|<market id>`.
+  - The draw uses only the market ID and the listed start and end dates. It
+    never uses the outcome, any price, or the actual close time.
+  - It is drawn at selection, so it is frozen in the market list (10.7).
+- **Why not a fixed horizon.** A fixed horizon (for example close − 7 days)
+  would make `time_to_resolution` nearly constant. The question in 10.1 names it
+  as one of three features.
+- **Open at `t_d`.** A market that had already closed at `t_d` was not available
+  to a trader then. It is excluded and counted (`closed_before_decision`). This
+  defines the sampling frame and is not look-ahead. It does under-represent
+  markets that resolve early, which is reported as a limitation.
+- **Features, all from data strictly before `t_d`**
+  (`polymarket.decision_features`):
+  - `price` = the last CLOB price-history point **strictly before** `t_d`, at
+    most 24 h old. If there is none, or it is stale, the market is excluded and
+    counted.
+  - `recent_change` = `price` minus the last point at or before `t_d − 24 h`,
+    clipped to ±1. If the market has no such point, it is excluded and counted.
+  - `time_to_resolution` = days from `t_d` to the **scheduled** end date. It is
+    never the actual close, which would leak early resolutions. The encoder clips
+    values above 365 days and reports it.
+  - `liquidity` = 0.5 and `signal` = 0.5.
+- **Look-ahead guard.**
+  - **At the source:** each history request ends at `t_d`, as
+    [`t_d` − 3 days, `t_d`] at 60-min fidelity. Nothing after `t_d` is
+    downloaded.
+  - **In code:** `strictly_before` drops every point with t ≥ `t_d` before any
+    feature is computed.
+  - **Tested:** a property test changes, removes or adds every point at or after
+    `t_d` in 300 random histories, and the features must not change. Breaking
+    the guard (`<` to `<=`) makes it fail, which was checked on 2026-10-12.
+- **Unverified, to check on the first permitted requests** (a handful of
+  markets, before the bulk run):
+  - whether the CLOB history `p` is a midpoint or a last trade (the docs do not
+    say);
+  - whether fine-grained history is still served for long-resolved markets;
+  - whether Gamma's `endDate` was edited after listing. Only the current value is
+    available.
+
+### 10.6 Selection (PROPOSED threshold)
+
+- **Universe.** Every closed market from Gamma `/markets/keyset`
+  (`closed=true`), archived markets included. No server-side volume filter is
+  used, so excluded markets can be counted.
+- **Rules, each exclusion counted:**
+  - binary only: outcomes exactly Yes/No with two CLOB token IDs;
+  - resolved: `outcomePrices` exactly (1, 0) or (0, 1). A 50/50 resolution is
+    counted as **void**, and anything else as unresolved or ambiguous;
+  - start, end and close dates present;
+  - a non-empty decision window;
+  - open at `t_d`.
+- **Final-volume threshold: ≥ $10,000 (USDC, `volumeNum`), PROPOSED.**
+  - *Why.* It removes thin markets whose prices go stale.
+  - *Sensitivity.* Counts at $1,000 and $100,000 are reported (counts only).
+  - *Limitation.* Final volume is known only afterwards, and it selects markets
+    that drew attention. That may correlate with surprising outcomes. This is
+    accepted under decision 3 and reported as a limitation.
+- **One market per event.** Within an event, keep the market with the lowest
+  SHA-256 of `flyshi-phase2-event-20261012|<market id>`. The choice is blind to
+  outcome and price. A market with no event is its own event.
+- **Not yet decided.** Per-series caps (criterion 5 of Section 5).
+
+### 10.7 Frozen list, split and output
+
+- **Frozen list** (`freeze_selection`). The selected markets are written with
+  their IDs, YES token, dates, `t_d`, final volume and archived flag, plus the
+  selection parameters and all counts. The file gets a SHA-256 checksum. It holds
+  **no outcomes and no prices**; outcomes are stored apart and joined only at the
+  build step. A different list can never overwrite a frozen one, and the build
+  step refuses if the checksum does not match.
+- **Train/test split** (`split_train_test`).
+  - **Training:** markets **resolved** before the cutoff `T_s`, in resolution
+    order.
+  - **Test:** markets with `t_d` ≥ `T_s` + gap, in `t_d` order. The gap is
+    **7 days** (proposed).
+  - Markets in between are excluded and counted.
+  - `T_s` is to be chosen after the metadata count, before any price history is
+    fetched.
+- **Output** (`write_market_file`). A JSON file in the `simulator.Market` fields
+  the synthetic runner consumes: `quote`, `outcome`, `signal`, `recent_change`,
+  `time_to_resolution`, `liquidity` and `sequence`.
+  - `latent_probability` is unknown for real markets. It is `null` in the file
+    and NaN once loaded; the runner never reads it.
+  - Per-market metadata is kept beside the fields.
+  - `load_market_file` returns the training and test lists of `Market` objects.
+- **Not yet built:**
+  - assembling 250-market chains (Section 7);
+  - feeding a market file into the runner, whose `run_dataset` still generates
+    synthetic markets;
+  - the calibration comparator;
+  - the shuffled-outcome arm.
+
+### 10.8 Network rules (Section 1 conditions, enforced in code)
+
+**Code.** `flyshi_research.realdata.polymarket` and the CLI
+`repro/polymarket/load_polymarket.py` (steps `check`, `select`, `history` and
+`build`).
+
+- **Off by default.** A request needs **both** `--allow-network` **and**
+  `--permission <file>` naming that exact endpoint. Otherwise it is refused
+  before any transport runs. No permission file exists yet: creating one is the
+  owner's act.
+- **Only two endpoints exist in code:**
+  - `GET https://gamma-api.polymarket.com/markets/keyset`;
+  - `GET https://clob.polymarket.com/prices-history`.
+
+  A permission file cannot add others.
+- **Read-only and anonymous:** GET only, https only, no redirects, no cookies, no
+  authentication headers, key or wallet.
+- **Rate.**
+  - The default pre-set rate is 0.5 requests per second.
+  - It is refused if it exceeds 25% of the **published** limit recorded in the
+    permission file. The API specs do not state the limits, so they must be taken
+    from Polymarket's documentation when the file is written.
+  - HTTP 429 gets exponential backoff, up to 5 retries.
+- **Request log.** Every request is logged as JSON lines: UTC time, endpoint,
+  URL, status, bytes, SHA-256 and attempt number.
+- **Raw storage.** Raw responses are stored privately under `data/polymarket/`,
+  which is git-ignored. They are never redistributed (condition 6).
+
+**Permission file schema:**
+
+```json
+{"recorded_on": "YYYY-MM-DD", "recorded_by": "<owner>",
+ "endpoints": [{"endpoint": "GET https://clob.polymarket.com/prices-history",
+                "basis": "<e.g. Polymarket's written confirmation of DATE>",
+                "published_limit": {"requests": N, "per_seconds": S, "source": "<URL, date checked>"}}]}
+```
+
+**Tests.** `tests/realdata/test_polymarket_loader.py` has 19 tests, using
+recorded **fake** responses in `tests/fixtures/polymarket/`, hand-written to the
+documented schemas. No test can build the real transport.

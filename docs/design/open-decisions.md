@@ -661,6 +661,39 @@ that saved configuration.
 >   [`phase2-design.md`](phase2-design.md), Section 1 and open decision 4.
 > - **Downloads.** No Polymarket data has been downloaded.
 
+
+> **DECISIONS 2026-10-12, later the same day (project owner): Phase 2 design
+> choices.** Everything above is kept as the record. The details are in
+> [`phase2-design.md`](phase2-design.md), Section 10, which is still DRAFT.
+>
+> 1. **Signal: none.** The signal pool is held at 0.5 so total drive stays in the
+>    validated range. The question is whether the circuit can beat the market
+>    using only market-internal features (price, recent_change and
+>    time_to_resolution). Cross-venue signal is deferred to a follow-up.
+> 2. **Comparator: the market price, calibrated on training markets only.** The
+>    method is **proposed, not final**, and awaits the owner's confirmation:
+>    - isotonic regression on the probability scale;
+>    - shrinkage toward the block's mean price, with pseudo-count 20;
+>    - a training-only cross-validation guard that falls back to the raw price if
+>      calibration does not beat it.
+>
+>    It is chosen to avoid the Platt-on-logit artifact seen at extreme prices.
+> 3. **Liquidity: input held at 0.5.** Final volume is used **only** as a
+>    market-selection criterion, never as an input. The threshold, ≥ $10,000
+>    USDC, is **proposed**.
+> 4. **Size: Design A.** Arms `profit`, `learning_off` and the shuffled-outcome
+>    null control: about **$75** at the measured CCX33 rate, leaving about
+>    **$25 buffer** within the $200 total.
+>
+> - **Also proposed:**
+>   - the decision time: a seeded uniform draw over the scheduled life, minus
+>     24 h at each end;
+>   - a 7-day train/test gap.
+> - **Loader.** A Polymarket loader is drafted and tested on recorded fake
+>   responses only. No network request has been made and no data has been
+>   downloaded. Network is refused unless both `--allow-network` and a recorded
+>   permission file covering the endpoint are given. No permission file exists.
+
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 
 **DECIDED 2026-10-09 (project owner).** Item 5's list of remaining placeholders is

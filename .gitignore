@@ -14,3 +14,6 @@ venv/
 build/
 dist/
 third_party/
+
+# Phase 2 real-market data: private, never redistributed (phase2-design.md, Section 1, condition 6)
+data/
