@@ -78,6 +78,34 @@ def test_refuses_to_write_into_or_beside_the_original(rc):
     assert fl.results_dir_for(rc.RECHECK_BASE, rc.recheck_config()) != rc.ORIGINAL_DIR
 
 
+class _MetaSim:
+    kc_ids, mbon_ids, mbon_labels = [1, 2], [3], ["MBON01"]
+    cue_sets = {"A": [1], "B": [2]}
+
+
+def test_write_meta_creates_the_new_output_folder_and_restarts_cleanly(rc, tmp_path):
+    base = tmp_path / "results" / "first_learning_ignition_recheck_20261012"  # parents absent too
+    rc.write_meta(base, _MetaSim(), [9], {1: "left", 2: "right"})
+    meta = json.loads((base / "meta.json").read_text())
+    assert meta["kc_ids"] == [1, 2] and meta["is_a_validation"] is False
+    rc.write_meta(base, _MetaSim(), [9], {1: "left", 2: "right"})  # restart: same content is fine
+    with pytest.raises(RuntimeError):
+        rc.write_meta(base, _MetaSim(), [8], {1: "left", 2: "right"})  # a different simulator is not
+
+
+def test_write_meta_never_writes_into_or_beside_the_original(rc, tmp_path, monkeypatch):
+    # Guarded paths point into tmp_path, so even a broken guard cannot touch the real results.
+    root = tmp_path / "results"
+    original = root / "first_learning_6fea97ac91"
+    original.mkdir(parents=True)
+    monkeypatch.setattr(rc, "RESULTS_ROOT", root)
+    monkeypatch.setattr(rc, "ORIGINAL_DIR", original)
+    for bad in (root, original, original / "sub"):
+        with pytest.raises(SystemExit):
+            rc.write_meta(bad, _MetaSim(), [9], {1: "left", 2: "right"})
+    assert sorted(p.relative_to(root).as_posix() for p in root.rglob("*")) == ["first_learning_6fea97ac91"]
+
+
 # ---- recorder: never alters the scores --------------------------------------------- #
 def test_per_trial_counts_sum_to_the_trial_mean_counts(runner):
     flyid2i = {101: 0, 102: 1, 103: 2}

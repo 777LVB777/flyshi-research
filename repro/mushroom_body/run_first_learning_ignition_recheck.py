@@ -115,7 +115,9 @@ def write_meta(base: Path, sim, apl_ids: Sequence[int], kc_sides: Mapping[int, s
             "kc_sides": {str(k): s for k, s in kc_sides.items()},
             "spec": SPEC, "is_a_validation": False, "has_pass_criterion": False}
     text = json.dumps(meta, sort_keys=True)
-    path = Path(base) / "meta.json"
+    base = check_base(base)  # the first write of a run: create the new folder, never the original
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / "meta.json"
     if path.exists() and path.read_text() != text:
         raise RuntimeError(f"{path} does not match this simulator")
     path.write_text(text)
