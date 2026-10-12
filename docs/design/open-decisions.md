@@ -18,6 +18,14 @@ Phase 2 market data source). Items 1–4 are unchanged.
 permission, and the Phase 2 venue is under review. See the dated revision at the
 end of item 6.
 
+**Update 2026-10-12:** item 6 is revised again. Polymarket is planned as the
+primary venue under stated conditions, with Manifold as backup. This rests on a
+human support reply that is not definitive. The verbatim support transcript and
+an open Gamma-versus-CLOB conflict are recorded in the second dated revision at
+the end of item 6. Later the same day, the owner resolved the conflict by
+allowing CLOB `/prices-history` alongside Gamma (amendment at the end of
+item 6).
+
 ## 1. Degree-preserving shuffle scope
 
 The implemented shuffle exchanges the targets of two directed edges while
@@ -503,6 +511,155 @@ that saved configuration.
 > - **Budget.** The Phase 2 compute budget remains about $100. It is set in the
 >   [`synthetic-market-experiment.md`](synthetic-market-experiment.md) Section 7
 >   revision of 2026-10-11.
+
+> **REVISION 2026-10-12 (project owner): Polymarket planned as primary, under
+> conditions; Manifold backup.** The 2026-10-11 revision above is kept unchanged
+> as the record. Kalshi remains blocked pending permission.
+>
+> *Polymarket support conversation.* The project owner asked Polymarket support,
+> through the polymarket.com support chat, whether the planned research use is
+> allowed. The conversation began at about 21:55 ET on 2026-10-11. The final
+> substantive reply came at about 22:55 ET the same day. Both times are
+> approximate.
+>
+> - The messages signed "Polybot (AI Agent)" or "Polybot" are from Polymarket's
+>   AI support agent. Polybot gave no answer on the substance. It said it lacked
+>   the relevant terms and handed the request to a human.
+> - The final substantive reply is from "Roni", a human member of Polymarket
+>   support, who joined after the handoff. Roni is a support agent, not
+>   Polymarket's legal team. The reply reports what Polymarket's documentation
+>   says. It does not grant a licence or permission.
+>
+> *What the human reply supports:*
+>
+> - the Gamma API is public, needs no authentication, and is intended for public,
+>   read-only use, including non-profit research projects;
+> - Roni found no stated restriction on bulk retrieval within rate limits, on
+>   private storage for research, or on use with learning models. That holds as
+>   long as access is read-only and unauthenticated, with no direct interaction
+>   with the Polymarket platform or contracts.
+>
+> *What it does not settle:*
+>
+> - The reply says itself that it is **not a definitive written confirmation**
+>   of compliance with Polymarket's terms of use for academic research.
+> - It does not address attribution, publication of aggregate results, or
+>   confidential sharing with peer reviewers. It says only that the
+>   documentation specifies no requirements on them. According to the project
+>   owner, a follow-up on these points has been sent. No answer has been recorded.
+> - It speaks only about the **Gamma API**. It does not mention the CLOB API or
+>   the Data API, and it does not address the Terms of Use §4 ban on
+>   scrapers and data harvesting.
+>
+> *Transcript, verbatim* as supplied by the project owner (the typo
+> "scrapyour" is in the original):
+>
+> ```text
+> Hey, Welcome to Polymarket Support! 👋
+> What brings you here today?
+> — Polybot (AI Agent)
+>
+> Luca: Hi, I'm an undergraduate at the University of Pennsylvania doing a non-commercial computational neuroscience research project. I'd like written confirmation that a planned use of Polymarket's historical data is allowed under your terms.
+> I would retrieve historical, already-resolved binary markets (metadata, price history, volume, outcomes) through your official public API, within rate limits, and replay them to a simulated fruit-fly brain model that includes a learning rule. No trading, no account, no money involved.
+> Could you confirm whether: (1) bulk retrieval through the official API is permitted, as opposed to the scrapyour terms prohibit; (2) I may store the data privately for the research; (3) I may use it with a model that learns from it; (4) I may publish aggregate results crediting Polymarket; and (5) I may share market IDs or data confidentially with peer reviewers if a journal asks?
+> If this needs to go to a different team, I'd be grateful if you could forward it. Thank you!
+>
+> Polybot (AI Agent): Thank you for sharing the details of your research! Let me look into the guidelines around data use for you.
+>
+> Polybot: To make sure I get you the right information, are you using the Polymarket website or the US app?
+>
+> Luca: The Polymarket website (polymarket.com) and its public data API, not the US app. I don't have an account on either and won't be trading. My question is only about using historical, already-resolved market data for academic research.
+>
+> Polybot (AI Agent): I don't have the specific terms for academic data usage and publication in my documentation. I can connect you with the team that handles these requests to get you a definitive answer.
+> The team is handling a high volume right now so a human reply may take quite a while, and you can usually sort this out faster right here. Would you like me to pass this along to them?
+>
+> Luca: Yes, please pass it along.
+>
+> Polybot (AI Agent): Thanks for laying out your research use case so clearly. I'm going to hand this over to a human member of the support team so they can review and provide the written confirmation you're asking for.
+>
+> Polybot: Sure thing! Polymarket will reply as soon as they can.
+>
+> [Roni joined the conversation]
+>
+> Roni: Hi there! This is Roni. Thank you for bringing this to our attention. I acknowledge the inquiry regarding API.
+> Please allow me a moment to look into this for you. Thanks!
+>
+> Luca: Sounds good
+>
+> Roni: Thank you for your patience while I investigate a solution for the API.
+>
+> The Gamma API is fully public, does not require authentication, and is intended for public, read-only use, including for non-profit research projects. There is no mention of restrictions on bulk retrieval within rate limits, private storage for research, or use with learning models, as long as the API is accessed in a read-only, unauthenticated manner and there is no direct interaction with the Polymarket platform or contracts.
+>
+> Our documentation does not specify requirements regarding attribution, publication of aggregate results, or confidential sharing with peer reviewers.
+>
+> However, the sources do not explicitly address the terms of use or licensing restrictions for academic research, nor do they provide definitive written confirmation for your specific use case.
+>
+> Therefore, while your described use case appears to align with the intended public, read-only use of the API, the provided documentation does not fully address all aspects of your query or provide a definitive written confirmation regarding compliance with Polymarket's terms of use for academic research.
+> ```
+>
+> *Decision (project owner, 2026-10-12):*
+>
+> - **Primary source:** *Polymarket (Gamma API only, read-only, unauthenticated,
+>   within rate limits, no platform or contract interaction, no public
+>   redistribution of raw data) planned as primary; human support reply
+>   2026-10-11 supports this use but is not definitive; publication and reviewer
+>   sharing not addressed (follow-up sent); Manifold backup.*
+> - **Kalshi.** Still blocked pending permission. The request draft remains
+>   unsent.
+> - **Conditions in the design.** The conditions are carried into
+>   [`phase2-design.md`](phase2-design.md), Section 1.
+> - **Downloads.** No Polymarket data has been downloaded.
+>
+> **Open conflict, needs the owner's decision before any download.** Polymarket's
+> own API specifications, read on 2026-10-12, put the data the design needs
+> on different APIs:
+>
+> - **Gamma** (`gamma-api.polymarket.com`) serves market and event metadata,
+>   resolution status, and *current* snapshot fields. Those fields include
+>   `outcomePrices`, `lastTradePrice`, `bestBid`/`bestAsk`, `volume` and
+>   `liquidity`.
+> - **The historical price time series** is served only by the **CLOB API**,
+>   `GET clob.polymarket.com/prices-history`. That endpoint is marked
+>   `security: []`, so it needs no authentication.
+>
+> Under "Gamma API only", `price` and `recent_change` at the decision time
+> `t_d` therefore cannot be built. Liquidity at `t_d` cannot be built either,
+> because Gamma's `liquidity` and `volume` are snapshots. The owner must choose
+> one:
+>
+> - extend the condition to include read-only, unauthenticated CLOB
+>   `/prices-history`, and ideally ask support to confirm that the reply also
+>   covers it;
+> - or restrict the design to data Gamma can supply.
+>
+> The specs read were `gamma-openapi.yaml`, SHA-256
+> `0630db87b3fd91e908c16de674561f1466a3049867d56322bd2069132eb1a9dd`, and
+> `clob-openapi.yaml`, SHA-256
+> `d993169c2fd17cbc75304c9cd7bc3b6a351fa21f98cbd12dcd4c5dbbca2fedb8`. Both come
+> from `docs.polymarket.com/api-spec/`. They are API documentation, not market
+> data.
+>
+> **AMENDMENT 2026-10-12 (project owner): conflict resolved by option (i).** The
+> decision and conflict above are kept unchanged as the record. They are
+> superseded by this:
+>
+> - **Primary source:** *Polymarket (Gamma API plus CLOB `GET /prices-history`
+>   only; read-only, unauthenticated, at a pre-set rate under the published
+>   limit, with a request log; no platform or contract interaction; no public
+>   redistribution of raw data) planned as primary. The CLOB endpoint is allowed
+>   pending Polymarket's confirmation that the 2026-10-11 human support reply
+>   also covers it. That reply supports the use but is not definitive.
+>   Publication and reviewer sharing are not addressed. A follow-up was sent
+>   2026-10-12 asking about the CLOB endpoint, publication and reviewer sharing.
+>   Manifold backup.*
+> - **If Polymarket says no to the CLOB endpoint,** it is dropped and option (ii)
+>   applies: Polymarket cannot support the design, and Manifold becomes primary.
+> - **Not allowed:** any other CLOB endpoint, including the POST
+>   `/batch-prices-history`, and the Data API.
+> - **Still open:** liquidity at `t_d` cannot be built from allowed data.
+>   `/prices-history` gives prices only, and Gamma gives snapshots. See
+>   [`phase2-design.md`](phase2-design.md), Section 1 and open decision 4.
+> - **Downloads.** No Polymarket data has been downloaded.
 
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 

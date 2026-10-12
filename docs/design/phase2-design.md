@@ -4,11 +4,16 @@
 proposal awaiting project-owner sign-off. The open decisions are listed in
 Section 9.
 
-- **Venue.** The design is venue-neutral. Kalshi is blocked pending written
-  permission ([`open-decisions.md`](open-decisions.md), item 6, revision
-  2026-10-11). No venue is chosen.
-- **What was done.** No market data has been downloaded, no simulation was run,
-  and nothing is committed.
+- **Venue.** Kalshi is blocked pending written permission
+  ([`open-decisions.md`](open-decisions.md), item 6, revision 2026-10-11).
+  **Update 2026-10-12:** Polymarket is *planned* as primary under the conditions
+  in Section 1, with Manifold as backup (item 6, revision 2026-10-12). It is not
+  final, because the support reply behind it is not definitive. On 2026-10-12
+  the owner chose option (i): CLOB `/prices-history` is allowed alongside Gamma
+  under the same conditions, pending Polymarket's confirmation (Section 1). The
+  rest of the design stays venue-neutral.
+- **What was done.** No market data has been downloaded and no simulation was
+  run.
 - **Unverified figures.** Every figure marked **unverified** comes from
   documentation or arithmetic. None comes from data or from a model run.
 
@@ -50,11 +55,11 @@ interpretation.
 | venue | money | binary markets with resolved outcomes | history (rough, **unverified**) | verdict |
 |---|---|---|---|---|
 | Kalshi | real (USD, CFTC-regulated) | yes | 2021– | **blocked** pending written permission (open-decisions item 6) |
-| Polymarket (polymarket.com) | real (USDC) | yes | 2020– | **usable with conditions**; written confirmation advised |
+| Polymarket (polymarket.com) | real (USDC) | yes | 2020– | **usable with conditions**; planned primary 2026-10-12 (see conditions below); support reply not definitive |
 | Iowa Electronic Markets | real (small stakes) | yes, but few (winner-takes-all markets) | 1988– | **unclear**: no data terms found |
 | PredictIt | real (USD, $3,500 cap per contract) | yes (each contract is binary) | 2014– | **blocked** without written permission |
 | Metaculus | none (not a market) | resolved binary questions, community forecasts, no prices | 2015– | **blocked** without written permission; poor fit |
-| Manifold Markets | play money (mana) | yes, many | Dec 2021– | **usable with conditions** (non-commercial; written confirmation advised) |
+| Manifold Markets | play money (mana) | yes, many | Dec 2021– | **usable with conditions** (non-commercial; written confirmation advised); backup |
 
 ### Polymarket: usable with conditions
 
@@ -99,6 +104,94 @@ plain-text export is
     not "scraping".
 - **Not reviewed.** Polymarket US (`polymarket.us`, the CFTC-regulated U.S.
   exchange) has separate terms, which were not reviewed.
+
+#### Polymarket support reply and binding conditions (2026-10-12)
+
+**The support reply.** On 2026-10-11, a human member of Polymarket support
+answered after the AI agent "Polybot" handed the request over. The transcript is
+recorded verbatim in [`open-decisions.md`](open-decisions.md), item 6, revision
+2026-10-12. The reply supports the planned use:
+
+- the Gamma API is public, unauthenticated, and intended for read-only use,
+  including non-profit research;
+- the documentation states no restriction on bulk retrieval within rate limits,
+  on private storage, or on use with learning models.
+
+The reply is **not a definitive written confirmation**. It does not address
+attribution, publication or sharing with reviewers. The owner sent a follow-up
+on 2026-10-12. It asks whether the reply also covers CLOB `/prices-history`,
+and asks about publication and reviewer sharing. It has not been answered.
+
+**Conditions on any Polymarket use (project owner, 2026-10-12).** Each is
+binding on the data-retrieval code and its run log:
+
+1. **Allowed endpoints** (amended 2026-10-12, option (i)):
+   - the Gamma API (`gamma-api.polymarket.com`);
+   - **and** the CLOB price-history endpoint `GET
+     clob.polymarket.com/prices-history`, nothing else on the CLOB host.
+
+   This is *pending Polymarket's confirmation* that the support reply also
+   covers `/prices-history`. That was asked in the 2026-10-12 follow-up. If
+   Polymarket says no, `/prices-history` is dropped and the owner revisits
+   option (ii).
+
+   Not allowed: any other Polymarket API (Data API, other CLOB endpoints,
+   including the POST `/batch-prices-history`), website scraping, or chain
+   indexing. Conditions 2–8 apply to both endpoints.
+2. **Read-only.** Only GET requests, except where a read-only endpoint is
+   documented as POST, such as a batch read. Nothing is created, changed or
+   submitted.
+3. **Unauthenticated.** No account, no API key, no wallet, no signature, no
+   cookies or session.
+4. **Within published rate limits.** A pre-stated request rate below the limit,
+   backoff on HTTP 429, and a request log kept with the run record.
+5. **No interaction with the platform or contracts.** No orders, no trading, no
+   transactions, no on-chain calls.
+6. **No public redistribution of raw data.** Raw responses stay in private
+   storage. The repository and any public release contain only code, the frozen
+   hashed market-ID list and aggregate results. Public release of market IDs
+   and derived per-market features waits for the follow-up answer.
+7. **Publication and reviewer sharing are on hold** until Polymarket answers the
+   follow-up. No manuscript or preprint naming Polymarket data, and no reviewer
+   data package, goes out before then. If the answer is no or never comes,
+   this is an open decision for the owner.
+8. **Re-check before download.** Reread the Terms of Use, compare the SHA-256
+   checksum with the 2026-10-11 value above, and record the result.
+
+**Conflict: Gamma-only versus price history. Resolved 2026-10-12 by option
+(i); the record is kept below.** This was checked against
+Polymarket's own API specifications, `docs.polymarket.com/api-spec/`, read
+2026-10-12. The checksums are in open-decisions item 6.
+
+- **Gamma** serves market and event metadata and resolution status. It also
+  serves current snapshot fields: `outcomePrices`, `lastTradePrice`,
+  `bestBid`/`bestAsk`, `oneDayPriceChange`, `volume` and `liquidity`.
+- **Historical price series** come only from the **CLOB API**:
+  `GET clob.polymarket.com/prices-history`, with `security: []`, so no
+  authentication.
+
+Under condition 1, the features that need history at `t_d` cannot be built:
+`price`, `recent_change`, and `liquidity` at `t_d` (Section 3). Gamma can
+supply only outcomes, timing and final or snapshot values.
+
+The owner was asked to choose one of two options before any download:
+
+- **(i)** extend condition 1 to read-only, unauthenticated CLOB
+  `/prices-history`, with the same rate-limit rule, and ask support to confirm
+  that the reply covers it. *Recommended*, because the design depends on it.
+  **Chosen by the project owner, 2026-10-12**, pending confirmation.
+- **(ii)** keep Gamma only, which leaves Polymarket unable to support this
+  design. In that case Manifold, the backup, becomes primary.
+
+**Still open after option (i).** `/prices-history` returns prices only.
+`price` and `recent_change` at `t_d` can now be built. **Liquidity at `t_d`
+cannot**, because Gamma's `liquidity` and `volume` are snapshots and no trade
+endpoint is allowed. Open decision 4 must therefore define liquidity from what
+is allowed, or drop it. Two candidates:
+
+- the count or density of price-history points before `t_d`;
+- final volume as a *selection* filter only, never as a feature, because it is
+  measured after `t_d` and would leak the future.
 
 ### Iowa Electronic Markets (IEM): unclear
 
@@ -450,7 +543,15 @@ At 213 runs/h and $0.266/h, server time only:
 
 ## 9. Open decisions for the project owner
 
-1. **Venue:**
+1. **Venue:** *planned 2026-10-12: Polymarket primary under the Section 1
+   conditions, Manifold backup.* Still open:
+   - Polymarket's confirmation that the reply covers CLOB `/prices-history`
+     (option (i), chosen 2026-10-12; Section 1);
+   - a liquidity measure built only from allowed data (open decision 4);
+   - what happens if the publication and reviewer follow-up is refused or not
+     answered.
+
+   The options originally listed were:
    - Polymarket (real money; terms usable with conditions);
    - Manifold (play money; non-commercial use permitted, conflict in §8);
    - wait for Kalshi's answer;
