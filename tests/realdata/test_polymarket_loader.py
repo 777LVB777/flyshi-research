@@ -340,15 +340,127 @@ def test_cli_network_steps_refuse_without_flag_and_permission(tmp_path, capsys):
     assert capsys.readouterr().out.count("REFUSED") == 2
 
 
-def test_cli_runs_end_to_end_on_the_fake_server_when_both_are_given(tmp_path, capsys):
-    cli, server = _cli(), FakeServer()
+NOW = datetime(2026, 10, 12, 18, 0, tzinfo=timezone.utc)
+
+
+def _fake_terms(tmp_path, monkeypatch, text=b"FAKE TERMS TEXT"):
+    f = tmp_path / "terms.txt"
+    f.write_bytes(text)
+    import hashlib
+    monkeypatch.setattr(pm, "RECORDED_TERMS_SHA256", hashlib.sha256(b"FAKE TERMS TEXT").hexdigest())
+    return f
+
+
+def _perm_file(tmp_path, endpoints=pm.ALLOWED_ENDPOINTS):
+    permission(tmp_path, endpoints=endpoints)  # writes tmp_path/permission.json
     p = tmp_path / "perm.json"
-    permission(tmp_path)  # writes tmp_path/permission.json
     (tmp_path / "permission.json").rename(p)
+    return p
+
+
+def test_cli_runs_end_to_end_on_the_fake_server_when_both_are_given(tmp_path, capsys, monkeypatch):
+    cli, server = _cli(), FakeServer()
+    p = _perm_file(tmp_path)
+    terms = _fake_terms(tmp_path, monkeypatch)
     args = ["--allow-network", "--permission", str(p), "--data-dir", str(tmp_path / "d")]
-    assert cli.main(["select", *args], transport=server) == 0
-    assert cli.main(["history", *args], transport=server) == 0
+    assert cli.main(["terms", "--terms-file", str(terms), "--data-dir", str(tmp_path / "d")], now=NOW) == 0
+    assert cli.main(["select", *args], transport=server, now=NOW) == 0
+    assert cli.main(["history", *args], transport=server, now=NOW) == 0
     assert cli.main(["build", "--data-dir", str(tmp_path / "d"), "--cutoff", "2025-06-01"]) == 0
     out = next((tmp_path / "d").glob("markets_*_cutoff_2025-06-01.json"))
     tr, te = pm.load_market_file(out)
     assert (len(tr), len(te)) == (2, 1)
+
+
+# ---- terms gate, count-only report, permission file (2026-10-12) ---------------------- #
+def test_network_steps_refuse_without_a_fresh_matching_terms_check(tmp_path, monkeypatch, capsys):
+    cli, server = _cli(), FakeServer()
+    p = _perm_file(tmp_path)
+    d = tmp_path / "d"
+    args = ["select", "--count-only", "--allow-network", "--permission", str(p), "--data-dir", str(d)]
+    assert cli.main(args, transport=server, now=NOW) == 2  # no terms check at all
+    changed = _fake_terms(tmp_path, monkeypatch, text=b"CHANGED TERMS")
+    assert cli.main(["terms", "--terms-file", str(changed), "--data-dir", str(d)], now=NOW) == 3
+    assert cli.main(args, transport=server, now=NOW) == 2  # recorded, but not matching
+    same = _fake_terms(tmp_path, monkeypatch)
+    assert cli.main(["terms", "--terms-file", str(same), "--data-dir", str(d)], now=NOW) == 0
+    assert cli.main(args, transport=server, now=NOW + timedelta(hours=25)) == 2  # stale
+    assert server.calls == []
+    assert "terms" in capsys.readouterr().err.lower()
+    assert cli.main(args, transport=server, now=NOW + timedelta(hours=1)) == 0
+    assert len(server.calls) == 2
+
+
+def test_count_only_snapshots_and_reports_but_freezes_nothing(tmp_path, monkeypatch, capsys):
+    cli, server = _cli(), FakeServer()
+    p, d = _perm_file(tmp_path), tmp_path / "d"
+    terms = _fake_terms(tmp_path, monkeypatch)
+    cli.main(["terms", "--terms-file", str(terms), "--data-dir", str(d)], now=NOW)
+    capsys.readouterr()
+    assert cli.main(["select", "--count-only", "--allow-network", "--permission", str(p), "--data-dir", str(d)],
+                    transport=server, now=NOW) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert not (d / "frozen_market_list.json").exists() and not list(d.glob("*.outcomes.json"))
+    assert report["qualifying_one_per_event"] == {">=1000": 4, ">=10000": 3, ">=100000": 0}
+    assert report["resolved_binary_markets"] == 7 and report["raw_markets"] == 13
+    assert report["exclusions_by_reason_at_10000"]["void_50_50"] == 1
+    assert sum(report["selected_at_10000_by_close_month"].values()) == 3
+    assert all(c.startswith("https://gamma-api.polymarket.com/") for c, _ in server.calls)
+    snap = pm.read_snapshot(Path(report["snapshot"]))
+    assert len(snap) == 13 and set(snap[0]) == set(pm.SNAPSHOT_FIELDS) | {"events"}
+    # later: freeze offline from the snapshot, no request at all
+    n = len(server.calls)
+    assert cli.main(["select", "--from-metadata", report["snapshot"], "--data-dir", str(d)], now=NOW) == 0
+    assert (d / "frozen_market_list.json").exists() and len(server.calls) == n
+
+
+def test_count_report_carries_no_outcome_or_price_information():
+    raw = _raw()
+    altered = json.loads(json.dumps(raw))
+    for m in altered:
+        if m["outcomePrices"] in ('["1", "0"]', '["0", "1"]'):
+            m["outcomePrices"] = '["0", "1"]' if m["outcomePrices"] == '["1", "0"]' else '["1", "0"]'
+        m.update(lastTradePrice=0.77, bestBid=0.7, bestAsk=0.8, oneDayPriceChange=0.1)
+    a, b = pm.count_report(raw), pm.count_report(altered)
+    assert a == b
+    text = json.dumps({k: v for k, v in a.items() if k != "note"}).lower()
+    for word in ('"yes"', '"no"', "outcome_", "price", "brier", "pnl"):
+        assert word not in text
+
+
+def test_the_recorded_permission_file_covers_gamma_only_at_a_safe_rate():
+    path = REPO / "repro" / "polymarket" / "permissions" / "gamma_markets_keyset_20261012.json"
+    perm = pm.Permission.load(path)
+    assert [e.endpoint for e in perm.endpoints] == [pm.GAMMA_MARKETS]
+    assert perm.endpoints[0].published_rate == 30.0  # /markets 300 req / 10 s
+    raw = json.loads(path.read_text())
+    assert "Roni" in raw["endpoints"][0]["basis"] and "NOT a definitive" in raw["endpoints"][0]["basis"]
+    ours = raw["endpoints"][0]["our_rate_requests_per_second"]
+    pm.NetworkPolicy(True, perm, ours).check(pm.GAMMA_MARKETS)
+    with pytest.raises(pm.NetworkRefused, match="does not cover"):
+        pm.NetworkPolicy(True, perm, ours).check(pm.CLOB_PRICES_HISTORY)
+
+
+def test_metadata_fetch_resumes_after_an_interruption(tmp_path):
+    progress = tmp_path / "progress.jsonl"
+
+    class Dies(FakeServer):
+        def __call__(self, url, headers):
+            if "after_cursor" in url:
+                raise ConnectionError("simulated interruption")
+            return super().__call__(url, headers)
+
+    with pytest.raises(ConnectionError):
+        pm.fetch_closed_markets(client(tmp_path, Dies()), transform=pm.compact_market, progress_path=progress)
+    assert len(progress.read_text().splitlines()) == 1  # page 1 saved
+    for sub in ("b", "c", "e"):
+        (tmp_path / sub).mkdir()
+    server = FakeServer()
+    resumed = pm.fetch_closed_markets(client(tmp_path / "b", server), transform=pm.compact_market,
+                                      progress_path=progress)
+    assert len(server.calls) == 1 and "after_cursor=FAKECURSOR1" in server.calls[0][0]
+    whole = pm.fetch_closed_markets(client(tmp_path / "c", FakeServer()), transform=pm.compact_market)
+    assert resumed == whole and pm.count_report(resumed) == pm.count_report(_raw())
+    again = FakeServer()
+    assert pm.fetch_closed_markets(client(tmp_path / "e", again), progress_path=progress) == whole
+    assert again.calls == []  # a finished progress file needs no request

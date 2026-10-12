@@ -1,0 +1,26 @@
+{
+ "recorded_on": "2026-10-12",
+ "recorded_by": "Luca Volpi Benowitz (project owner), written at the owner's instruction",
+ "scope_note": "Gamma /markets/keyset ONLY. CLOB /prices-history is NOT permitted here: it stays unpermitted until Polymarket answers the 2026-10-12 follow-up (open-decisions item 6, amendment 2026-10-12).",
+ "endpoints": [
+  {
+   "endpoint": "GET https://gamma-api.polymarket.com/markets/keyset",
+   "basis": "Human Polymarket support reply ('Roni', polymarket.com support chat, 2026-10-11 ~22:55 ET; transcript verbatim in open-decisions item 6, revision 2026-10-12): the Gamma API is public, unauthenticated and intended for public read-only use including non-profit research; no stated restriction on bulk retrieval within rate limits, private storage or use with learning models, provided access is read-only and unauthenticated with no platform or contract interaction. The reply states it is NOT a definitive written confirmation and does not address attribution, publication or reviewer sharing.",
+   "published_limit": {
+    "requests": 300,
+    "per_seconds": 10,
+    "source": "https://docs.polymarket.com/api-reference/rate-limits.md (redirected from /quickstart/introduction/rate-limits.md), read 2026-10-12, SHA-256 1a238b502342564ff0afb087a725aad2bf16e5fa5978d19bcf414ea81d2a84a5. Gamma API table: General 4,000 req/10s; /markets 300 req/10s; /events 500 req/10s; /markets + /events listing 900 req/10s. /markets/keyset is not listed; the stricter /markets figure (300 req/10s = 30 req/s) is applied. The page says excess requests are throttled (delayed/queued) on sliding windows."
+   },
+   "our_rate_requests_per_second": 1.0,
+   "our_rate_fraction_of_published": 0.0333
+  }
+ ],
+ "conditions": [
+  "read-only GET, unauthenticated: no account, key, wallet, signature or cookie",
+  "no interaction with the platform or contracts",
+  "within the published limit: our pre-set rate 1 req/s = 3.3% of the /markets limit (cap in code: 25%)",
+  "every request logged (data/polymarket/request_log.jsonl)",
+  "raw data stored privately under data/polymarket/ (git-ignored); no public redistribution of raw data",
+  "terms re-checked (SHA-256) within 24 h before any request (loader 'terms' step)"
+ ]
+}

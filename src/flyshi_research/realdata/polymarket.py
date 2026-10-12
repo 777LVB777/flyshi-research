@@ -25,6 +25,7 @@ final-volume threshold, decision time drawn) -> ``freeze_selection`` (SHA-256) -
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import math
@@ -78,6 +79,38 @@ MARKET_FILE_FORMAT = "flyshi.simulator.Market/v1"
 
 class NetworkRefused(RuntimeError):
     """A request was refused before any transport ran."""
+
+
+# ---- terms re-check before any request (Section 1, condition 8) -------------------- #
+#: SHA-256 of the plain-text export of the Terms of Use (effective 2026-08-11), recorded
+#: 2026-10-11 and re-confirmed identical 2026-10-12 (phase2-design.md, Section 1)
+RECORDED_TERMS_SHA256 = "0506de1ebf824b1827dfef90828f0e78f45d9defa63241ac91f1ed2c0ee2847d"
+TERMS_EXPORT_URL = "https://docs.google.com/document/d/1N4aYlRcqaWCeKMID7vUSWJ1UPMvw_v6SP4cOFN8ZxR4/export?format=txt"
+TERMS_MAX_AGE = timedelta(hours=24)
+
+
+def record_terms_check(text_path: Path, out_path: Path, now: datetime) -> dict:
+    """Hash a locally saved copy of the terms and record whether it matches."""
+    digest = hashlib.sha256(Path(text_path).read_bytes()).hexdigest()
+    record = {"checked_utc": now.astimezone(timezone.utc).isoformat(), "sha256": digest,
+              "recorded_sha256": RECORDED_TERMS_SHA256, "matches": digest == RECORDED_TERMS_SHA256,
+              "source": TERMS_EXPORT_URL}
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_path).write_text(json.dumps(record, indent=1, sort_keys=True))
+    return record
+
+
+def require_fresh_terms_check(path: Path, now: datetime) -> dict:
+    """Refuse unless a matching terms check was recorded within TERMS_MAX_AGE."""
+    if not Path(path).exists():
+        raise NetworkRefused(f"no terms check recorded at {path} (run the 'terms' step first)")
+    record = json.loads(Path(path).read_text())
+    if not record.get("matches") or record.get("recorded_sha256") != RECORDED_TERMS_SHA256:
+        raise NetworkRefused("the terms changed since 2026-10-11: stop; the owner must review them")
+    age = now - datetime.fromisoformat(record["checked_utc"])
+    if not timedelta(0) <= age <= TERMS_MAX_AGE:
+        raise NetworkRefused(f"the terms check is {age} old; re-check (at most {TERMS_MAX_AGE})")
+    return record
 
 
 # --------------------------------------------------------------------------- #
@@ -231,26 +264,46 @@ class PolymarketClient:
 
     def _store_raw(self, url: str, body: bytes) -> None:
         self.raw_dir.mkdir(parents=True, exist_ok=True)
-        (self.raw_dir / (hashlib.sha256(url.encode()).hexdigest() + ".json")).write_bytes(body)
+        (self.raw_dir / (hashlib.sha256(url.encode()).hexdigest() + ".json.gz")).write_bytes(gzip.compress(body))
 
 
 # --------------------------------------------------------------------------- #
 # metadata fetch and selection
 # --------------------------------------------------------------------------- #
-def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = None) -> List[dict]:
+def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = None,
+                         transform: Optional[Callable[[Mapping], dict]] = None,
+                         progress_path: Optional[Path] = None) -> List[dict]:
     """Every closed market, archived included, by keyset paging (no volume filter, so
-    the excluded markets can be counted)."""
+    the excluded markets can be counted).
+
+    ``transform`` reduces each market as it arrives (the CLI keeps only the snapshot
+    fields, so memory stays small). With ``progress_path`` every page is appended as
+    one JSON line with the cursor that follows it, and a re-run resumes after the
+    last saved page instead of starting again."""
     markets: List[dict] = []
     cursor: Optional[str] = None
     pages = 0
+    if progress_path is not None and Path(progress_path).exists():
+        for line in Path(progress_path).read_text().splitlines():
+            entry = json.loads(line)
+            markets.extend(entry["markets"])
+            cursor = entry["next_cursor"]
+            pages += 1
+        if pages and not cursor:
+            return markets  # finished earlier
     while max_pages is None or pages < max_pages:
         params: Dict[str, object] = {"closed": "true", "limit": GAMMA_PAGE_LIMIT}
         if cursor:
             params["after_cursor"] = cursor
         page = client.get(GAMMA_MARKETS, params)
-        markets.extend(page.get("markets") or [])
+        batch = [transform(m) if transform else m for m in (page.get("markets") or [])]
+        markets.extend(batch)
         pages += 1
         cursor = page.get("next_cursor")
+        if progress_path is not None:
+            Path(progress_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(progress_path, "a") as fh:
+                fh.write(json.dumps({"next_cursor": cursor, "markets": batch}) + "\n")
         if not cursor:
             break
     return markets
@@ -418,6 +471,73 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
     sens = {f">={v:g}": sum(x >= v for x in volumes) for v in (*VOLUME_SENSITIVITY_USDC, min_volume)}
     return Selection(selection_params(min_volume), selected,
                      {s.market_id: outcomes[s.market_id] for s in selected}, counts, sens)
+
+
+# --------------------------------------------------------------------------- #
+# metadata snapshot and blinded count report
+# --------------------------------------------------------------------------- #
+#: the only Gamma fields kept in the private metadata snapshot (selection needs them)
+SNAPSHOT_FIELDS = ("id", "question", "closed", "archived", "outcomes", "outcomePrices", "clobTokenIds",
+                   "volumeNum", "startDate", "createdAt", "endDate", "closedTime", "umaResolutionStatus")
+COUNT_THRESHOLDS_USDC = (*VOLUME_SENSITIVITY_USDC[:1], MIN_FINAL_VOLUME_USDC, *VOLUME_SENSITIVITY_USDC[1:])
+
+
+def compact_market(m: Mapping) -> dict:
+    out = {k: m.get(k) for k in SNAPSHOT_FIELDS}
+    out["events"] = [{"id": e.get("id")} for e in (m.get("events") or []) if isinstance(e, Mapping)]
+    return out
+
+
+def write_snapshot(markets: Sequence[Mapping], path: Path) -> str:
+    """Private metadata snapshot (compact fields only) plus its SHA-256."""
+    payload = [compact_market(m) for m in markets]
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(text)
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    Path(path).with_name(Path(path).name + ".sha256").write_text(digest + "\n")
+    return digest
+
+
+def read_snapshot(path: Path) -> List[dict]:
+    text = Path(path).read_text()
+    recorded = Path(path).with_name(Path(path).name + ".sha256").read_text().strip()
+    if hashlib.sha256(text.encode()).hexdigest() != recorded:
+        raise RuntimeError(f"metadata snapshot hash mismatch: {path}")
+    return json.loads(text)
+
+
+def count_report(raw: Sequence[Mapping], thresholds: Sequence[float] = COUNT_THRESHOLDS_USDC,
+                 main: float = MIN_FINAL_VOLUME_USDC) -> dict:
+    """Counts only. Reports NO outcome and NO price: no YES/NO split, no price field,
+    and nothing that changes when outcomes or prices change (tested)."""
+    sels = {v: select_markets(raw, v) for v in thresholds}
+    s = sels[main]
+
+    def months(key: str) -> Dict[str, int]:
+        out: Dict[str, int] = {}
+        for m in s.markets:
+            k = parse_time(getattr(m, key)).strftime("%Y-%m")
+            out[k] = out.get(k, 0) + 1
+        return dict(sorted(out.items()))
+
+    return {
+        "note": "counts only; no outcome or price is reported",
+        "raw_markets": s.counts["raw"],
+        "archived_in_raw": sum(bool(m.get("archived")) for m in raw),
+        "resolved_binary_markets": s.counts["raw"] - sum(s.counts[k] for k in (
+            "duplicate_id", "not_closed", "not_binary", "missing_token_ids", "void_50_50",
+            "unresolved_or_ambiguous")),
+        f"exclusions_by_reason_at_{main:g}": {k: v for k, v in s.counts.items() if k not in (
+            "raw", "eligible_before_event_choice", "selected", "archived_selected")},
+        "one_per_event": {f">={v:g}": {"eligible_before_event_choice": sels[v].counts["eligible_before_event_choice"],
+                                       "dropped_one_per_event": sels[v].counts["dropped_one_per_event"],
+                                       "selected": sels[v].counts["selected"]} for v in thresholds},
+        "qualifying_one_per_event": {f">={v:g}": sels[v].counts["selected"] for v in thresholds},
+        f"selected_at_{main:g}_by_close_month": months("closed_time"),
+        f"selected_at_{main:g}_by_decision_month": months("decision_time"),
+        f"archived_selected_at_{main:g}": s.counts["archived_selected"],
+    }
 
 
 # --------------------------------------------------------------------------- #

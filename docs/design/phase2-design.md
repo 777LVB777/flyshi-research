@@ -606,9 +606,21 @@ At 213 runs/h and $0.266/h, server time only:
 
 **Status.** The project owner decided items 1–4 below on 2026-10-12. Sections 2–9
 above are kept as the record of what was weighed. Where they conflict with this
-section, this section governs. The whole file remains DRAFT. Three items are
-**PROPOSED** and await the owner's confirmation: the calibration method (10.2),
+section, this section governs. The whole file remains DRAFT. Three items were
+**PROPOSED** and awaited the owner's confirmation: the calibration method (10.2),
 the decision-time rule (10.5) and the volume threshold (10.6).
+
+> **CONFIRMED 2026-10-12 (project owner): 10.2, 10.5 and 10.6 are FINAL.**
+>
+> 1. **Calibration:** isotonic regression with pseudo-count-20 shrinkage and the
+>    5-fold raw-versus-calibrated guard.
+> 2. **Decision time:** a seeded random time over the scheduled life, excluding the
+>    first and last 24 h. Markets closed by then are excluded and counted.
+> 3. **Volume threshold:** $10,000, with $1,000 and $100,000 reported as
+>    sensitivity.
+>
+> Still open: the 7-day gap, the cutoff `T_s` (chosen after the metadata count)
+> and per-series caps.
 
 ### 10.1 Signal: none (decision 1)
 
@@ -623,8 +635,8 @@ the decision-time rule (10.5) and the volume threshold (10.6).
 
 ### 10.2 Comparator: the market price, calibrated on training markets only (decision 2)
 
-**PROPOSED method: isotonic calibration of the raw price, with shrinkage, plus a
-training-only guard.**
+**FINAL (confirmed 2026-10-12): isotonic calibration of the raw price, with
+shrinkage, plus a training-only guard.**
 
 1. **Fit.** Fit isotonic regression (pool-adjacent-violators) of the outcome on
    the raw price at `t_d`, **on the probability scale**, using training markets
@@ -681,7 +693,7 @@ simpler, but it is a step function and its edges are arbitrary.
 - **Market count needed:** about 10,000 distinct qualifying markets, one per
   event. **Unverified until the metadata count (10.7).**
 
-### 10.5 Decision time and features (PROPOSED)
+### 10.5 Decision time and features (FINAL, confirmed 2026-10-12)
 
 - **Decision time `t_d`.** A seeded uniform draw over the market's
   **scheduled** life, [start + 24 h, scheduled end − 24 h].
@@ -724,7 +736,7 @@ simpler, but it is a step function and its edges are arbitrary.
   - whether Gamma's `endDate` was edited after listing. Only the current value is
     available.
 
-### 10.6 Selection (PROPOSED threshold)
+### 10.6 Selection (threshold FINAL, confirmed 2026-10-12)
 
 - **Universe.** Every closed market from Gamma `/markets/keyset`
   (`closed=true`), archived markets included. No server-side volume filter is
@@ -736,7 +748,7 @@ simpler, but it is a step function and its edges are arbitrary.
   - start, end and close dates present;
   - a non-empty decision window;
   - open at `t_d`.
-- **Final-volume threshold: ≥ $10,000 (USDC, `volumeNum`), PROPOSED.**
+- **Final-volume threshold: ≥ $10,000 (USDC, `volumeNum`), FINAL.**
   - *Why.* It removes thin markets whose prices go stale.
   - *Sensitivity.* Counts at $1,000 and $100,000 are reported (counts only).
   - *Limitation.* Final volume is known only afterwards, and it selects markets
@@ -817,3 +829,44 @@ simpler, but it is a step function and its edges are arbitrary.
 **Tests.** `tests/realdata/test_polymarket_loader.py` has 19 tests, using
 recorded **fake** responses in `tests/fixtures/polymarket/`, hand-written to the
 documented schemas. No test can build the real transport.
+
+### 10.9 Gamma-only metadata count: preparation (2026-10-12; not run)
+
+- **Permission file:**
+  `repro/polymarket/permissions/gamma_markets_keyset_20261012.json`.
+  - It covers **Gamma `/markets/keyset` only.** CLOB `/prices-history` stays
+    unpermitted until Polymarket answers the 2026-10-12 follow-up.
+  - Its basis is the 2026-10-11 human support reply ("Roni"), including that the
+    reply is not definitive.
+- **Published rate limit.** Recorded from
+  `docs.polymarket.com/api-reference/rate-limits.md`, read 2026-10-12, SHA-256
+  `1a238b502342564ff0afb087a725aad2bf16e5fa5978d19bcf414ea81d2a84a5`.
+  - The Gamma figures are: general 4,000 per 10 s; `/markets` 300 per 10 s;
+    `/events` 500 per 10 s; `/markets` + `/events` listing 900 per 10 s.
+  - `/markets/keyset` is not listed, so the stricter `/markets` limit (30
+    requests per second) applies.
+  - **Our rate is 1 request per second**, 3.3% of that limit. The code caps it at
+    25%.
+- **Terms re-check (condition 8), 2026-10-12.**
+  - The plain-text export of the Google Doc embedded at `polymarket.com/tos` has
+    SHA-256 `0506de1e…2847d`. That is **identical** to the 2026-10-11 record. The
+    terms are effective 11 August 2026, and the page still embeds the same
+    document.
+  - The loader also enforces the check: every network step refuses unless a
+    matching terms check was recorded within the last 24 h (the `terms` step).
+- **Count mode.** `select --count-only` downloads metadata only. It saves a
+  private, compact snapshot with a SHA-256 checksum and prints a blinded count
+  report:
+  - resolved binary markets and exclusions by reason;
+  - one-per-event counts;
+  - qualifying counts at $1,000, $10,000 and $100,000;
+  - selected markets by month of close and by month of decision time.
+
+  The report carries no outcome or price. A test checks that flipping every
+  outcome and changing every price leaves the report identical. Count mode
+  freezes nothing. Later, `select --from-metadata <snapshot>` freezes the list
+  offline from the same snapshot.
+- **What the snapshot contains.** Gamma's market metadata includes each market's
+  final `outcomePrices`, which the selection needs in order to detect void and
+  resolved markets. That field is stored in the private snapshot, but it is never
+  printed or summarised.
