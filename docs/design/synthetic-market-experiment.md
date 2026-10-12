@@ -969,6 +969,29 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 >   CONTROL FAILED`, a pipeline or generator problem. Chance passes at the
 >   bootstrap's error rate remain possible, as before.
 > - **Cost:** $0. Nothing is re-run.
+>
+> *Addendum, later on 2026-10-12: pointer to the first learning test's ignition
+> re-check.* This is outside this sweep and descriptive only. Everything above
+> stays as written, including the readings, the report, the gate and the null
+> control.
+>
+> - **Source.** A pre-stated diagnostic re-ran the finished first learning test
+>   bit for bit, saving per-trial KC rates. Its results are in
+>   [`first-learning-ignition-recheck-diagnostic.md`](first-learning-ignition-recheck-diagnostic.md),
+>   Results.
+> - **The reward-only pattern.** Applying this sweep's ignition definition,
+>   cascades of about 65% of non-stimulated KCs occurred **only on rewarded
+>   cues**: 2/50, 4/50 and 6/50 test trials in the three rewarded conditions.
+>   There were none in the pre-test, with plasticity off, or under punishment.
+> - **Cascades lowered the score.** Every cascaded trial scored below its
+>   presentation's other trials, so cascades **opposed the learned preference**.
+>   In `main` they reduced Δ by 4.758: 154.49 as recorded, 159.25 without them.
+> - **Agreement with point 2.** This matches point 2 above, where ignition was
+>   learning-induced and confined to the `profit` arm.
+> - **Not carried over.** It is not carried over to this sweep's forecasts. The
+>   sweep reads a YES−NO score difference that is learned in closed loop, so the
+>   direction of any effect on its gate is **not inferred**, and point 5 stands
+>   unchanged.
 
 ## Results
 

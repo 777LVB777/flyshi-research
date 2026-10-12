@@ -472,3 +472,27 @@ with its own copy of the network, and writes its own file:
 
 *None yet. Append a new dated section here after the run; do not edit anything
 above.*
+
+### 2026-10-12: pointer to the ignition re-check (diagnostic; the verdict above is unchanged)
+
+A pre-stated diagnostic re-ran this test bit for bit: every score, MBON value,
+training-curve entry and weight summary matched exactly. This time it saved
+per-trial KC rates, labelled with the synthetic-market sweep's ignition
+definition. Full record:
+[`first-learning-ignition-recheck-diagnostic.md`](first-learning-ignition-recheck-diagnostic.md),
+Results.
+
+- **KC cascades occur only on rewarded cues.** They recruit about 65% of
+  non-stimulated KCs. There were none in the pre-test, `a_plasticity_off` or
+  `d_punish_a`. The cascades were:
+  - in `main`, 2 of 50 test trials, on cue A;
+  - in `b_reward_b`, 4 test trials and 1 training presentation, on cue B;
+  - in `c_reward_both`, 6 test trials and 1 training presentation, on either
+    cue.
+- **Cascaded trials score lower,** so they oppose the learned preference.
+  Removing them moves Δ_main from 154.49 to 159.25, a shift of −4.758. The main
+  result does not depend on them.
+- **The seed split in `b_reward_b` and `c_reward_both`** (cue-B change about
+  +181 against about +102) is explained by test-time cascades in seeds 20260318
+  and 20260320, by the diagnostic's pre-stated criteria.
+- **Descriptive only.** `LEARNING DEMONSTRATED` stands as decided.

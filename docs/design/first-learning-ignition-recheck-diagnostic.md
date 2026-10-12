@@ -185,3 +185,88 @@ Commands are in the runner's docstring and `--help`. The run is
 ## Results
 
 *None yet. Append a dated section after the run; do not edit anything above.*
+
+### 2026-10-12: re-check run and analysis (DIAGNOSTIC; descriptive only, no verdict)
+
+Sources:
+
+- `repro/mushroom_body/results/first_learning_ignition_recheck_20261012/ignition_recheck_summary.json`
+  (`kind: diagnostic`, `is_a_validation: false`, `verdict: null`);
+- the `--analyze` output, which is that file's `summary_lines`;
+- per-trial files in `trials/` (260 presentations);
+- the run log `repro/mushroom_body/run_log_first_learning_recheck.txt`.
+
+**Run.** 260 runs, sequential, one process, on this Mac. The first per-trial file
+was written at 14:11 and the last at 16:09, so the run took about **2 h**,
+longer than the 80–90 min estimated in Section 7. The first attempt crashed
+before any simulation, while writing `meta.json`. It was fixed in commit
+`92cb818`. `verdict.json` was not written.
+
+**Validity check (Section 4): passed exactly.** There were 0 mismatches against
+`first_learning_6fea97ac91`, covering:
+
+- every pre-test and post-test `score_A`/`score_B`;
+- every `mbon_A`/`mbon_B` value;
+- every training-curve `cue`, `score`, `teaching` and `n_eligible_kc`;
+- every `weight_summary` field.
+
+The re-run reproduces the first learning test bit for bit. Linearity check:
+the largest |presentation score − mean of trial scores| was 2.8 × 10⁻¹⁴ Hz,
+below 1 × 10⁻⁶, so the adjusted figures are computable.
+
+**Ignited trials (sweep definition: above 0.5 Hz per trial, above 1% of
+non-stimulated KCs):**
+
+| stage | ignited test trials | where | training cascades |
+|---|---:|---|---|
+| pre-test | 0 / 50 | — | — |
+| `main` post-test | **2 / 50** | cue A: seed 20260318 trial 1, seed 20260319 trial 2 | 0 / 40 |
+| `a_plasticity_off` post-test | 0 / 50 | — | 0 / 40 |
+| `b_reward_b` post-test | 4 / 50 | cue B: seed 20260318 trials 1 and 3, seed 20260320 trials 3 and 4 | 1 / 40 (k = 31, cue B) |
+| `c_reward_both` post-test | 6 / 50 | cue A: seeds 20260317, 20260318 and 20260319 (1 each); cue B: seed 20260318 (1) and seed 20260320 (2) | 1 / 40 (k = 31, cue B) |
+| `d_punish_a` post-test | 0 / 50 | — | 0 / 40 |
+
+- **All 12 ignited test trials are full cascades.** Spread ran from 64.1% to
+  66.3% of non-stimulated KCs, or 3,256–3,367 KCs. No trial fell near the 1%
+  label.
+- **Only rewarded cues cascade.** Every ignited trial, in testing and in
+  training, is on a cue that was rewarded in that condition: A in `main`, B in
+  `b_reward_b`, either cue in `c_reward_both`. The conditions without reward
+  had no cascades: the pre-test, `a_plasticity_off` (no learning) and
+  `d_punish_a` (punishment, PPL1).
+- **Ignited trials lower the score.** In all 9 presentations with an ignited
+  trial, the mean score of the ignited trials is below that of the non-ignited
+  trials. Ignited-trial scores ran from −220.8 to +53.5 Hz. The non-ignited
+  trials of the same presentations ran from about +91 to +96 Hz. Reward raises
+  a cue's score, so cascades **oppose the learned preference**.
+
+**Pre-stated reading (1): `main` and the +154.49.**
+
+- Two post-test trials ignited, both cue A:
+  - seed 20260318: ignited trial 12.1 against a non-ignited mean of 92.4;
+  - seed 20260319: ignited trial 53.5 against a non-ignited mean of 92.2.
+- No pre-test trial ignited, so the threshold is unchanged at 6.545.
+- Δ_main = 154.493; Δ_main(adjusted) = 159.251.
+- Reading, as pre-stated: *"cascades move Δ_main by −4.758; the main result
+  does not depend on them"*. The cascades made the recorded Δ smaller, not
+  larger.
+
+**Pre-stated reading (2): the seed split.**
+
+| condition | cue-B ignited trials, seeds 17 / 19 / 21 | cue-B ignited trials, seeds 18 / 20 | gap | gap, adjusted | reduction | reading |
+|---|---|---|---:|---:|---:|---|
+| `b_reward_b` | 0 / 0 / 0 | 2 / 2 | 78.455 | −0.348 | 99.6% | *test-time cascades explain the split* |
+| `c_reward_both` | 0 / 0 / 0 | 1 / 2 | 71.065 | −0.072 | 99.9% | *test-time cascades explain the split* |
+
+Both meet the pre-stated criteria: (i) more ignited cue-B trials in seeds
+20260318 and 20260320, and (ii) at least a 75% reduction of the gap. With the
+ignited trials removed, the non-ignited cue-B trials of seeds 20260318 and
+20260320 score about +92 to +96, like the other three seeds.
+
+**Not done.**
+
+- No mechanism is inferred.
+- The reward-B and reward-both Δs were not recomputed without cascades. The
+  pre-statement does not ask for it.
+- Nothing here changes the first learning test's recorded verdict, `LEARNING
+  DEMONSTRATED`, which was decided under its own pre-stated rules.
