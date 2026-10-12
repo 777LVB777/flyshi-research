@@ -993,6 +993,38 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 >   direction of any effect on its gate is **not inferred**, and point 5 stands
 >   unchanged.
 
+> **REVISION 2026-10-12 (project owner): the phase-1-only evaluation is written,
+> before any phase 1 result is read.** This is the gate-only evaluation the
+> 2026-10-11 revision said would be written later and labelled as such. Nothing
+> pre-stated changes: not the gate, comparator, bootstrap seeds, null control,
+> readings or reports, and not the config hash (still **`a325e6b206`**).
+>
+> - **Code.**
+>   - `synthetic_market.evaluate_phase1`, run as
+>     `run_synthetic_market_experiment.py --finish-phase1`.
+>   - It reads only the 160 phase 1 job files (`profit`, `learning_off`) and
+>     writes `verdict_phase1.json`.
+>   - It applies the Section 6 gate through the same `evaluate_signal_requirement`,
+>     restricted to those two arms. On identical outputs the gate figures equal the
+>     full evaluation's, and a test checks this.
+>   - `accuracy` and `profit_drift_off` appear wherever an arm would, as
+>     **"not run (dropped for budget, 2026-10-11)"**.
+>   - `--finish` and the launcher still require all four arms.
+> - **What it reports, all as pre-stated:**
+>   - the null control (strength 0);
+>   - the 0.4 note ("undetermined, not absent");
+>   - the exclusion-sensitivity analysis;
+>   - the ignition exposure;
+>   - the ignited-training counts;
+>   - the 2026-10-12 ignition report (point 4 above): Wilson and Newcombe 95%
+>     intervals, reading only ignition fields, drives, `sequence` and strength.
+>
+>   Plus the pre-stated wording of each outcome (`readings`): a non-pass above 0
+>   is ambiguous between (a) and (b) as in point 5; a 0.4 non-pass is
+>   undetermined; and instability is flagged.
+> - **Tested on fake job files only.** No real result file was opened while
+>   writing or testing it.
+
 ## Results
 
 *None. Append results here after the selected mitigation has completed;

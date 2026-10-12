@@ -178,6 +178,10 @@ def parser() -> argparse.ArgumentParser:
     group.add_argument("--job", help="Run one job ID.")
     group.add_argument("--list-jobs", action="store_true")
     group.add_argument("--finish", action="store_true", help="Evaluate completed jobs; no simulation.")
+    group.add_argument("--finish-phase1", action="store_true",
+                       help="Phase 1 only (2026-10-11 budget revision): the pre-stated gate and reports from"
+                       " profit and learning_off; accuracy and profit_drift_off reported as not run."
+                       " Writes verdict_phase1.json; no simulation.")
     return p
 
 
@@ -185,9 +189,9 @@ def _config(mitigation: str) -> sm.SyntheticConfig:
     return sm.SyntheticConfig(mitigation=mitigation)
 
 
-def _load_outputs(cfg: sm.SyntheticConfig, paths: Paths) -> dict:
+def _load_outputs(cfg: sm.SyntheticConfig, paths: Paths, arms=None) -> dict:
     outputs = {}
-    for job in sm.plan_jobs(cfg):
+    for job in sm.plan_jobs(cfg, arms):
         if job.kind != "condition":
             continue
         path = paths.output(job)
@@ -202,6 +206,15 @@ def finish(cfg: sm.SyntheticConfig, results_base: Path) -> dict:
     paths = Paths(directory)
     verdict = sm.evaluate_signal_requirement(_load_outputs(cfg, paths), cfg)
     _write_json(directory / "verdict.json", verdict)
+    return verdict
+
+
+def finish_phase1(cfg: sm.SyntheticConfig, results_base: Path) -> dict:
+    """Reads only the phase 1 job files (profit, learning_off); writes verdict_phase1.json."""
+    directory = sm.results_dir_for(results_base, cfg)
+    paths = Paths(directory)
+    verdict = sm.evaluate_phase1(_load_outputs(cfg, paths, sm.PHASE1_ARMS), cfg)
+    _write_json(directory / "verdict_phase1.json", verdict)
     return verdict
 
 
@@ -222,6 +235,10 @@ def main(argv=None) -> int:
         return 0
     if args.finish:
         verdict = finish(cfg, args.results_base)
+        print(json.dumps(verdict, indent=2))
+        return 0
+    if args.finish_phase1:
+        verdict = finish_phase1(cfg, args.results_base)
         print(json.dumps(verdict, indent=2))
         return 0
     selected = next((job for job in jobs if job.id == args.job), None)

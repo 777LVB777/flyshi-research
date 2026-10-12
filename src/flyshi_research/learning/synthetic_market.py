@@ -771,10 +771,10 @@ def _ignited(row: Mapping) -> bool:
 
 
 def ignition_exposure(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig",
-                      strength: float) -> dict:
+                      strength: float, arms: Sequence[str] = CONDITIONS) -> dict:
     """Decisions with an ignited framing, per arm and split. Reported, never gating."""
     out = {}
-    for condition in CONDITIONS:
+    for condition in arms:
         rows = {split: [r for seed in cfg.market_seeds
                         for r in outputs[(strength, seed, condition)][split]]
                 for split in ("train", "test")}
@@ -807,7 +807,8 @@ def _ignited_training_counts(rows: Sequence[Mapping], condition: str, cfg: "Synt
 
 
 def ignited_training_presentations(
-    outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig"
+    outputs: Mapping[Tuple[float, int, str], Mapping], cfg: "SyntheticConfig",
+    arms: Sequence[str] = CONDITIONS,
 ) -> dict:
     """PRE-STATED COUNT (2026-10-09). REPORTED ONLY, NEVER GATING.
 
@@ -821,7 +822,7 @@ def ignited_training_presentations(
     out = {"note": ("reported only, never gating; decisions that could have taught the "
                     "circuit from a presentation with an ignited trial (safeguard not adopted)")}
     try:
-        for condition in CONDITIONS:
+        for condition in arms:
             per_strength = {}
             pooled_rows = []
             for strength in cfg.signal_strengths:
@@ -972,8 +973,14 @@ def profit_by_price_region(
     return out
 
 
-def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig) -> dict:
-    """Evaluate complete job outputs and apply the pre-stated paired-bootstrap gate."""
+def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig,
+                                arms: Sequence[str] = CONDITIONS) -> dict:
+    """Evaluate complete job outputs and apply the pre-stated paired-bootstrap gate.
+
+    ``arms``: the conditions to evaluate (default: all four). The gate needs only
+    GATE_ARMS; evaluate_phase1 passes exactly those."""
+    if not set(GATE_ARMS) <= set(arms) or set(arms) - set(CONDITIONS):
+        raise ValueError(f"arms must include {GATE_ARMS} and be among {CONDITIONS}")
     strengths_out: Dict[str, dict] = {}
     qualifying = []
     innate_rows: list = []
@@ -981,7 +988,7 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
     for strength in cfg.signal_strengths:
         circuit: Dict[str, dict] = {}
         condition_vectors: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, list[Action]]] = {}
-        for condition in CONDITIONS:
+        for condition in arms:
             rows = [
                 row
                 for seed in cfg.market_seeds
@@ -1089,7 +1096,7 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
             # Reported, never gating (DECIDED 2026-10-09).
             "profit_by_price_region": profit_by_price_region(condition_vectors, cfg),
             # Reported, never gating (pre-stated 2026-10-09).
-            "ignition_exposure": ignition_exposure(outputs, cfg, strength),
+            "ignition_exposure": ignition_exposure(outputs, cfg, strength, arms),
             "sensitivity_excluding_ignited": sensitivity_excluding_ignited(
                 outputs, cfg, strength, vs_market, vs_off),
         }
@@ -1154,9 +1161,239 @@ def evaluate_signal_requirement(outputs: Mapping[Tuple[float, int, str], Mapping
                  "both_lower_bounds_above_zero")), None),
         # Reported, never gating (pre-stated 2026-10-09): training decisions that
         # could have taught the circuit from a presentation with an ignited trial.
-        "ignited_training_presentations": ignited_training_presentations(outputs, cfg),
+        "ignited_training_presentations": ignited_training_presentations(outputs, cfg, arms),
         "strengths": strengths_out,
     }
+
+
+# ---- phase 1 only: gate-only evaluation --------------------------------------------- #
+# Pre-stated exception (synthetic-market-experiment.md, Section 7 revision 2026-10-11):
+# phase 2 (accuracy, profit_drift_off) was dropped for budget, so the gate is reported
+# from the phase 1 arms alone and the dropped arms are marked "not run". Written on
+# 2026-10-12, after that decision and before any phase 1 result file was read; tested
+# on fake job files only. The gate, its comparator, bootstrap seeds, null control and
+# every report are the pre-stated ones: this only restricts which arms are evaluated.
+PHASE1_ARMS = RUN_PHASES[1]
+DROPPED_ARMS = RUN_PHASES[2]
+NOT_RUN_NOTE = "not run (dropped for budget, 2026-10-11)"
+PHASE1_EVALUATION_LABEL = (
+    "phase 1 only: gate-only evaluation per the 2026-10-11 budget revision; written "
+    "2026-10-12, after that decision and before any phase 1 result was read")
+#: fields the ignition report reads (2026-10-12 revision, point 4); nothing else
+IGNITION_REPORT_FIELDS = ("sequence", "drive_yes_hz", "drive_no_hz", "ignition_yes", "ignition_no")
+#: fixed framing-drive bands of the ignition report, in kHz: [low, high)
+IGNITION_DRIVE_BANDS_KHZ = ((None, 25.0), (25.0, 30.0), (30.0, 40.0), (40.0, 50.0), (50.0, 70.0), (70.0, None))
+IGNITION_DRIVE_BAND_LABELS = ("<25 kHz", "25-30 kHz", "30-40 kHz", "40-50 kHz", "50-70 kHz", ">=70 kHz")
+IGNITION_BLOCK_DECISIONS = 10
+_Z95 = 1.959963984540054
+
+
+def wilson_interval(k: int, n: int, z: float = _Z95) -> Tuple[Optional[float], Optional[float]]:
+    """Wilson score interval for k successes out of n (None, None when n = 0)."""
+    if n == 0:
+        return None, None
+    p = k / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return float(max(0.0, centre - half)), float(min(1.0, centre + half))
+
+
+def newcombe_difference(k1: int, n1: int, k2: int, n2: int) -> dict:
+    """p1 - p2 with Newcombe's hybrid score interval (method 10), from Wilson intervals."""
+    if n1 == 0 or n2 == 0:
+        return {"difference": None, "lower": None, "upper": None}
+    p1, p2 = k1 / n1, k2 / n2
+    (l1, u1), (l2, u2) = wilson_interval(k1, n1), wilson_interval(k2, n2)
+    d = p1 - p2
+    return {"difference": d, "lower": float(d - np.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)),
+            "upper": float(d + np.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2))}
+
+
+def _rate(k: int, n: int) -> dict:
+    lo, hi = wilson_interval(k, n)
+    return {"ignited": int(k), "total": int(n), "rate": (k / n) if n else None, "wilson_95": [lo, hi]}
+
+
+def _spread_flags(record: Mapping, cfg: SyntheticConfig) -> list:
+    return [s is not None and s > cfg.ignition_spread_fraction for s in record["spread"]]
+
+
+def _range_summary(values: Sequence) -> Optional[dict]:
+    v = [float(x) for x in values if x is not None]
+    return {"median": float(np.median(v)), "min": min(v), "max": max(v), "n": len(v)} if v else None
+
+
+def _drive_band(drive_hz: float) -> str:
+    khz = drive_hz / 1000.0
+    for (lo, hi), label in zip(IGNITION_DRIVE_BANDS_KHZ, IGNITION_DRIVE_BAND_LABELS):
+        if (lo is None or khz >= lo) and (hi is None or khz < hi):
+            return label
+    raise AssertionError("bands cover every drive")
+
+
+def _ignition_trials(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig,
+                     strength: float, condition: str) -> list:
+    """One entry per (decision, framing, trial), built from IGNITION_REPORT_FIELDS only."""
+    out = []
+    for seed in cfg.market_seeds:
+        for split in ("train", "test"):
+            for row in outputs[(strength, seed, condition)][split]:
+                r = {k: row[k] for k in IGNITION_REPORT_FIELDS}
+                for framing in ("yes", "no"):
+                    record = r[f"ignition_{framing}"]
+                    for t, flag in enumerate(_spread_flags(record, cfg)):
+                        out.append({"seed": seed, "split": split, "sequence": int(r["sequence"]),
+                                    "framing": framing, "drive_hz": float(r[f"drive_{framing}_hz"]),
+                                    "flag": flag, "trial": t, "record": record})
+    return out
+
+
+def ignition_report(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig,
+                    arms: Sequence[str] = PHASE1_ARMS) -> dict:
+    """PRE-STATED 2026-10-12 (revision, point 4). REPORTED ONLY, NEVER GATING.
+
+    Per arm x strength: ignited trials (Wilson 95%, pooled over seeds, with the
+    seed-to-seed range), decisions with an ignited framing (training, test),
+    presentations by number of ignited trials, and the spread, recruited count,
+    recruited mean rate and APL rate of ignited trials; the rise during training
+    (ignited trials per 10-decision block of ``sequence``, training against test);
+    the drive relationship (fixed framing-drive bands, YES against NO); and the
+    per-strength comparison (profit minus learning-off, and profit at s against
+    profit at 0; Newcombe 95%). Reads only IGNITION_REPORT_FIELDS, the strength and
+    the seed: no score, action, forecast, outcome, reward or P/L field."""
+    report: dict = {"note": ("reported only, never gating; ignition fields, drives, sequence and "
+                             "strength only (2026-10-12 revision, point 4)"),
+                    "definition": {"active_hz": cfg.ignition_active_hz,
+                                   "spread_fraction": cfg.ignition_spread_fraction},
+                    "by_arm": {}, "per_strength_comparison": {}}
+    counts: Dict[Tuple[str, float], Tuple[int, int]] = {}
+    try:
+        for condition in arms:
+            per_strength = {}
+            for strength in cfg.signal_strengths:
+                trials = _ignition_trials(outputs, cfg, strength, condition)
+                k, n = sum(t["flag"] for t in trials), len(trials)
+                counts[(condition, strength)] = (k, n)
+                seed_rates = []
+                for seed in cfg.market_seeds:
+                    ts = [t for t in trials if t["seed"] == seed]
+                    seed_rates.append(sum(t["flag"] for t in ts) / len(ts) if ts else None)
+                presentations: Dict[Tuple[int, str, int], int] = {}
+                decisions: Dict[str, set] = {"train": set(), "test": set()}
+                all_decisions: Dict[str, set] = {"train": set(), "test": set()}
+                for t in trials:
+                    key = (t["seed"], t["framing"], t["sequence"])
+                    presentations[key] = presentations.get(key, 0) + t["flag"]
+                    all_decisions[t["split"]].add((t["seed"], t["sequence"]))
+                    if t["flag"]:
+                        decisions[t["split"]].add((t["seed"], t["sequence"]))
+                by_count = {str(c): sum(v == c for v in presentations.values()) for c in range(1, cfg.trials + 1)}
+                ignited = [t for t in trials if t["flag"]]
+                detail = {f: _range_summary([t["record"][f][t["trial"]] for t in ignited])
+                          for f in ("spread", "n_recruited", "recruited_mean_hz", "apl_hz")}
+                blocks = []
+                for start in range(0, cfg.markets_per_seed, IGNITION_BLOCK_DECISIONS):
+                    bt = [t for t in trials if start <= t["sequence"] < start + IGNITION_BLOCK_DECISIONS]
+                    blocks.append({"first_sequence": start,
+                                   "split": "train" if start < cfg.train_count else "test",
+                                   "ignited_trials": sum(t["flag"] for t in bt), "trials": len(bt)})
+                split_rates = {s: _rate(sum(t["flag"] for t in trials if t["split"] == s),
+                                        sum(1 for t in trials if t["split"] == s)) for s in ("train", "test")}
+                band_of = [_drive_band(t["drive_hz"]) for t in trials]
+                bands = {label: _rate(sum(t["flag"] for t, b in zip(trials, band_of) if b == label),
+                                      band_of.count(label))
+                         for label in IGNITION_DRIVE_BAND_LABELS}
+                framing = {f: _rate(sum(t["flag"] for t in trials if t["framing"] == f),
+                                    sum(1 for t in trials if t["framing"] == f)) for f in ("yes", "no")}
+                rates = [r for r in seed_rates if r is not None]
+                per_strength[str(strength)] = {
+                    "trials": _rate(k, n),
+                    "seed_to_seed_range": [min(rates), max(rates)] if rates else None,
+                    "decisions_with_ignited_framing": {
+                        s: {"ignited": len(decisions[s]), "total": len(all_decisions[s])} for s in ("train", "test")},
+                    "presentations_by_ignited_trials": by_count,
+                    "ignited_trials_detail": detail,
+                    "rise_during_training": {"blocks": blocks, "training_rate": split_rates["train"],
+                                             "test_rate": split_rates["test"],
+                                             "note": "descriptive; no trend test"},
+                    "drive_bands": bands,
+                    "framing": framing,
+                }
+            report["by_arm"][condition] = per_strength
+    except KeyError as missing:
+        return {"available": False, "reason": f"ignition record missing ({missing})"}
+    for strength in cfg.signal_strengths:
+        entry = {}
+        if (PROFIT, strength) in counts and (LEARNING_OFF, strength) in counts:
+            entry["profit_minus_learning_off"] = newcombe_difference(*counts[(PROFIT, strength)],
+                                                                     *counts[(LEARNING_OFF, strength)])
+        if strength != NULL_CONTROL_STRENGTH and (PROFIT, NULL_CONTROL_STRENGTH) in counts:
+            entry["profit_minus_profit_at_strength0"] = newcombe_difference(
+                *counts[(PROFIT, strength)], *counts[(PROFIT, NULL_CONTROL_STRENGTH)])
+        report["per_strength_comparison"][str(strength)] = entry
+    report["available"] = True
+    return report
+
+
+def phase1_readings(verdict: Mapping, cfg: SyntheticConfig) -> dict:
+    """The pre-stated wording of each outcome (Sections 1 and 6 revisions, 2026-10-09;
+    ignition revision, 2026-10-12, point 5). Wording only; it decides nothing."""
+    out = {}
+    for strength in cfg.signal_strengths:
+        s = verdict["strengths"][str(strength)]
+        if strength == NULL_CONTROL_STRENGTH:
+            out[str(strength)] = verdict["null_control"]["interpretation"]
+            continue
+        if s["passes"]:
+            text = ("passes: both lower bounds above zero; the market comparison is a signal edge over the "
+                    "best price-only forecast, and the learning-off comparison is 'learning effect, any source'")
+        else:
+            text = ("does not pass; ambiguous between (a) no learning of the signal and (b) learning-induced "
+                    "ignition degrading the readout, which this sweep cannot separate; the ignition report and "
+                    "the sensitivity analysis are shown alongside and cannot turn it into a pass")
+            if strength in UNDERPOWERED_STRENGTHS:
+                text += f"; pre-stated: {UNDERPOWERED_STRENGTHS[strength]}"
+        out[str(strength)] = text
+    if verdict["null_control"] and verdict["null_control"]["passes"]:
+        overall = verdict["null_control"]["interpretation"]
+    elif verdict["signal_requirement"] is not None:
+        overall = f"signal requirement: {verdict['signal_requirement']:g}"
+    else:
+        tested = [st for st in cfg.signal_strengths if st != NULL_CONTROL_STRENGTH]
+        overall = (f"no signal requirement demonstrated within {min(tested):g}-{max(tested):g}"
+                   if tested else "no tested strength")
+    out["overall"] = overall
+    if verdict["higher_strength_failures"]:
+        out["instability"] = ("pre-stated instability: strength(s) "
+                              f"{', '.join(f'{x:g}' for x in verdict['higher_strength_failures'])} "
+                              "fail after a lower strength passes")
+    out["sensitivity"] = ("the exclusion-sensitivity analysis is reported only; it cannot rescue or "
+                          "overturn the criterion")
+    return out
+
+
+def evaluate_phase1(outputs: Mapping[Tuple[float, int, str], Mapping], cfg: SyntheticConfig) -> dict:
+    """The pre-stated gate and reports from the phase 1 arms only (profit, learning_off).
+
+    Every phase 1 job output must be present; outputs of other arms are ignored. The
+    dropped arms are reported as NOT_RUN_NOTE wherever an arm would appear."""
+    missing = [condition_job_id(c, s, seed) for s in cfg.signal_strengths for seed in cfg.market_seeds
+               for c in PHASE1_ARMS if (s, seed, c) not in outputs]
+    if missing:
+        raise ValueError(f"{len(missing)} phase 1 job output(s) missing, e.g. {missing[:3]}")
+    phase1 = {k: v for k, v in outputs.items() if k[2] in PHASE1_ARMS}
+    verdict = evaluate_signal_requirement(phase1, cfg, arms=PHASE1_ARMS)
+    not_run = {arm: NOT_RUN_NOTE for arm in DROPPED_ARMS}
+    for entry in verdict["strengths"].values():
+        entry["circuit"].update(not_run)
+        if entry["ignition_exposure"].get("available", True):
+            entry["ignition_exposure"].update(not_run)
+    if verdict["ignited_training_presentations"].get("available"):
+        verdict["ignited_training_presentations"].update(not_run)
+    verdict["ignition_report"] = ignition_report(phase1, cfg, PHASE1_ARMS)
+    verdict["readings"] = phase1_readings(verdict, cfg)
+    return {"evaluation": PHASE1_EVALUATION_LABEL, "arms_evaluated": list(PHASE1_ARMS),
+            "arms_not_run": not_run, **verdict}
 
 
 def results_dir_for(base: Path, cfg: SyntheticConfig) -> Path:
