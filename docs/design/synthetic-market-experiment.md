@@ -837,6 +837,139 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 >   $100.** Phase 1 has no contingency: any restart, idle server hour or
 >   failed job is paid out of that same $100.
 
+> **REVISION 2026-10-12 (project owner), during phase 1, before any phase 1
+> result is seen: elevated ignition found by an operational check; sweep
+> continues unchanged; an ignition report is added (reported only, never
+> gating).** All text above is kept unchanged. Nothing in the run, the
+> configuration (hash **`a325e6b206`**), the gate, the null control, the
+> sensitivity analysis or the learning rule changes.
+>
+> *1. Log of the check: it went beyond the pre-stated running summary.* The
+> running summary allows only the number of decisions with an ignited framing.
+> On 2026-10-12 the project owner asked for a more detailed operational check.
+> It was done on local backup copies of the four phase 1 job files finished at
+> that time:
+>
+> - `condition_profit_0_20261001.json`, `condition_learning_off_0_20261001.json`;
+> - `condition_profit_0_20261002.json` and
+>   `condition_learning_off_0_20261002.json`.
+>
+> All four are at strength 0 and come from
+> `~/flyshi-backups/repro/mushroom_body/results/synthetic_market_a325e6b206/parts/`.
+>
+> - **Fields read, and only these:**
+>   - per job: `condition` and `market_seed`;
+>   - per decision (train and test): `sequence`, `drive_yes_hz`, `drive_no_hz`,
+>     and the whole `ignition_yes` and `ignition_no` blocks (`spread`,
+>     `spread_left`, `spread_right`, `n_recruited`, `recruited_mean_hz`,
+>     `apl_hz`, `ignited_any_trial`).
+> - **Fields not accessed:** no score, action, forecast, outcome, reward or P/L
+>   field was accessed, printed or used in any computation. That covers
+>   `outcome`, `quote`, `raw_probability`, `action`, `score_difference`,
+>   `mbon_yes`, `mbon_no`, `calibrated_probability` and `calibrator`. The JSON
+>   parser loaded each file whole. The analysis copied only the fields listed
+>   above, through a whitelist, and wrote only those to its scratch file. The
+>   field names and types were listed first, without any values, to build that
+>   whitelist.
+> - **Also used:** saved diagnostic files outside the sweep were re-scored with
+>   the sweep's ignition rule (`ignition_record`: recruited above 0.5 Hz in a
+>   trial, trial ignited above 1% of non-stimulated KCs). Those files are not
+>   blinded.
+> - **Nothing changed.** Nothing was run, and nothing on the server was
+>   touched.
+>
+> *2. What the check found (operational fields only).*
+>
+> | arm (strength 0, seeds 20261001–2) | trials ignited | decisions with an ignited framing: training / test |
+> |---|---:|---:|
+> | `profit` | 212 / 5,000 (4.2%) | 17 / 140; 156 / 360 |
+> | `learning_off` | 7 / 5,000 (0.14%) | 0 / 140; 7 / 360 |
+>
+> - **Cascades, not stray spikes.** Of the 219 flagged trials, the median spread
+>   was 66.5%, about 3,100 KCs, on both sides. 211 trials were above 50%.
+>   Unflagged trials recruited at most 2 KCs (0.04%). No trial fell between
+>   0.04% and 2.1%.
+> - **Learning-induced.**
+>   - The two arms see identical stimuli and drives. No trial and no
+>     presentation ignited in both.
+>   - `learning_off` matches the baseline-weight diagnostics: 4/1,255 trials
+>     when re-scored with the sweep's rule.
+>   - In `profit`, ignition starts after about 10 training decisions, rises
+>     during training, and plateaus in the test block, where weights are frozen.
+>   - Learning changes only KC→MBON weights. The route by which this produces KC
+>     cascades is **not identified**.
+> - **Drive.** Ignition falls with total drive: 4.5% in the lowest drive quintile
+>   and 0.5% in the highest, pooled over arms. Flagged trials ran from 22.9 to
+>   59 kHz.
+> - **Why the pre-run estimate missed it.** The roughly 0.2% estimate (Section 3
+>   revision for design (b′)) came only from baseline-weight runs, so it could
+>   not capture learning-induced ignition.
+>
+> *3. Decision (project owner, 2026-10-12): continue unchanged.* The sweep runs
+> to completion as pre-stated. The drafted safeguard (Section 3) stays **not
+> adopted**. Reasons:
+>
+> - A restart would use most of the remaining budget.
+> - The first `profit` ignitions follow training decisions that themselves did
+>   not ignite. A no-update-on-ignition rule would therefore not have prevented
+>   the drift, and it does nothing about ignition in the test block.
+>
+> This decision rests only on the operational figures in point 2.
+>
+> *4. Added report: ignition by arm, training position, drive and strength
+> (reported only, never gating).* It is computed after all 160 phase 1 files
+> exist. It uses only the fields listed in point 1, plus each job's `strength`.
+> It cannot change the gate, the signal requirement, the null-control verdict or
+> the sensitivity analysis.
+>
+> - **Per-arm ignition rates.** For each arm × strength:
+>   - ignited trials out of trials;
+>   - decisions with an ignited framing, training and test separately;
+>   - presentations by number of ignited trials (1–5);
+>   - the spread, recruited count, recruited mean rate and APL rate of ignited
+>     trials (median and range).
+>
+>   Intervals are 95% Wilson intervals, pooled over seeds. The seed-to-seed
+>   range is reported next to them.
+> - **Rise during training.** For each arm × strength, ignited trials per
+>   10-decision block of `sequence` (0–69 training, 70–249 test), pooled over
+>   seeds. Also the training-block rate against the test-block rate.
+>   Descriptive; no trend test.
+> - **Drive relationship.** For each arm × strength, the ignited-trial rate by
+>   framing drive, in fixed bands: below 25, 25–30, 30–40, 40–50, 50–70 and 70
+>   kHz or more. Also YES against NO framing.
+> - **Per-strength comparison.** Profit minus learning-off ignition rate at each
+>   strength, and the profit rate at each s > 0 against the profit rate at 0.
+>   Each is a difference with a 95% Newcombe interval. Descriptive only.
+> - **Not inferred.** No score, outcome or reward is joined to these tables.
+>   Whether ignited presentations score differently is **not** part of this
+>   report.
+>
+> *5. How gate outcomes are to be read in the light of ignition (stated before
+> any result).*
+>
+> - **Non-pass at a strength above 0.** It must be reported as **ambiguous**
+>   between two explanations:
+>   - (a) the circuit did not learn the signal;
+>   - (b) learning-induced ignition degraded the readout.
+>
+>   This sweep cannot separate them. The ignition report (point 4) and the
+>   pre-stated sensitivity analysis excluding ignited test markets (Section 6)
+>   are shown next to it. Neither may be used to turn a non-pass into a pass.
+> - **Pass at a strength above 0.** The market comparison is against the exact
+>   price-only posterior (Section 6 revision). Only use of the signal can beat it
+>   in expectation, so a pass keeps its meaning despite ignition. The
+>   learning-off comparison keeps its label, "learning effect, any source".
+> - **The strength-0 null control remains protected.** The comparator is
+>   E[truth | price], the best forecast possible from the price alone. A cascade
+>   is a response to the presented features (which carry no information beyond
+>   the price at strength 0), the learned weights and simulation noise. So
+>   ignition cannot **systematically** beat that comparator: it can add noise or
+>   bias, not a price-independent edge. A strength-0 pass still reads `NULL
+>   CONTROL FAILED`, a pipeline or generator problem. Chance passes at the
+>   bootstrap's error rate remain possible, as before.
+> - **Cost:** $0. Nothing is re-run.
+
 ## Results
 
 *None. Append results here after the selected mitigation has completed;
