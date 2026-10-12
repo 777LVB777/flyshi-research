@@ -14,6 +14,10 @@ simulation.
 (the remaining learning-rule and reward placeholders are locked) and 6 (the
 Phase 2 market data source). Items 1–4 are unchanged.
 
+**Update 2026-10-11:** item 6 is revised. Kalshi is blocked pending written
+permission, and the Phase 2 venue is under review. See the dated revision at the
+end of item 6.
+
 ## 1. Degree-preserving shuffle scope
 
 The implemented shuffle exchanges the targets of two directed edges while
@@ -415,6 +419,90 @@ that saved configuration.
   was written.
 - **Backtest details still open.** Date range, market-selection criteria, fee
   schedule and the Polymarket replication protocol are not yet specified.
+
+> **REVISION 2026-10-11 (project owner): Kalshi blocked pending permission; venue
+> under review.** The decision above is kept unchanged as the record. It no longer
+> holds. **No Kalshi data may be downloaded, stored or used.** No Kalshi data was
+> ever downloaded, and the Kalshi API was never called.
+>
+> *Finding.* The terms review that item 6 required before any bulk download was
+> done on 2026-10-11. Kalshi's terms forbid what Phase 2 needs unless Kalshi
+> gives written permission. That covers storing historical data, analysing it,
+> using it with a learning model, publishing results and sharing data with
+> reviewers.
+>
+> *Documents reviewed, retrieved 2026-10-11:*
+>
+> | document | source | version shown | SHA-256 of the file retrieved |
+> |---|---|---|---|
+> | Kalshi Developer Agreement | `https://assets.kalshi.com/Kalshi-Developer-Agreement.pdf`, linked from `kalshi.com/developer-agreement` | "v1.1", no date | `9d3e33685c0f0a88d23895685107975b0745283aac96f8bf7d202f5ae4dc1fa6` |
+> | Kalshi Data Terms of Use | `https://kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf`, linked from `kalshi.com/terms` | no date | `d19a0f94ffd65aa51eccb80cc8c9a06fb842478c5bf4cbd5a31ec51dd0a3966f` |
+>
+> Kalshi's API documentation says that using the API binds the user to the
+> Developer Agreement. The two documents were not copied into the repository. The
+> checksums identify the exact versions read. Clause summaries follow, with one
+> short verbatim quote; the wording governs.
+>
+> *Developer Agreement:*
+>
+> - **§3 (preamble).** API use is limited to facilitating the member's own trading
+>   on the exchange. Every other use is disallowed and can lead to suspension.
+>   **This blocks the project:** a historical replay is not trading.
+> - **§3.1.** Collecting, caching, aggregating or storing API data is prohibited
+>   except to facilitate one's own trading. Sharing it with third parties in any
+>   manner needs Kalshi's prior written authorization. **This blocks building the
+>   dataset and blocks giving data to reviewers.**
+> - **§4.1.1.** API users must be Kalshi Members, which means an exchange account
+>   with identity checks. **Unclear** whether the project owner qualifies.
+> - **§6.4.** Public statements, releases and disclosures relating to Kalshi or
+>   its API need Kalshi's prior written approval. **This limits publication.**
+>   How broadly Kalshi reads this clause is **unclear**.
+>
+> *Data Terms of Use* (all Kalshi Data: prices, volume, settlement prices, market
+> descriptions):
+>
+> - **§I.** Access is for personal, non-commercial use only, and only in the form
+>   presented on the website. Without prior written consent, non-commercial use
+>   excludes developing software, including "training a machine learning or
+>   artificial intelligence system", and excludes giving archived or cached data
+>   sets to anyone else.
+> - **§II.** Without prior written authorization this section prohibits:
+>   - downloading, collecting and copying;
+>   - compiling databases and systematic retrieval;
+>   - text and data mining;
+>   - publishing, distributing and creating derivative works;
+>   - analysing the data;
+>   - using scripts or bots.
+>
+>   A closing paragraph in bold prohibits any use of Kalshi Data in any manner for
+>   machine learning or AI. **This blocks the project.** Whether a spiking circuit
+>   with plasticity counts as machine learning is arguable. The design does not
+>   rely on arguing that it does not.
+> - **§III.** Kalshi claims all rights to the data. **This blocks redistributing
+>   a dataset with the paper.**
+>
+> *Not settled:*
+>
+> - **Kalshi Research.** Kalshi Research (`kalshi.com/research`), reported as
+>   launched in December 2025, says it collaborates with academics. No public data
+>   access route or research licence was found.
+> - **Third-party resellers.** Resellers of Kalshi data were not checked. Buying
+>   from them does not obviously avoid the Data Terms.
+> - **Member Agreement and Rulebook.** Not reviewed.
+>
+> *Decision (project owner, 2026-10-11):*
+>
+> - **Primary source:** *Kalshi blocked pending permission; venue under review.*
+> - **Permission request.** A request to Kalshi Research is drafted as a document
+>   only, in [`kalshi-permission-request-DRAFT.md`](kalshi-permission-request-DRAFT.md).
+>   Nothing has been sent.
+> - **Alternative venues.** Their terms, reviewed the same day, are in
+>   [`phase2-design.md`](phase2-design.md), Section 1.
+> - **Phase 2 design.** The design is now venue-neutral and DRAFT, in
+>   [`phase2-design.md`](phase2-design.md).
+> - **Budget.** The Phase 2 compute budget remains about $100. It is set in the
+>   [`synthetic-market-experiment.md`](synthetic-market-experiment.md) Section 7
+>   revision of 2026-10-11.
 
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 
