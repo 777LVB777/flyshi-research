@@ -87,6 +87,10 @@ class FastRunnerSimulator:
         W0[self._rows, self._cols] = np.asarray(syn.w[:])[sel]  # volts, units stripped
         # (a zero-weight synapse simply stays 0 under the rule: floor and drift target are 0)
         self._W0 = W0
+        # Optional per-trial recorder (ignition re-check diagnostic, 2026-10-12). None by
+        # default; when set it is handed per-trial spike counts from the same spike table
+        # and cannot change what present() returns.
+        self.trial_sink = None
         print(f"[backend] {sel.size} KC->MBON synapses; build {self.bundle['build_seconds']:.1f}s")
 
     def baseline_weights(self) -> np.ndarray:
@@ -104,7 +108,23 @@ class FastRunnerSimulator:
                              minlength=self.bundle["n"]) if len(spikes) else np.zeros(self.bundle["n"])
         # mean over trials of count/duration == utils.get_rate's per-trial mean
         rate = counts / (duration_ms / 1000.0 * n_trials)
+        if self.trial_sink is not None:
+            self.trial_sink(rates_by_kc_id, seed, duration_ms, n_trials,
+                            per_trial_counts(spikes, self.bundle["flyid2i"], self.bundle["n"], n_trials))
         return rate[self._kc_brian], rate[self._mbon_brian]
+
+
+def per_trial_counts(spikes, flyid2i: Mapping[int, int], n: int, n_trials: int) -> np.ndarray:
+    """Spike counts per trial and neuron, ``[n_trials, n]`` (Brian2 index order), from
+    run_cue_rates' spike table (columns ``flywire_id`` and ``trial``)."""
+    counts = np.zeros((n_trials, n), dtype=np.int64)
+    if len(spikes):
+        idx = np.array([flyid2i[f] for f in spikes["flywire_id"]], dtype=int)
+        trial = np.asarray(spikes["trial"], dtype=int)
+        if trial.min() < 0 or trial.max() >= n_trials:
+            raise ValueError(f"trial index outside 0..{n_trials - 1}")
+        np.add.at(counts, (trial, idx), 1)
+    return counts
 
 
 # --------------------------------------------------------------------------- #
