@@ -168,8 +168,8 @@ def _raw():
 def test_selection_counts_every_exclusion_and_keeps_one_market_per_event():
     sel = pm.select_markets(_raw())
     c = sel.counts
-    assert c["raw"] == 13 and c["duplicate_id"] == 1 and c["not_closed"] == 1 and c["not_binary"] == 1
-    assert c["missing_token_ids"] == 1 and c["void_50_50"] == 1 and c["unresolved_or_ambiguous"] == 1
+    assert c["raw"] == 13 and c["duplicate_id"] == 1 and c["not_closed"] == 1 and c["multi_outcome"] == 1
+    assert c["missing_token_ids"] == 1 and c["void_50_50"] == 1 and c["interior_final_price"] == 1
     assert c["below_min_volume"] == 1 and c["no_decision_window"] == 1 and c["closed_before_decision"] == 1
     assert c["eligible_before_event_choice"] == 4 and c["dropped_one_per_event"] == 1
     assert c["selected"] == 3 and c["archived_selected"] == 1
@@ -423,9 +423,70 @@ def test_count_report_carries_no_outcome_or_price_information():
         m.update(lastTradePrice=0.77, bestBid=0.7, bestAsk=0.8, oneDayPriceChange=0.1)
     a, b = pm.count_report(raw), pm.count_report(altered)
     assert a == b
-    text = json.dumps({k: v for k, v in a.items() if k != "note"}).lower()
-    for word in ('"yes"', '"no"', "outcome_", "price", "brier", "pnl"):
-        assert word not in text
+
+    def keys(x):
+        return set(x) | {k for v in x.values() if isinstance(v, dict) for k in keys(v)} if isinstance(x, dict) else set()
+
+    named_reasons = {"interior_final_price", "malformed_prices"}  # resolution-state reasons, not prices
+    for k in keys(a):
+        assert "price" not in k.lower() or k in named_reasons, k
+        assert k.lower() not in ("yes", "no", "outcome", "outcomes", "brier", "pnl"), k
+
+
+def _real_page(name="gamma_markets_keyset_realformat_page1.json"):
+    return json.loads((FIX / name).read_text())
+
+
+def test_real_format_page_is_parsed_with_named_reasons():
+    """Mirrors the REAL Gamma format seen in the 2026-10-12 trial (values made up)."""
+    page = _real_page()
+    assert set(page) == {"$schema", "markets", "next_cursor"}
+    c = pm.select_markets(page["markets"]).counts
+    assert c["raw"] == 12
+    assert c["multi_outcome"] == 2 and c["two_named_outcomes_not_yes_no"] == 2
+    assert c["near_0_1_not_exact"] == 2 and c["interior_final_price"] == 1  # AMM-era: never accepted
+    assert c["missing_token_ids"] == 1 and c["missing_dates"] == 1
+    assert c["selected"] == 2  # the two exact-settlement markets
+    assert sum(v for k, v in c.items() if k not in (
+        "raw", "eligible_before_event_choice", "selected", "archived_selected", "dropped_one_per_event")) \
+        + c["eligible_before_event_choice"] == c["raw"]
+
+
+def test_near_settled_amm_prices_are_never_taken_as_outcomes():
+    assert pm._resolution(["0.9999999999999999999999999999999999", "0.0000000000000000000000000000000001"]) \
+        == "near_0_1_not_exact"
+    assert pm._resolution(["0.0000000000000000000000000000000001", "0.9999999999999999999999999999999999"]) \
+        == "near_0_1_not_exact"  # symmetric: the reason does not reveal the side
+    assert pm._resolution(["0.6125", "0.3875"]) == "interior_final_price"
+    assert pm._resolution(["1", "0"]) == "yes" and pm._resolution(["0", "1"]) == "no"
+    assert pm._resolution(["0.5", "0.5"]) == "void" and pm._resolution(None) == "malformed_prices"
+
+
+def test_real_timestamp_formats_parse():
+    for v, iso in (("2020-10-21T15:04:05.123Z", "2020-10-21T15:04:05.123000+00:00"),
+                   ("2020-10-21T15:04:05.12Z", "2020-10-21T15:04:05.120000+00:00"),
+                   ("2020-10-21T15:04:05.1Z", "2020-10-21T15:04:05.100000+00:00"),
+                   ("2020-10-21T15:04:05Z", "2020-10-21T15:04:05+00:00"),
+                   ("2021-01-06 17:30:00+00", "2021-01-06T17:30:00+00:00")):
+        assert pm.parse_time(v).isoformat() == iso
+    assert pm.parse_time(None) is None
+
+
+def test_count_report_on_the_real_format_is_blind_to_outcomes_and_prices():
+    raw = _real_page()["markets"]
+    altered = json.loads(json.dumps(raw))
+    for m in altered:
+        prices = json.loads(m["outcomePrices"])
+        if prices in (["1", "0"], ["0", "1"]):
+            m["outcomePrices"] = json.dumps(prices[::-1])
+        elif len(prices) == 2:  # move non-exact prices within their reason category, and swap sides
+            r = pm._resolution(prices)
+            new = ["0.99999999", "0.00000001"] if r == "near_0_1_not_exact" else ["0.41", "0.59"]
+            m["outcomePrices"] = json.dumps(new)
+    assert pm.count_report(raw) == pm.count_report(altered)
+    rep = pm.count_report(raw)
+    assert rep["era_and_status_in_raw"]["amm_market_maker_address_present"] == 8
+    assert rep["era_and_status_in_raw"]["uma_resolution_status_resolved"] == 2
 
 
 def test_the_recorded_permission_file_covers_gamma_only_at_a_safe_rate():

@@ -272,7 +272,8 @@ class PolymarketClient:
 # --------------------------------------------------------------------------- #
 def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = None,
                          transform: Optional[Callable[[Mapping], dict]] = None,
-                         progress_path: Optional[Path] = None) -> List[dict]:
+                         progress_path: Optional[Path] = None,
+                         extra_params: Optional[Mapping[str, object]] = None) -> List[dict]:
     """Every closed market, archived included, by keyset paging (no volume filter, so
     the excluded markets can be counted).
 
@@ -292,7 +293,7 @@ def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = No
         if pages and not cursor:
             return markets  # finished earlier
     while max_pages is None or pages < max_pages:
-        params: Dict[str, object] = {"closed": "true", "limit": GAMMA_PAGE_LIMIT}
+        params: Dict[str, object] = {"closed": "true", "limit": GAMMA_PAGE_LIMIT, **(extra_params or {})}
         if cursor:
             params["after_cursor"] = cursor
         page = client.get(GAMMA_MARKETS, params)
@@ -318,6 +319,10 @@ def parse_time(value: Optional[str]) -> Optional[datetime]:
         v = v[:-1] + "+00:00"
     elif len(v) >= 3 and v[-3] in "+-" and v[-2:].isdigit():
         v = v + ":00"
+    if "." in v:  # real Gamma createdAt has 1-3 fractional digits; pad to 6
+        head, _, rest = v.partition(".")
+        digits = len(rest) - len(rest.lstrip("0123456789"))
+        v = head + "." + rest[:digits].ljust(6, "0")[:6] + rest[digits:]
     t = datetime.fromisoformat(v)
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
@@ -373,28 +378,44 @@ class Selection:
     volume_sensitivity: Dict[str, int] = field(default_factory=dict)
 
 
-def _resolution(prices: Optional[list]) -> Optional[str]:
-    """'yes', 'no', 'void' (50/50) or None (anything else)."""
+#: tolerance used ONLY to name an exclusion reason (never to accept a market)
+NEAR_SETTLED_TOLERANCE = 0.02
+
+
+def _resolution(prices: Optional[list]) -> str:
+    """'yes', 'no' or 'void' (50/50) for an EXACT recorded settlement; otherwise the
+    reason it is not one:
+
+    * 'near_0_1_not_exact': within NEAR_SETTLED_TOLERANCE of a 0/1 pair but not exact,
+      e.g. ['0.9999999999…', '0.0000000000…'] in 2020-21 AMM-era markets, whose
+      outcomePrices is the pool's last price, not a settlement record;
+    * 'interior_final_price': further from 0/1 than that;
+    * 'malformed_prices': missing, not two numbers.
+
+    Only an exact pair is accepted, so a stale pool price is never taken as an outcome.
+    The reason is symmetric in the two sides, so counting it reveals no outcome."""
     if not prices or len(prices) != 2:
-        return None
+        return "malformed_prices"
     try:
         a, b = (float(x) for x in prices)
     except (TypeError, ValueError):
-        return None
+        return "malformed_prices"
     if (a, b) == (1.0, 0.0):
         return "yes"
     if (a, b) == (0.0, 1.0):
         return "no"
     if (a, b) == (0.5, 0.5):
         return "void"
-    return None
+    distance = min(max(abs(a - 1.0), abs(b)), max(abs(a), abs(b - 1.0)))
+    return "near_0_1_not_exact" if distance <= NEAR_SETTLED_TOLERANCE else "interior_final_price"
 
 
 def selection_params(min_volume: float = MIN_FINAL_VOLUME_USDC) -> dict:
     return {"min_final_volume_usdc": min_volume, "decision_margin_hours": DECISION_MARGIN.total_seconds() / 3600,
             "decision_time_seed": DECISION_TIME_SEED, "event_choice_seed": EVENT_CHOICE_SEED,
-            "binary": "outcomes exactly ['Yes','No'] with two CLOB token IDs",
-            "resolved": "closed and outcomePrices exactly (1,0) or (0,1); (0.5,0.5) counted as void",
+            "binary": "outcomes exactly ['Yes','No'] with two CLOB token IDs; two named outcomes counted apart",
+            "resolved": ("closed and outcomePrices exactly (1,0) or (0,1); (0.5,0.5) counted as void; "
+                         "near-0/1 (AMM-era pool prices) and interior final prices counted, never accepted"),
             "one_per_event": "lowest sha256(event_choice_seed|market_id) within the event"}
 
 
@@ -402,8 +423,9 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
     """Resolved binary markets, final volume >= ``min_volume``, one market per event.
     Every exclusion is counted; archived markets are included and counted."""
     counts: Dict[str, int] = {k: 0 for k in (
-        "raw", "duplicate_id", "not_closed", "not_binary", "missing_token_ids", "void_50_50",
-        "unresolved_or_ambiguous", "missing_dates", "below_min_volume", "no_decision_window",
+        "raw", "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no",
+        "missing_token_ids", "void_50_50", "near_0_1_not_exact", "interior_final_price", "malformed_prices",
+        "missing_dates", "below_min_volume", "no_decision_window",
         "closed_before_decision", "eligible_before_event_choice", "dropped_one_per_event", "selected", "archived_selected")}
     seen, eligible = set(), []
     volumes: List[float] = []
@@ -419,8 +441,11 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
             counts["not_closed"] += 1
             continue
         names = _json_list(m.get("outcomes"))
-        if not names or [str(n).lower() for n in names] != ["yes", "no"]:
-            counts["not_binary"] += 1
+        if not names or len(names) != 2:
+            counts["multi_outcome"] += 1
+            continue
+        if [str(n).strip().lower() for n in names] != ["yes", "no"]:
+            counts["two_named_outcomes_not_yes_no"] += 1  # e.g. two team or candidate names
             continue
         tokens = _json_list(m.get("clobTokenIds"))
         if not tokens or len(tokens) != 2:
@@ -430,8 +455,8 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
         if res == "void":
             counts["void_50_50"] += 1
             continue
-        if res is None:
-            counts["unresolved_or_ambiguous"] += 1
+        if res not in ("yes", "no"):
+            counts[res] += 1
             continue
         start = parse_time(m.get("startDate") or m.get("createdAt"))
         end = parse_time(m.get("endDate"))
@@ -478,7 +503,8 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
 # --------------------------------------------------------------------------- #
 #: the only Gamma fields kept in the private metadata snapshot (selection needs them)
 SNAPSHOT_FIELDS = ("id", "question", "closed", "archived", "outcomes", "outcomePrices", "clobTokenIds",
-                   "volumeNum", "startDate", "createdAt", "endDate", "closedTime", "umaResolutionStatus")
+                   "volumeNum", "startDate", "createdAt", "endDate", "closedTime", "umaResolutionStatus",
+                   "umaResolutionStatuses", "marketMakerAddress", "fpmmLive", "enableOrderBook")
 COUNT_THRESHOLDS_USDC = (*VOLUME_SENSITIVITY_USDC[:1], MIN_FINAL_VOLUME_USDC, *VOLUME_SENSITIVITY_USDC[1:])
 
 
@@ -507,6 +533,20 @@ def read_snapshot(path: Path) -> List[dict]:
     return json.loads(text)
 
 
+def _uma_resolved(m: Mapping) -> bool:
+    statuses = _json_list(m.get("umaResolutionStatuses")) or []
+    return m.get("umaResolutionStatus") == "resolved" or "resolved" in [str(x) for x in statuses]
+
+
+def _year_counts(raw: Sequence[Mapping]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for m in raw:
+        t = parse_time(m.get("createdAt") or m.get("startDate"))
+        k = t.strftime("%Y") if t else "unknown"
+        out[k] = out.get(k, 0) + 1
+    return dict(sorted(out.items()))
+
+
 def count_report(raw: Sequence[Mapping], thresholds: Sequence[float] = COUNT_THRESHOLDS_USDC,
                  main: float = MIN_FINAL_VOLUME_USDC) -> dict:
     """Counts only. Reports NO outcome and NO price: no YES/NO split, no price field,
@@ -526,8 +566,12 @@ def count_report(raw: Sequence[Mapping], thresholds: Sequence[float] = COUNT_THR
         "raw_markets": s.counts["raw"],
         "archived_in_raw": sum(bool(m.get("archived")) for m in raw),
         "resolved_binary_markets": s.counts["raw"] - sum(s.counts[k] for k in (
-            "duplicate_id", "not_closed", "not_binary", "missing_token_ids", "void_50_50",
-            "unresolved_or_ambiguous")),
+            "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no", "missing_token_ids",
+            "void_50_50", "near_0_1_not_exact", "interior_final_price", "malformed_prices")),
+        "era_and_status_in_raw": {
+            "amm_market_maker_address_present": sum(bool(m.get("marketMakerAddress")) for m in raw),
+            "uma_resolution_status_resolved": sum(_uma_resolved(m) for m in raw),
+            "created_year": _year_counts(raw)},
         f"exclusions_by_reason_at_{main:g}": {k: v for k, v in s.counts.items() if k not in (
             "raw", "eligible_before_event_choice", "selected", "archived_selected")},
         "one_per_event": {f">={v:g}": {"eligible_before_event_choice": sels[v].counts["eligible_before_event_choice"],
