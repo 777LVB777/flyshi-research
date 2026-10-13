@@ -157,6 +157,9 @@ def main(argv=None, transport=None, now=None) -> int:
     except pm.NetworkRefused as why:
         print(f"REFUSED: {why}", file=sys.stderr)
         return 2
+    except pm.RetriesExhausted as failed:  # includes MetadataPageFailed, which names the cursor
+        print(f"STOPPED: {failed}", file=sys.stderr)
+        return 4
     # build: no network
     if not args.cutoff:
         raise SystemExit("build needs --cutoff YYYY-MM-DD")

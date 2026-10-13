@@ -22,6 +22,8 @@ import pytest
 from flyshi_research.realdata import polymarket as pm
 from flyshi_research.simulator import Market
 
+REAL_URLLIB_TRANSPORT = pm.urllib_transport  # kept before the autouse fixture replaces it
+
 REPO = Path(__file__).resolve().parents[2]
 FIX = REPO / "tests" / "fixtures" / "polymarket"
 CLI = REPO / "repro" / "polymarket" / "load_polymarket.py"
@@ -511,7 +513,7 @@ def test_metadata_fetch_resumes_after_an_interruption(tmp_path):
                 raise ConnectionError("simulated interruption")
             return super().__call__(url, headers)
 
-    with pytest.raises(ConnectionError):
+    with pytest.raises(pm.MetadataPageFailed, match="after cursor 'FAKECURSOR1'"):
         pm.fetch_closed_markets(client(tmp_path, Dies()), transform=pm.compact_market, progress_path=progress)
     assert len(progress.read_text().splitlines()) == 1  # page 1 saved
     for sub in ("b", "c", "e"):
@@ -525,3 +527,187 @@ def test_metadata_fetch_resumes_after_an_interruption(tmp_path):
     again = FakeServer()
     assert pm.fetch_closed_markets(client(tmp_path / "e", again), progress_path=progress) == whole
     assert again.calls == []  # a finished progress file needs no request
+
+
+
+# ---- transient network failures (2026-10-12) ------------------------------------------ #
+import http.client  # noqa: E402
+import socket  # noqa: E402
+import urllib.error  # noqa: E402
+
+PAGE1 = (FIX / "gamma_markets_keyset_page1.json").read_bytes()
+
+
+class Flaky:
+    """Fails ``n`` times in the given way, then serves the recorded fake page."""
+
+    def __init__(self, failure, n=1):
+        self.failure, self.n, self.calls = failure, n, 0
+
+    def __call__(self, url, headers):
+        self.calls += 1
+        if self.calls <= self.n:
+            f = self.failure
+            if isinstance(f, BaseException):
+                raise f
+            return f  # a (status, body, headers) tuple
+        return 200, PAGE1, {}
+
+
+FAILURES = {
+    "truncated_body": ((200, PAGE1[: len(PAGE1) // 2], {}), "JSONDecodeError", len(PAGE1) // 2),
+    "non_json_body": ((200, b"<html>502 Bad Gateway</html>", {}), "JSONDecodeError", 28),
+    "IncompleteRead": (http.client.IncompleteRead(b"x" * 404009, 1000), "IncompleteRead", 404009),
+    "ConnectionResetError": (ConnectionResetError(54, "Connection reset by peer"), "ConnectionResetError", 0),
+    "RemoteDisconnected": (http.client.RemoteDisconnected("Remote end closed connection"), "RemoteDisconnected", 0),
+    "socket.timeout": (socket.timeout("timed out"), "TimeoutError", 0),
+    "TimeoutError": (TimeoutError("timed out"), "TimeoutError", 0),
+    "URLError": (urllib.error.URLError(ConnectionRefusedError(61, "refused")), "URLError(ConnectionRefusedError)", 0),
+    "transport_error": (pm.TransientNetworkError("IncompleteRead", 404009), "IncompleteRead", 404009),
+    "HTTP 503": ((503, b"busy", {}), "HTTP 503", 4),
+}
+
+
+@pytest.mark.parametrize("name", sorted(FAILURES))
+def test_each_transient_failure_is_retried_logged_and_then_succeeds(tmp_path, name):
+    failure, kind, nbytes = FAILURES[name]
+    server, clock = Flaky(failure, n=2), FakeClock()
+    c = client(tmp_path, server, clock=clock)
+    page = c.get(pm.GAMMA_MARKETS, {"closed": "true"})
+    assert len(page["markets"]) == 6 and server.calls == 3
+    log = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
+    assert [e["result"] for e in log] == ["retry", "retry", "ok"]
+    assert [e["error"] for e in log[:2]] == [kind, kind] and [e["bytes"] for e in log[:2]] == [nbytes, nbytes]
+    assert 2.0 in clock.slept and 4.0 in clock.slept  # the existing backoff
+    assert len(list((tmp_path / "raw").iterdir())) == 1  # only the page that parsed is saved
+
+
+def test_a_page_failing_every_attempt_stops_naming_its_cursor_and_saves_nothing(tmp_path):
+    progress = tmp_path / "progress.jsonl"
+
+    class FailsPage2(FakeServer):
+        def __call__(self, url, headers):
+            if "after_cursor=FAKECURSOR1" in url:
+                raise http.client.IncompleteRead(b"y" * 1234, 10)
+            return super().__call__(url, headers)
+
+    server, clock = FailsPage2(), FakeClock()
+    with pytest.raises(pm.MetadataPageFailed) as failed:
+        pm.fetch_closed_markets(client(tmp_path, server, clock=clock), transform=pm.compact_market,
+                                progress_path=progress)
+    msg = str(failed.value)
+    assert "after cursor 'FAKECURSOR1'" in msg and "all 6 attempts" in msg and "IncompleteRead (1234 bytes)" in msg
+    assert failed.value.cursor == "FAKECURSOR1" and failed.value.saved_pages == 1
+    assert len(server.calls) == 1  # the fake records only the request it answered
+    assert len(progress.read_text().splitlines()) == 1  # page 1 only; the failed page left no trace
+    log = [json.loads(line) for line in (tmp_path / "log.jsonl").read_text().splitlines()]
+    assert [e["result"] for e in log] == ["ok"] + ["retry"] * 5 + ["gave_up"]
+    assert clock.slept.count(2.0) and 32.0 in clock.slept
+    # resume continues from the last saved page with a working server: one request, page 2
+    (tmp_path / "r").mkdir()
+    server2 = FakeServer()
+    resumed = pm.fetch_closed_markets(client(tmp_path / "r", server2), transform=pm.compact_market,
+                                      progress_path=progress)
+    assert len(server2.calls) == 1 and "after_cursor=FAKECURSOR1" in server2.calls[0][0]
+    assert pm.count_report(resumed) == pm.count_report(_raw())
+
+
+def test_cli_stops_with_a_clear_message_naming_the_cursor(tmp_path, monkeypatch, capsys):
+    cli = _cli()
+    p, d = _perm_file(tmp_path), tmp_path / "d"
+    terms = _fake_terms(tmp_path, monkeypatch)
+    cli.main(["terms", "--terms-file", str(terms), "--data-dir", str(d)], now=NOW)
+
+    class FailsPage2(FakeServer):
+        def __call__(self, url, headers):
+            if "after_cursor" in url:
+                raise ConnectionResetError(54, "reset")
+            return super().__call__(url, headers)
+
+    monkeypatch.setattr(pm.time, "sleep", lambda s: None)
+    args = ["select", "--count-only", "--allow-network", "--permission", str(p), "--data-dir", str(d)]
+    assert cli.main(args, transport=FailsPage2(), now=NOW) == 4
+    err = capsys.readouterr().err
+    assert "STOPPED" in err and "after cursor 'FAKECURSOR1'" in err and "Re-run the same command" in err
+    assert not list(d.glob("metadata_closed_markets_*.json"))  # no snapshot from a failed run
+    assert cli.main(args, transport=FakeServer(), now=NOW) == 0  # resumes and finishes
+
+
+def test_a_torn_last_progress_line_is_dropped_on_resume(tmp_path):
+    progress = tmp_path / "progress.jsonl"
+    whole = json.dumps({"next_cursor": "FAKECURSOR1", "markets": [{"id": "1"}]})
+    progress.write_text(whole + "\n" + '{"next_cursor": "X", "markets": [{"id": "2"')  # killed mid-write
+    entries = pm._read_progress(progress)
+    assert [e["next_cursor"] for e in entries] == ["FAKECURSOR1"]
+    assert progress.read_text() == whole + "\n"
+    progress.write_text('{"broken\n' + whole + "\n")
+    with pytest.raises(RuntimeError, match="damaged but later pages exist"):
+        pm._read_progress(progress)
+
+
+class _FakeResp:
+    def __init__(self, chunks, status=200, error_after=None):
+        self.chunks, self.status, self.headers, self.error_after = list(chunks), status, {}, error_after
+
+    def read(self, n=-1):
+        if self.error_after is not None and not self.chunks:
+            raise self.error_after
+        return self.chunks.pop(0) if self.chunks else b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _FakeOpener:
+    def __init__(self, resp=None, exc=None):
+        self.resp, self.exc, self.timeouts = resp, exc, []
+
+    def open(self, req, timeout=None):
+        self.timeouts.append(timeout)
+        if self.exc:
+            raise self.exc
+        return self.resp
+
+
+def test_real_transport_has_a_socket_timeout_and_a_whole_request_deadline():
+    t = [0.0]
+
+    def clock():
+        t[0] += 50.0  # each chunk takes 50 s: a slow trickle
+        return t[0]
+
+    opener = _FakeOpener(_FakeResp([b"a" * 100] * 10))
+    get = REAL_URLLIB_TRANSPORT(timeout_s=30.0, deadline_s=120.0, opener=opener, clock=clock)
+    with pytest.raises(pm.TransientNetworkError) as e:
+        get("https://gamma-api.polymarket.com/markets/keyset", {})
+    # two 100-byte chunks arrive inside the 120 s deadline; the third check trips it
+    assert e.value.kind == "TimeoutError" and e.value.bytes_received == 200 and opener.timeouts == [30.0]
+    assert pm.REQUEST_TIMEOUT_S == 30.0 and pm.REQUEST_DEADLINE_S == 120.0
+
+
+def test_real_transport_turns_read_failures_into_retryable_errors_with_bytes():
+    resp = _FakeResp([b"z" * 65536], error_after=http.client.IncompleteRead(b"z" * 100, 5))
+    with pytest.raises(pm.TransientNetworkError) as e:
+        REAL_URLLIB_TRANSPORT(opener=_FakeOpener(resp))("https://x.test/", {})
+    assert e.value.kind == "IncompleteRead" and e.value.bytes_received == 65536 + 100
+    for exc, kind in ((ConnectionResetError(54, "reset"), "ConnectionResetError"),
+                      (http.client.RemoteDisconnected("closed"), "RemoteDisconnected"),
+                      (socket.timeout("timed out"), "TimeoutError"),
+                      (urllib.error.URLError(socket.gaierror(8, "nodename")), "URLError(gaierror)")):
+        with pytest.raises(pm.TransientNetworkError) as e:
+            REAL_URLLIB_TRANSPORT(opener=_FakeOpener(exc=exc))("https://x.test/", {})
+        assert e.value.kind == kind
+
+
+def test_refused_redirects_and_permanent_http_errors_are_not_retried(tmp_path):
+    server = Flaky(pm.NetworkRefused("redirect to 'https://elsewhere.example/' refused"), n=10)
+    with pytest.raises(pm.NetworkRefused):
+        client(tmp_path, server).get(pm.GAMMA_MARKETS, {})
+    assert server.calls == 1
+    server = Flaky((404, b"not found", {}), n=10)
+    with pytest.raises(RuntimeError, match="HTTP 404"):
+        client(tmp_path / "x", server).get(pm.GAMMA_MARKETS, {}) if (tmp_path / "x").mkdir() is None else None
+    assert server.calls == 1

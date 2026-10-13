@@ -27,8 +27,10 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import http.client
 import json
 import math
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -49,7 +51,18 @@ ALLOWED_ENDPOINTS = (GAMMA_MARKETS, CLOB_PRICES_HISTORY)
 RATE_FRACTION = 0.25
 #: default pre-set rate: one request every 2 s (0.5 req/s)
 DEFAULT_REQUESTS_PER_SECOND = 0.5
-MAX_RETRIES_429 = 5
+#: retries after a TRANSIENT failure (so up to MAX_RETRIES + 1 attempts), with
+#: exponential backoff 2, 4, 8, 16, 32 s: HTTP 429/500/502/503/504, a truncated or
+#: non-JSON 200 body, http.client.IncompleteRead, connection resets and remote
+#: disconnects, timeouts, and other socket/URL errors
+MAX_RETRIES = 5
+MAX_RETRIES_429 = MAX_RETRIES  # former name
+TRANSIENT_STATUSES = (429, 500, 502, 503, 504)
+#: per socket operation (connect, each read)
+REQUEST_TIMEOUT_S = 30.0
+#: the whole request, body included: a slow trickle can never hang a request forever
+REQUEST_DEADLINE_S = 120.0
+READ_CHUNK_BYTES = 64 * 1024
 GAMMA_PAGE_LIMIT = 100  # the documented maximum for /markets/keyset
 
 # ---- pre-stated selection and feature parameters (PROPOSED 2026-10-12) ------------- #
@@ -187,22 +200,89 @@ _FORBIDDEN_HEADERS = ("authorization", "cookie", "poly_address", "poly_signature
                       "poly_passphrase", "poly_timestamp", "x-api-key")
 
 
+class TransientNetworkError(Exception):
+    """A network failure worth retrying, with how many body bytes had arrived."""
+
+    def __init__(self, kind: str, bytes_received: int = 0, detail: str = "") -> None:
+        super().__init__(f"{kind} after {bytes_received} bytes{': ' + detail if detail else ''}")
+        self.kind, self.bytes_received, self.detail = kind, bytes_received, detail
+
+
+class RetriesExhausted(RuntimeError):
+    """Every attempt at one URL failed with a transient error."""
+
+    def __init__(self, url: str, attempts: int, last_error: str) -> None:
+        super().__init__(f"all {attempts} attempts failed for {url} (last error: {last_error})")
+        self.url, self.attempts, self.last_error = url, attempts, last_error
+
+
+class MetadataPageFailed(RetriesExhausted):
+    """A Gamma metadata page failed every attempt; names the cursor to resume from."""
+
+    def __init__(self, cursor: Optional[str], saved_pages: int, cause: RetriesExhausted) -> None:
+        where = f"after cursor {cursor!r}" if cursor else "1 (no cursor)"
+        RuntimeError.__init__(
+            self, f"Gamma metadata page {where} failed all {cause.attempts} attempts "
+                  f"(last error: {cause.last_error}). Nothing was saved for this page; the "
+                  f"{saved_pages} saved page(s) are kept. Re-run the same command to resume from this cursor.")
+        self.url, self.attempts, self.last_error = cause.url, cause.attempts, cause.last_error
+        self.cursor, self.saved_pages = cursor, saved_pages
+
+
+def _classify(exc: BaseException) -> Tuple[str, int]:
+    """(error kind, bytes received) for a transient exception raised by a transport."""
+    if isinstance(exc, TransientNetworkError):
+        return exc.kind, exc.bytes_received
+    if isinstance(exc, http.client.IncompleteRead):
+        return "IncompleteRead", len(exc.partial or b"")
+    if isinstance(exc, urllib.error.URLError) and not isinstance(exc, urllib.error.HTTPError):
+        return f"URLError({type(exc.reason).__name__})", 0
+    return type(exc).__name__, 0
+
+
+#: exceptions a transport may raise that are retried (NetworkRefused is never among them)
+TRANSIENT_EXCEPTIONS = (TransientNetworkError, http.client.HTTPException, OSError)
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
         raise NetworkRefused(f"redirect to {newurl!r} refused")
 
 
-def urllib_transport(timeout_s: float = 30.0) -> Transport:
-    """The real transport: https GET, no redirects, no cookie jar, no proxy auth."""
-    opener = urllib.request.build_opener(_NoRedirect())
+def urllib_transport(timeout_s: float = REQUEST_TIMEOUT_S, deadline_s: float = REQUEST_DEADLINE_S,
+                     opener=None, clock: Callable[[], float] = time.monotonic) -> Transport:
+    """The real transport: https GET, no redirects, no cookie jar, no proxy auth.
+
+    ``timeout_s`` bounds each socket operation; ``deadline_s`` bounds the whole request,
+    checked between body chunks. Every network failure is raised as
+    TransientNetworkError with the bytes received so far; a refused redirect is not."""
+    opener = opener or urllib.request.build_opener(_NoRedirect())
 
     def get(url: str, headers: Mapping[str, str]):
         req = urllib.request.Request(url, headers=dict(headers), method="GET")
+        start, received, chunks = clock(), 0, []
         try:
             with opener.open(req, timeout=timeout_s) as resp:
-                return resp.status, resp.read(), dict(resp.headers)
+                while True:
+                    if clock() - start > deadline_s:
+                        raise TransientNetworkError("TimeoutError", received, f"request deadline {deadline_s:g} s")
+                    chunk = resp.read(READ_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    received += len(chunk)
+                return resp.status, b"".join(chunks), dict(resp.headers)
         except urllib.error.HTTPError as err:
-            return err.code, err.read(), dict(err.headers or {})
+            try:
+                body = err.read()
+            except (http.client.HTTPException, OSError):
+                body = b""
+            return err.code, body, dict(err.headers or {})
+        except http.client.IncompleteRead as exc:
+            raise TransientNetworkError("IncompleteRead", received + len(exc.partial or b"")) from exc
+        except (http.client.HTTPException, OSError) as exc:
+            kind, _ = _classify(exc)
+            raise TransientNetworkError(kind, received, str(exc)[:200]) from exc
 
     return get
 
@@ -211,11 +291,14 @@ class PolymarketClient:
     """Read-only GET client. Every request passes the policy, the rate limit and the log."""
 
     def __init__(self, policy: NetworkPolicy, transport: Optional[Transport], log_path: Path,
-                 raw_dir: Optional[Path] = None, clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep,
-                 wallclock: Callable[[], float] = time.time) -> None:
+                 raw_dir: Optional[Path] = None, clock: Optional[Callable[[], float]] = None,
+                 sleep: Optional[Callable[[float], None]] = None,
+                 wallclock: Optional[Callable[[], float]] = None) -> None:
         self.policy, self.log_path, self.raw_dir = policy, Path(log_path), raw_dir
-        self.clock, self.sleep, self.wallclock = clock, sleep, wallclock
+        # resolved when the client is built (not when the class is defined)
+        self.clock = clock or time.monotonic
+        self.sleep = sleep or time.sleep
+        self.wallclock = wallclock or time.time
         self._transport = transport
         self._last: Optional[float] = None
         self.requests = 0
@@ -231,20 +314,39 @@ class PolymarketClient:
             raise NetworkRefused("https only")
         if any(h.lower() in _FORBIDDEN_HEADERS for h in REQUEST_HEADERS):
             raise NetworkRefused("authentication headers are never sent")
-        for attempt in range(MAX_RETRIES_429 + 1):
+        last_error = ""
+        for attempt in range(MAX_RETRIES + 1):
             self._throttle()
-            status, body, _ = self._transport(url, REQUEST_HEADERS)
+            status: Optional[int] = None
+            body = b""
+            error: Optional[str] = None
+            try:
+                status, body, _ = self._transport(url, REQUEST_HEADERS)
+            except NetworkRefused:
+                raise
+            except TRANSIENT_EXCEPTIONS as exc:
+                error, received = _classify(exc)
+            else:
+                received = len(body)
+                if status == 200:
+                    try:
+                        value = json.loads(body)  # a truncated or non-JSON body is transient
+                    except ValueError as exc:
+                        error = type(exc).__name__
+                elif status in TRANSIENT_STATUSES:
+                    error = f"HTTP {status}"
             self.requests += 1
-            self._log(endpoint, url, status, body, attempt)
-            if status == 429 and attempt < MAX_RETRIES_429:
+            self._log(endpoint, url, status, body, attempt, error=error, bytes_received=received)
+            if error is None:
+                if status != 200:
+                    raise RuntimeError(f"HTTP {status} for {url}")
+                if self.raw_dir is not None:  # only a page that parsed is ever saved
+                    self._store_raw(url, body)
+                return value
+            last_error = f"{error} ({received} bytes)"
+            if attempt < MAX_RETRIES:
                 self.sleep(min(60.0, 2.0 ** (attempt + 1)))
-                continue
-            if status != 200:
-                raise RuntimeError(f"HTTP {status} for {url}")
-            if self.raw_dir is not None:
-                self._store_raw(url, body)
-            return json.loads(body)
-        raise RuntimeError(f"rate limited after {MAX_RETRIES_429} retries: {url}")
+        raise RetriesExhausted(url, MAX_RETRIES + 1, last_error)
 
     def _throttle(self) -> None:
         interval = 1.0 / self.policy.requests_per_second
@@ -254,11 +356,15 @@ class PolymarketClient:
                 self.sleep(wait)
         self._last = self.clock()
 
-    def _log(self, endpoint: str, url: str, status: int, body: bytes, attempt: int) -> None:
+    def _log(self, endpoint: str, url: str, status: Optional[int], body: bytes, attempt: int,
+             error: Optional[str] = None, bytes_received: Optional[int] = None) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         entry = {"utc": datetime.fromtimestamp(self.wallclock(), timezone.utc).isoformat(),
-                 "endpoint": endpoint, "url": url, "status": status, "bytes": len(body),
-                 "sha256": hashlib.sha256(body).hexdigest(), "attempt": attempt}
+                 "endpoint": endpoint, "url": url, "status": status,
+                 "bytes": len(body) if bytes_received is None else bytes_received,
+                 "sha256": hashlib.sha256(body).hexdigest() if body else None, "attempt": attempt,
+                 "error": error, "result": "ok" if error is None else
+                 ("retry" if attempt < MAX_RETRIES else "gave_up")}
         with open(self.log_path, "a") as fh:
             fh.write(json.dumps(entry, sort_keys=True) + "\n")
 
@@ -285,8 +391,7 @@ def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = No
     cursor: Optional[str] = None
     pages = 0
     if progress_path is not None and Path(progress_path).exists():
-        for line in Path(progress_path).read_text().splitlines():
-            entry = json.loads(line)
+        for entry in _read_progress(Path(progress_path)):
             markets.extend(entry["markets"])
             cursor = entry["next_cursor"]
             pages += 1
@@ -296,18 +401,51 @@ def fetch_closed_markets(client: PolymarketClient, max_pages: Optional[int] = No
         params: Dict[str, object] = {"closed": "true", "limit": GAMMA_PAGE_LIMIT, **(extra_params or {})}
         if cursor:
             params["after_cursor"] = cursor
-        page = client.get(GAMMA_MARKETS, params)
+        try:
+            page = client.get(GAMMA_MARKETS, params)
+        except RetriesExhausted as failed:  # nothing is saved for this page
+            raise MetadataPageFailed(cursor, pages, failed) from failed
         batch = [transform(m) if transform else m for m in (page.get("markets") or [])]
+        next_cursor = page.get("next_cursor")
+        if progress_path is not None:
+            _append_progress(Path(progress_path), {"next_cursor": next_cursor, "markets": batch})
         markets.extend(batch)
         pages += 1
-        cursor = page.get("next_cursor")
-        if progress_path is not None:
-            Path(progress_path).parent.mkdir(parents=True, exist_ok=True)
-            with open(progress_path, "a") as fh:
-                fh.write(json.dumps({"next_cursor": cursor, "markets": batch}) + "\n")
+        cursor = next_cursor
         if not cursor:
             break
     return markets
+
+
+def _append_progress(path: Path, entry: Mapping) -> None:
+    """One whole line per page, flushed and fsynced before the next request."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as fh:
+        fh.write(json.dumps(entry) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def _read_progress(path: Path) -> List[dict]:
+    """Saved pages. A torn LAST line (the process was killed mid-write) is dropped and
+    the file truncated to the last whole page; a bad line anywhere else is an error."""
+    text = path.read_text()
+    lines = text.split("\n")
+    entries, good_chars = [], 0
+    for i, line in enumerate(lines):
+        if not line:
+            good_chars += 1 if i < len(lines) - 1 else 0
+            continue
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            if any(rest.strip() for rest in lines[i + 1:]):
+                raise RuntimeError(f"{path}: line {i + 1} is damaged but later pages exist; inspect it")
+            with open(path, "r+") as fh:
+                fh.truncate(good_chars)
+            break
+        good_chars += len(line) + 1
+    return entries
 
 
 def parse_time(value: Optional[str]) -> Optional[datetime]:
