@@ -1202,3 +1202,110 @@ def test_the_recorded_clob_permission_covers_prices_history_only_at_a_safe_rate(
         pm.NetworkPolicy(True, perm, ours).check(pm.GAMMA_MARKETS)
     with pytest.raises(pm.NetworkRefused, match="exceeds"):
         pm.NetworkPolicy(True, perm, 26.0).check(pm.CLOB_PRICES_HISTORY)
+
+
+# ---- history probe (fake server only) --------------------------------------------------- #
+def test_probe_takes_the_oldest_walked_training_market_and_the_first_ranks():
+    frozen = _frozen_world()
+    targets = {"train": 40, "test": 55}
+    chosen = pm.probe_selection(frozen, 5, targets=targets)
+    pools, _ = pm.pool_order(frozen)
+    window = pools["train"][:40]
+    oldest = min(window, key=lambda m: (pm.parse_time(m.closed_time), m.market_id))
+    assert chosen[0][0] == "train" and chosen[0][2] == oldest
+    assert len(chosen) == 5 and len({m.market_id for _, _, m, _ in chosen}) == 5
+    for pool, rank, m, _ in chosen:  # every probed market is one the fill always walks
+        assert rank < targets[pool] and pools[pool][rank] == m
+    rest = [(p, r) for p, r, _, _ in chosen[1:]]
+    assert [p for p, _ in rest] == ["train", "test", "train", "test"]
+    assert all(r <= 2 for _, r in rest)
+    # blind: no outcome is an input; only IDs, the pre-stated order and dates are used
+    import inspect
+    assert "outcome" not in str(inspect.signature(pm.probe_selection))
+
+
+def test_history_shape_uses_timestamps_and_counts_look_ahead_points():
+    td = datetime(2026, 5, 1, 12, tzinfo=timezone.utc)
+    t0 = int(td.timestamp())
+    shape = pm.history_shape([t0 - 72 * 3600 + h * 3600 for h in range(72)], td)
+    assert shape["points"] == 72 and shape["median_spacing_minutes"] == 60.0
+    assert shape["last_hours_before_td"] == 1.0 and shape["span_hours"] == 71.0
+    assert shape["points_at_or_after_td"] == 0 and shape["usable"]
+    bad = pm.history_shape([t0 - 3600, t0, t0 + 60], td)
+    assert bad["points_at_or_after_td"] == 2
+    assert pm.history_shape([], td) == {"points": 0, "first_hours_before_td": None, "last_hours_before_td": None,
+                                        "span_hours": None, "median_spacing_minutes": None,
+                                        "points_at_or_after_td": 0, "usable": False,
+                                        "exclusion": "no_price_before_decision"}
+
+
+class WindowServer(FakeServer):
+    """Like the real endpoint: returns only the points inside [startTs, endTs]."""
+
+    def __call__(self, url, headers):
+        status, body, h = super().__call__(url, headers)
+        parsed = urllib.parse.urlparse(url)
+        if parsed.path != "/prices-history" or status != 200:
+            return status, body, h
+        q = dict(urllib.parse.parse_qsl(parsed.query))
+        data = json.loads(body)
+        data["history"] = [pt for pt in data["history"] if int(q["startTs"]) <= pt["t"] < int(q["endTs"])]
+        return status, json.dumps(data).encode(), h
+
+
+def _probe_setup(tmp_path, monkeypatch, server):
+    cli = _cli()
+    p = _perm_file(tmp_path)
+    terms = _fake_terms(tmp_path, monkeypatch)
+    d = tmp_path / "d"
+    args = ["--allow-network", "--permission", str(p), "--data-dir", str(d)]
+    cli.main(["terms", "--terms-file", str(terms), "--data-dir", str(d)], now=NOW)
+    assert cli.main(["select", *args], transport=server, now=NOW) == 0
+    return cli, d, args + ["--cutoff", "2025-06-01"]
+
+
+def test_cli_probe_fetches_only_n_records_them_and_prints_no_outcome_or_price(tmp_path, capsys, monkeypatch):
+    server = WindowServer()
+    cli, d, args = _probe_setup(tmp_path, monkeypatch, server)
+    capsys.readouterr()
+    before = len(server.calls)
+    assert cli.main(["history", *args, "--probe", "2"], transport=server, now=NOW) == 0
+    probe_calls = server.calls[before:]
+    assert len(probe_calls) == 2 and all("clob.polymarket.com/prices-history" in u for u, _ in probe_calls)
+    report = json.loads(capsys.readouterr().out)
+    assert report["probe"] == 2 and report["look_ahead_points_total"] == 0
+    assert "midpoint" in report["docs_on_values"] and "last trade" in report["docs_on_values"]
+    for row in report["markets"]:
+        assert {"points", "span_hours", "median_spacing_minutes", "points_at_or_after_td"} <= set(row)
+        assert not {"outcome", "outcomes", "price", "prices", "history", "p"} & set(row)
+        assert row["points"] > 0 and row["points_at_or_after_td"] == 0
+    assert report["markets"][0]["why"].startswith("oldest close")
+    assert not list(d.glob("fill_plan_*.json"))  # a probe writes no fill plan
+    hist = next(d.glob("histories_*.jsonl"))
+    probed = {json.loads(line)["market_id"] for line in hist.read_text().splitlines()}
+    assert probed == {r["market_id"] for r in report["markets"]}
+    # a second probe re-reports from the file without any request
+    before = len(server.calls)
+    assert cli.main(["history", *args, "--probe", "2"], transport=server, now=NOW) == 0
+    assert len(server.calls) == before
+    assert all(r["already_fetched"] for r in json.loads(capsys.readouterr().out)["markets"])
+    # the real run reuses the probed histories: no request repeats
+    before = len(server.calls)
+    assert cli.main(["history", *args], transport=server, now=NOW) == 5  # fixtures cannot reach the targets
+    new = [u for u, _ in server.calls[before:]]
+    assert len(new) == 1 and not set(new) & {u for u, _ in probe_calls}  # 3 pool markets, 2 already probed
+
+
+def test_cli_probe_flags_points_at_or_after_the_decision_time(tmp_path, capsys, monkeypatch):
+    server = FakeServer()  # the raw fixtures ignore the request window, as a broken endpoint would
+    cli, d, args = _probe_setup(tmp_path, monkeypatch, server)
+    capsys.readouterr()
+    assert cli.main(["history", *args, "--probe", "2"], transport=server, now=NOW) == 6
+    report = json.loads(capsys.readouterr().out)
+    assert report["look_ahead_points_total"] > 0
+
+
+def test_probe_refuses_without_the_network_gates(tmp_path, capsys):
+    cli, server = _cli(), FakeServer()
+    assert cli.main(["history", "--probe", "3", "--data-dir", str(tmp_path)], transport=server, now=NOW) == 2
+    assert server.calls == []

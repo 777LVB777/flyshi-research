@@ -31,6 +31,7 @@ import http.client
 import json
 import math
 import os
+import statistics
 import time
 import urllib.error
 import urllib.parse
@@ -1198,6 +1199,71 @@ def fill_pools(frozen: Sequence[SelectedMarket], fetch: Callable[[SelectedMarket
                             "fetched_now": fetched, "usable": len(usable), "excluded_by_reason": excluded,
                             "reached": len(usable) >= targets[p], "usable_ids": usable}
     return plan
+
+
+# --------------------------------------------------------------------------- #
+# history probe: a few markets the fill would fetch anyway, inspected by timestamp
+# --------------------------------------------------------------------------- #
+#: what Polymarket's documentation says about the values of /prices-history, as
+#: recorded (phase2-design.md, 10.5); not re-read here (no network)
+PRICES_HISTORY_DOCS_NOTE = (
+    "The CLOB API spec read 2026-10-12 (docs.polymarket.com/api-spec/clob-openapi.yaml, SHA-256 "
+    "d993169c2fd17cbc75304c9cd7bc3b6a351fa21f98cbd12dcd4c5dbbca2fedb8) documents the history as points "
+    "{t, p} and does NOT say whether p is a midpoint or a last trade price (phase2-design.md, 10.5: "
+    "unverified). The probe cannot settle it: it reports timing only.")
+
+
+def probe_selection(frozen: Sequence[SelectedMarket], n: int = 5, cutoff: datetime = SPLIT_CUTOFF,
+                    gap: timedelta = SPLIT_GAP, test_end: Optional[datetime] = TEST_DECISION_END,
+                    seed: str = SAMPLE_ORDER_SEED,
+                    targets: Optional[Mapping[str, int]] = None) -> List[Tuple[str, int, SelectedMarket, str]]:
+    """``n`` markets the fill is CERTAIN to fetch: the walk always considers at least
+    ``targets[pool]`` markets of each pool, in order, so every rank below the target
+    is fetched by the real run anyway. Returns ``(pool, rank, market, why)``.
+
+    One is the training market with the OLDEST close among the first
+    ``targets["train"]`` training ranks (the oldest data the real run will request);
+    the rest are the first ranks of the training and test pools, alternating,
+    training first. Uses IDs, the pre-stated order and dates only."""
+    if n < 1:
+        raise ValueError("the probe needs at least one market")
+    targets = dict(pool_targets() if targets is None else targets)
+    pools, _ = pool_order(frozen, cutoff, gap, test_end, seed)
+    chosen: List[Tuple[str, int, SelectedMarket, str]] = []
+    window = pools["train"][:targets["train"]]
+    if window:
+        rank = min(range(len(window)), key=lambda r: (parse_time(window[r].closed_time), window[r].market_id))
+        chosen.append(("train", rank, window[rank], "oldest close among the training ranks the fill always walks"))
+    taken = {m.market_id for _, _, m, _ in chosen}
+    next_rank = {p: 0 for p in POOLS}
+    order = ("train", "test")
+    i = 0
+    while len(chosen) < n and any(next_rank[p] < min(len(pools[p]), targets[p]) for p in POOLS):
+        p = order[i % 2]
+        i += 1
+        while next_rank[p] < min(len(pools[p]), targets[p]) and pools[p][next_rank[p]].market_id in taken:
+            next_rank[p] += 1
+        if next_rank[p] < min(len(pools[p]), targets[p]):
+            m = pools[p][next_rank[p]]
+            chosen.append((p, next_rank[p], m, f"rank {next_rank[p]} of the {p} pool's fill order"))
+            taken.add(m.market_id)
+            next_rank[p] += 1
+    return chosen
+
+
+def history_shape(times: Iterable[int], td: datetime) -> dict:
+    """Timing of one history, from its TIMESTAMPS only (no price, no outcome)."""
+    ts = sorted(int(t) for t in times)
+    limit = td.timestamp()
+    spacing = [b - a for a, b in zip(ts, ts[1:])]
+    return {"points": len(ts),
+            "first_hours_before_td": round((limit - ts[0]) / 3600, 2) if ts else None,
+            "last_hours_before_td": round((limit - ts[-1]) / 3600, 2) if ts else None,
+            "span_hours": round((ts[-1] - ts[0]) / 3600, 2) if ts else None,
+            "median_spacing_minutes": round(statistics.median(spacing) / 60, 2) if spacing else None,
+            "points_at_or_after_td": sum(t >= limit for t in ts),
+            "usable": history_exclusion(ts, td) is None,
+            "exclusion": history_exclusion(ts, td)}
 
 
 # --------------------------------------------------------------------------- #

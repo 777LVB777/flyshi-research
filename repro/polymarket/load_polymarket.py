@@ -18,7 +18,8 @@ redistributed):
              --from-metadata --count-only
                               the same blinded count report from a saved snapshot,
                               streamed (hash checked first); freeze nothing [no network]
-  history  fill the training and test pools: walk each pool in its pre-stated hash
+  history  (--probe N: only N markets the fill would fetch anyway, timing report)
+           fill the training and test pools: walk each pool in its pre-stated hash
            order, fetching price histories that end at the decision time, until
            need + reserve markets are usable (CLOB /prices-history)  [network]
   build    features strictly before the decision time, train/test split, and the
@@ -64,6 +65,9 @@ def parser() -> argparse.ArgumentParser:
                    help="Trial only (needs --count-only and --max-pages): look at markets whose scheduled end"
                         " is on or after this date (Gamma end_date_min). Never used for the real count; it"
                         " writes no progress file, so the full run is unaffected.")
+    p.add_argument("--probe", type=int, nargs="?", const=5, default=None, metavar="N",
+                   help="history: fetch only N histories (default 5) that the fill would fetch anyway, record"
+                        " them for the real run, and report their timing. No outcome or price is printed.")
     p.add_argument("--cutoff", default=pm.SPLIT_CUTOFF.strftime("%Y-%m-%d"),
                    help="history/build: training markets resolved before this UTC date (FINAL: %(default)s).")
     p.add_argument("--gap-days", type=float, default=pm.SPLIT_GAP.days)
@@ -185,6 +189,24 @@ def main(argv=None, transport=None, now=None) -> int:
                 return h
 
             cutoff, gap, test_end = split_args(args)
+            if args.probe is not None:
+                have = read_histories(hist_path)
+                rows = []
+                for pool, rank, m, why in pm.probe_selection(frozen, args.probe, cutoff, gap, test_end):
+                    reused = m.market_id in have
+                    hist = have[m.market_id] if reused else fetch(m)
+                    rows.append({"market_id": m.market_id, "pool": pool, "rank": rank, "why": why,
+                                 "closed_month": m.closed_time[:7], "decision_time": m.decision_time,
+                                 "already_fetched": reused,
+                                 **pm.history_shape((t for t, _ in hist), pm.parse_time(m.decision_time))})
+                report = {"probe": len(rows), "requests": c.requests,
+                          "recorded_for_the_real_run": str(hist_path),
+                          "look_ahead_points_total": sum(r["points_at_or_after_td"] for r in rows),
+                          "docs_on_values": pm.PRICES_HISTORY_DOCS_NOTE, "markets": rows}
+                out = d / f"history_probe_{now.strftime('%Y%m%dT%H%M%SZ')}.json"
+                out.write_text(json.dumps(report, indent=1))
+                print(json.dumps({**report, "saved": str(out)}, indent=1))
+                return 0 if report["look_ahead_points_total"] == 0 else 6
             plan = pm.fill_pools(frozen, fetch, read_histories(hist_path), cutoff=cutoff, gap=gap,
                                  test_end=test_end)
             plan["frozen_sha256"] = digest

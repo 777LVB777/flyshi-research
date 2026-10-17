@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520">
+<rect width="1100" height="520" fill="white"/>
+<text x="20" y="26" font-size="15" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">Population scaling at 90 Hz per KC: bilateral runs ignited 0/6 at 100, 6/6 at 200, 6/6 at 300, 6/6 at 500 KCs; left-only runs 1/24</text>
+<clipPath id="c4484811728"><rect x="90" y="60" width="440" height="340"/></clipPath>
+<line x1="90" y1="390.97" x2="530" y2="390.97" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="394.47" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0</text>
+<line x1="90" y1="315.75" x2="530" y2="315.75" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="319.25" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0.25</text>
+<line x1="90" y1="240.53" x2="530" y2="240.53" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="244.03" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0.5</text>
+<line x1="90" y1="165.31" x2="530" y2="165.31" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="168.81" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0.75</text>
+<line x1="90" y1="90.09" x2="530" y2="90.09" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="93.59" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">1</text>
+<line x1="134.00" y1="400" x2="134.00" y2="404" stroke="#333"/>
+<text x="134.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">100</text>
+<line x1="222.00" y1="400" x2="222.00" y2="404" stroke="#333"/>
+<text x="222.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">200</text>
+<line x1="310.00" y1="400" x2="310.00" y2="404" stroke="#333"/>
+<text x="310.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">300</text>
+<line x1="398.00" y1="400" x2="398.00" y2="404" stroke="#333"/>
+<text x="398.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">400</text>
+<line x1="486.00" y1="400" x2="486.00" y2="404" stroke="#333"/>
+<text x="486.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">500</text>
+<line x1="90" y1="387.96" x2="530" y2="387.96" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="6 4" clip-path="url(#c4484811728)"/>
+<circle cx="126.96" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="129.16" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="131.36" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="133.56" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="135.76" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="137.96" cy="390.97" r="3.4" fill="#0072B2"/>
+<circle cx="214.96" cy="193.83" r="3.4" fill="#0072B2"/>
+<circle cx="217.16" cy="193.47" r="3.4" fill="#0072B2"/>
+<circle cx="219.36" cy="195.16" r="3.4" fill="#0072B2"/>
+<circle cx="221.56" cy="193.59" r="3.4" fill="#0072B2"/>
+<circle cx="223.76" cy="192.62" r="3.4" fill="#0072B2"/>
+<circle cx="225.96" cy="193.71" r="3.4" fill="#0072B2"/>
+<circle cx="302.96" cy="190.84" r="3.4" fill="#0072B2"/>
+<circle cx="305.16" cy="191.08" r="3.4" fill="#0072B2"/>
+<circle cx="307.36" cy="190.90" r="3.4" fill="#0072B2"/>
+<circle cx="309.56" cy="190.71" r="3.4" fill="#0072B2"/>
+<circle cx="311.76" cy="192.07" r="3.4" fill="#0072B2"/>
+<circle cx="313.96" cy="190.77" r="3.4" fill="#0072B2"/>
+<circle cx="478.96" cy="190.38" r="3.4" fill="#0072B2"/>
+<circle cx="481.16" cy="187.81" r="3.4" fill="#0072B2"/>
+<circle cx="483.36" cy="186.65" r="3.4" fill="#0072B2"/>
+<circle cx="485.56" cy="189.68" r="3.4" fill="#0072B2"/>
+<circle cx="487.76" cy="188.07" r="3.4" fill="#0072B2"/>
+<circle cx="489.96" cy="188.39" r="3.4" fill="#0072B2"/>
+<rect x="394.00" y="185.10" width="8" height="8" fill="#56B4E9"/>
+<polygon points="141.04,386.55 145.46,394.51 136.62,394.51" fill="#E69F00"/>
+<polygon points="143.24,386.55 147.66,394.51 138.82,394.51" fill="#E69F00"/>
+<polygon points="145.44,386.55 149.86,394.51 141.02,394.51" fill="#E69F00"/>
+<polygon points="147.64,386.55 152.06,394.51 143.22,394.51" fill="#E69F00"/>
+<polygon points="149.84,386.55 154.26,394.51 145.42,394.51" fill="#E69F00"/>
+<polygon points="152.04,386.55 156.46,394.51 147.62,394.51" fill="#E69F00"/>
+<polygon points="229.04,386.55 233.46,394.51 224.62,394.51" fill="#E69F00"/>
+<polygon points="231.24,386.55 235.66,394.51 226.82,394.51" fill="#E69F00"/>
+<polygon points="233.44,386.55 237.86,394.51 229.02,394.51" fill="#E69F00"/>
+<polygon points="235.64,386.55 240.06,394.51 231.22,394.51" fill="#E69F00"/>
+<polygon points="237.84,386.55 242.26,394.51 233.42,394.51" fill="#E69F00"/>
+<polygon points="240.04,386.55 244.46,394.51 235.62,394.51" fill="#E69F00"/>
+<polygon points="317.04,386.55 321.46,394.51 312.62,394.51" fill="#E69F00"/>
+<polygon points="319.24,209.92 323.66,217.88 314.82,217.88" fill="#E69F00"/>
+<polygon points="321.44,386.55 325.86,394.51 317.02,394.51" fill="#E69F00"/>
+<polygon points="323.64,386.55 328.06,394.51 319.22,394.51" fill="#E69F00"/>
+<polygon points="325.84,386.55 330.26,394.51 321.42,394.51" fill="#E69F00"/>
+<polygon points="328.04,386.55 332.46,394.51 323.62,394.51" fill="#E69F00"/>
+<polygon points="493.04,386.55 497.46,394.51 488.62,394.51" fill="#E69F00"/>
+<polygon points="495.24,386.55 499.66,394.51 490.82,394.51" fill="#E69F00"/>
+<polygon points="497.44,386.55 501.86,394.51 493.02,394.51" fill="#E69F00"/>
+<polygon points="499.64,386.55 504.06,394.51 495.22,394.51" fill="#E69F00"/>
+<polygon points="501.84,386.55 506.26,394.51 497.42,394.51" fill="#E69F00"/>
+<polygon points="504.04,386.55 508.46,394.51 499.62,394.51" fill="#E69F00"/>
+<rect x="90" y="60" width="440" height="340" fill="none" stroke="#333" stroke-width="1"/>
+<text x="90" y="50" font-size="13" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">A  Recruitment beyond the stimulated KCs</text>
+<text x="310.0" y="438" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111">stimulated KCs (90 Hz each)</text>
+<text x="40" y="230.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111" transform="rotate(-90 40 230.0)">non-stimulated KCs active (fraction)</text>
+<rect x="96.0" y="66.0" width="221.0" height="72.0" fill="white" fill-opacity="0.92" stroke="#bbb"/>
+<line x1="104" y1="79" x2="118" y2="79" stroke="#D55E00" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="124" y="83" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">1% ignition label (pre-stated)</text>
+<circle cx="111.00" cy="95.00" r="4.0" fill="#0072B2"/>
+<text x="124" y="99" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">bilateral pools</text>
+<polygon points="111.00,105.80 116.20,115.16 105.80,115.16" fill="#E69F00"/>
+<text x="124" y="115" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">left-only pools</text>
+<rect x="107.00" y="123.00" width="8.0" height="8.0" fill="#56B4E9"/>
+<text x="124" y="131" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">bilateral 400 KCs: mean only</text>
+<clipPath id="c4484813520"><rect x="620" y="60" width="440" height="340"/></clipPath>
+<line x1="620" y1="400.00" x2="1060" y2="400.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="403.50" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0.1</text>
+<line x1="620" y1="286.67" x2="1060" y2="286.67" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="290.17" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">1</text>
+<line x1="620" y1="173.33" x2="1060" y2="173.33" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="176.83" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">10</text>
+<line x1="620" y1="60.00" x2="1060" y2="60.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="63.50" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">100</text>
+<line x1="664.00" y1="400" x2="664.00" y2="404" stroke="#333"/>
+<text x="664.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">100</text>
+<line x1="752.00" y1="400" x2="752.00" y2="404" stroke="#333"/>
+<text x="752.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">200</text>
+<line x1="840.00" y1="400" x2="840.00" y2="404" stroke="#333"/>
+<text x="840.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">300</text>
+<line x1="928.00" y1="400" x2="928.00" y2="404" stroke="#333"/>
+<text x="928.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">400</text>
+<line x1="1016.00" y1="400" x2="1016.00" y2="404" stroke="#333"/>
+<text x="1016.00" y="416" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">500</text>
+<polyline points="664.00,313.14 752.00,85.07 840.00,75.88 928.00,107.74 1016.00,69.48" fill="none" stroke="#0072B2" stroke-width="1.6" clip-path="url(#c4484813520)"/>
+<circle cx="664.00" cy="313.14" r="4.0" fill="#0072B2"/>
+<circle cx="752.00" cy="85.07" r="4.0" fill="#0072B2"/>
+<circle cx="840.00" cy="75.88" r="4.0" fill="#0072B2"/>
+<circle cx="928.00" cy="107.74" r="4.0" fill="#0072B2"/>
+<circle cx="1016.00" cy="69.48" r="4.0" fill="#0072B2"/>
+<polyline points="664.00,322.38 752.00,297.00 840.00,206.37 1016.00,276.43" fill="none" stroke="#E69F00" stroke-width="1.6" stroke-dasharray="5 3" clip-path="url(#c4484813520)"/>
+<polygon points="664.00,317.18 669.20,326.54 658.80,326.54" fill="#E69F00"/>
+<polygon points="752.00,291.80 757.20,301.16 746.80,301.16" fill="#E69F00"/>
+<polygon points="840.00,201.17 845.20,210.53 834.80,210.53" fill="#E69F00"/>
+<polygon points="1016.00,271.23 1021.20,280.59 1010.80,280.59" fill="#E69F00"/>
+<rect x="620" y="60" width="440" height="340" fill="none" stroke="#333" stroke-width="1"/>
+<text x="620" y="50" font-size="13" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">B  Seed-to-seed score noise</text>
+<text x="840.0" y="438" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111">stimulated KCs (90 Hz each)</text>
+<text x="570" y="230.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111" transform="rotate(-90 570 230.0)">SD of the score across seeds (Hz, log scale)</text>
+<rect x="924.5" y="354.0" width="129.5" height="40.0" fill="white" fill-opacity="0.92" stroke="#bbb"/>
+<line x1="932.5" y1="367" x2="946.5" y2="367" stroke="#0072B2" stroke-width="1.8"/>
+<text x="952.5" y="371" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">bilateral pools</text>
+<line x1="932.5" y1="383" x2="946.5" y2="383" stroke="#E69F00" stroke-width="1.8" stroke-dasharray="5 3"/>
+<text x="952.5" y="387" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">left-only pools</text>
+<text x="20" y="478" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#444">Six seeds per rung (points); 1 s x 5 trials per run. Ignition label (pre-stated, for reporting only; no pass criterion): non-stimulated KC active fraction above 1%.</text>
+<text x="20" y="492" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#444">Bilateral 400-KC rung: only the six-seed mean was recorded (pale square). Sources: repro/mushroom_body/results/left_only_scaling_summary.json,</text>
+<text x="20" y="506" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#444">repro/mushroom_body/results/population_scaling_summary.json</text>
+</svg>

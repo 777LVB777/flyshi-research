@@ -81,17 +81,20 @@ def run(cmd: Sequence[str], cwd: Optional[Path] = None) -> subprocess.CompletedP
 
 
 # ---- pull (Mac) ------------------------------------------------------------------ #
-def rsync_commands(remote: str, remote_repo: str, dest: Path) -> List[List[str]]:
+def rsync_commands(remote: str, remote_repo: str, dest: Path, make_dirs: bool = True) -> List[List[str]]:
     """One rsync per source; never --delete; partial files excluded. ``remote`` may be
-    empty for a local source (tests)."""
+    empty for a local source (tests). ``make_dirs=False`` only builds the commands and
+    creates nothing (a dry run)."""
     prefix = f"{remote}:" if remote else ""
     cmds = []
     for rel in (SWEEP_REL, *EXTRA_REL):
         target = dest / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
+        if make_dirs:
+            target.parent.mkdir(parents=True, exist_ok=True)
         cmds.append(["rsync", "-a", "--exclude", "*.partial", "--exclude", "launcher.lock",
                      f"{prefix}{remote_repo}/{rel}", str(target.parent) + "/"])
-    (dest / RESULTS_REL).mkdir(parents=True, exist_ok=True)
+    if make_dirs:
+        (dest / RESULTS_REL).mkdir(parents=True, exist_ok=True)
     cmds.append(["rsync", "-a", "--include", EXTRA_GLOB, "--exclude", "*",
                  f"{prefix}{remote_repo}/{RESULTS_REL}/", str(dest / RESULTS_REL) + "/"])
     return cmds

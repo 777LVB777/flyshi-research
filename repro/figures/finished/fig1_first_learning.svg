@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520">
+<rect width="1100" height="520" fill="white"/>
+<text x="20" y="26" font-size="15" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">First learning test: LEARNING DEMONSTRATED (pre-stated; 5 test seeds)</text>
+<clipPath id="c4477930384"><rect x="90" y="60" width="440" height="340"/></clipPath>
+<line x1="90" y1="391.77" x2="530" y2="391.77" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="395.27" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">-200</text>
+<line x1="90" y1="306.82" x2="530" y2="306.82" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="310.32" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">-100</text>
+<line x1="90" y1="221.87" x2="530" y2="221.87" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="225.37" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0</text>
+<line x1="90" y1="136.92" x2="530" y2="136.92" stroke="#e6e6e6" stroke-width="1"/>
+<text x="84" y="140.42" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">100</text>
+<text x="140.77" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">main</text>
+<text x="140.77" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">reward A</text>
+<text x="225.38" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(a) plasticity</text>
+<text x="225.38" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">off</text>
+<text x="310.00" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(b) reward B</text>
+<text x="394.62" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(c) reward both</text>
+<text x="394.62" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">[diagnostic]</text>
+<text x="479.23" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(d) punish A</text>
+<rect x="90" y="216.31" width="440" height="11.12" fill="#666666" fill-opacity="0.12" clip-path="url(#c4477930384)"/>
+<line x1="90" y1="216.31" x2="530" y2="216.31" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="6 4" clip-path="url(#c4477930384)"/>
+<line x1="90" y1="227.43" x2="530" y2="227.43" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="6 4" clip-path="url(#c4477930384)"/>
+<line x1="90" y1="221.87" x2="530" y2="221.87" stroke="#999" stroke-width="0.8" clip-path="url(#c4477930384)"/>
+<circle cx="127.23" cy="83.45" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="134.00" cy="100.44" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="140.77" cy="92.61" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="147.54" cy="88.95" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="154.31" cy="87.71" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<polygon points="140.77,83.88 147.52,90.63 140.77,97.38 134.02,90.63" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<circle cx="211.85" cy="221.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="218.62" cy="221.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="225.38" cy="221.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="232.15" cy="221.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="238.92" cy="221.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<polygon points="225.38,215.12 232.13,221.87 225.38,228.62 218.63,221.87" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<circle cx="296.46" cy="373.87" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="303.23" cy="308.28" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="310.00" cy="373.23" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="316.77" cy="305.95" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="323.54" cy="376.55" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<polygon points="310.00,340.83 316.75,347.58 310.00,354.33 303.25,347.58" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<circle cx="381.08" cy="263.00" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="387.85" cy="225.55" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="394.62" cy="247.79" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="401.38" cy="175.90" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="408.15" cy="241.76" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<polygon points="394.62,224.05 401.37,230.80 394.62,237.55 387.87,230.80" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<circle cx="465.69" cy="279.91" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="472.46" cy="279.71" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="479.23" cy="278.94" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="486.00" cy="279.33" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<circle cx="492.77" cy="280.07" r="3.2" fill="#0072B2" fill-opacity="0.8" stroke-opacity="0.8"/>
+<polygon points="479.23,272.84 485.98,279.59 479.23,286.34 472.48,279.59" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<rect x="90" y="60" width="440" height="340" fill="none" stroke="#333" stroke-width="1"/>
+<text x="90" y="50" font-size="13" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">A  Change in cue A − cue B score</text>
+<text x="40" y="230.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111" transform="rotate(-90 40 230.0)">Δ(A−B) after training (Hz)</text>
+<rect x="351.8" y="66.0" width="172.2" height="72.0" fill="white" fill-opacity="0.92" stroke="#bbb"/>
+<rect x="359.8" y="74" width="14" height="10" fill="#666666" fill-opacity="0.3" stroke="#666666"/>
+<text x="379.8" y="83" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">|Δ| &lt; 3σ = 6.54 Hz</text>
+<line x1="359.8" y1="95" x2="373.8" y2="95" stroke="#D55E00" stroke-width="1.8" stroke-dasharray="6 4"/>
+<text x="379.8" y="99" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">±3σ (pre-stated)</text>
+<circle cx="366.80" cy="111.00" r="4.0" fill="#0072B2"/>
+<text x="379.8" y="115" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">per-seed paired change</text>
+<polygon points="366.80,121.60 372.20,127.00 366.80,132.40 361.40,127.00" fill="#E69F00" stroke="#111" stroke-width="0.8"/>
+<text x="379.8" y="131" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">pre-stated Δ</text>
+<clipPath id="c4478007504"><rect x="620" y="60" width="440" height="340"/></clipPath>
+<line x1="620" y1="358.79" x2="1060" y2="358.79" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="362.29" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">0</text>
+<line x1="620" y1="224.39" x2="1060" y2="224.39" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="227.89" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">100</text>
+<line x1="620" y1="89.98" x2="1060" y2="89.98" stroke="#e6e6e6" stroke-width="1"/>
+<text x="614" y="93.48" font-size="10.5" text-anchor="end" font-family="Helvetica, Arial, sans-serif" fill="#333">200</text>
+<text x="670.77" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">main</text>
+<text x="670.77" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">reward A</text>
+<text x="755.38" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(a) plasticity</text>
+<text x="755.38" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">off</text>
+<text x="840.00" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(b) reward B</text>
+<text x="924.62" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(c) reward both</text>
+<text x="924.62" y="428.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">[diagnostic]</text>
+<text x="1009.23" y="416.00" font-size="10.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#333">(d) punish A</text>
+<rect x="620" y="352.27" width="440" height="13.03" fill="#666666" fill-opacity="0.12" clip-path="url(#c4478007504)"/>
+<line x1="620" y1="352.27" x2="1060" y2="352.27" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="6 4" clip-path="url(#c4478007504)"/>
+<line x1="620" y1="365.30" x2="1060" y2="365.30" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="6 4" clip-path="url(#c4478007504)"/>
+<line x1="620" y1="358.79" x2="1060" y2="358.79" stroke="#999" stroke-width="0.8" clip-path="url(#c4478007504)"/>
+<polygon points="670.77,352.04 677.52,358.79 670.77,365.54 664.02,358.79" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<polygon points="755.38,352.04 762.13,358.79 755.38,365.54 748.63,358.79" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<polygon points="840.00,151.18 846.75,157.93 840.00,164.68 833.25,157.93" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<polygon points="924.62,145.98 931.37,152.73 924.62,159.48 917.87,152.73" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<polygon points="1009.23,352.04 1015.98,358.79 1009.23,365.54 1002.48,358.79" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<rect x="620" y="60" width="440" height="340" fill="none" stroke="#333" stroke-width="1"/>
+<text x="620" y="50" font-size="13" font-weight="bold" font-family="Helvetica, Arial, sans-serif" fill="#111">B  Change in cue B's own score</text>
+<text x="570" y="230.0" font-size="12" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" fill="#111" transform="rotate(-90 570 230.0)">cue B score change (Hz)</text>
+<rect x="626.0" y="66.0" width="282.0" height="40.0" fill="white" fill-opacity="0.92" stroke="#bbb"/>
+<rect x="634" y="74" width="14" height="10" fill="#666666" fill-opacity="0.3" stroke="#666666"/>
+<text x="654" y="83" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">(d) criterion: |change| &lt; 3σ_B = 4.85 Hz</text>
+<polygon points="641.00,89.60 646.40,95.00 641.00,100.40 635.60,95.00" fill="#009E73" stroke="#111" stroke-width="0.8"/>
+<text x="654" y="99" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#222">change of the 5-seed mean</text>
+<text x="20" y="492" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#444">Points: per-seed paired change; diamonds: the pre-stated measure (change of the 5-seed mean). Dashed: the pre-stated thresholds. (c) is a reported diagnostic and never gates.</text>
+<text x="20" y="506" font-size="10.5" font-family="Helvetica, Arial, sans-serif" fill="#444">σ = 2.18 Hz (SD of the pre-training A−B difference over seeds); σ_B = 1.62 Hz. Source: repro/mushroom_body/results/first_learning_6fea97ac91</text>
+</svg>

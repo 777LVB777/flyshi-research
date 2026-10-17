@@ -1,0 +1,49 @@
+{
+ "note": "figures from finished results only; no synthetic-sweep or Phase 2 file is read",
+ "png": "rendered from the SVG with macOS qlmanage + sips",
+ "figures": {
+  "fig1_first_learning": {
+   "svg": "fig1_first_learning.svg",
+   "png": "fig1_first_learning.png",
+   "sources": {
+    "repro/mushroom_body/results/first_learning_6fea97ac91": "d94dc592e01bbd3bc64238487defc1173d6a8486045a763624305c49f2b74fa6"
+   }
+  },
+  "fig2_first_learning_ignition_recheck": {
+   "svg": "fig2_first_learning_ignition_recheck.svg",
+   "png": "fig2_first_learning_ignition_recheck.png",
+   "sources": {
+    "repro/mushroom_body/results/first_learning_ignition_recheck_20261012/ignition_recheck_summary.json": "62959d2f8e73644f478f1b7e736adcc30c5243ac50d20560d005954f202630c6"
+   }
+  },
+  "fig3_population_scaling_ignition": {
+   "svg": "fig3_population_scaling_ignition.svg",
+   "png": "fig3_population_scaling_ignition.png",
+   "sources": {
+    "repro/mushroom_body/results/left_only_scaling_summary.json": "7dabeaf97a2fefd39cf508a616d61a0e23b0c929aa39bf4c2206a0b24aea83db",
+    "repro/mushroom_body/results/population_scaling_summary.json": "1bf5085c491fe8ac20e1b0cbc6fb4792941e26aac9b8f58a80f286d7612cf504"
+   }
+  },
+  "fig4_graded_encoding": {
+   "svg": "fig4_graded_encoding.svg",
+   "png": "fig4_graded_encoding.png",
+   "sources": {
+    "repro/mushroom_body/results/graded_left_mirrored_verdict.json": "ffcb9fbed3913c873f7e44eb46b0da83bbfee10a666ed8073ad905d42bf5cfb3"
+   }
+  },
+  "fig5_pool_identity_control": {
+   "svg": "fig5_pool_identity_control.svg",
+   "png": "fig5_pool_identity_control.png",
+   "sources": {
+    "repro/mushroom_body/results/pool_identity_control_summary.json": "41ac61646c732ff435d5b121f7754e0005d492b3b6cb30c60e58137508451837"
+   }
+  },
+  "fig6_low_drive_followup": {
+   "svg": "fig6_low_drive_followup.svg",
+   "png": "fig6_low_drive_followup.png",
+   "sources": {
+    "repro/mushroom_body/results/low_drive_followup_summary.json": "8e3ab88336c0c52570cb059b2f9ac5307e62171aabb27c00ca3351d86ff0da40"
+   }
+  }
+ }
+}
