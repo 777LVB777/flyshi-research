@@ -38,7 +38,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 from flyshi_research.simulator import Market
 
@@ -720,6 +720,259 @@ def count_report(raw: Sequence[Mapping], thresholds: Sequence[float] = COUNT_THR
         f"selected_at_{main:g}_by_decision_month": months("decision_time"),
         f"archived_selected_at_{main:g}": s.counts["archived_selected"],
     }
+
+
+# --------------------------------------------------------------------------- #
+# streaming count report (a multi-GB snapshot, never loaded whole)
+# --------------------------------------------------------------------------- #
+SNAPSHOT_READ_CHARS = 8 * 1024 * 1024
+#: no single market comes near this; a longer undecodable run means a damaged file
+MAX_RECORD_CHARS = 64 * 1024 * 1024
+#: numeric market IDs below this are remembered in a bitmap (at most 32 MB); others in a set
+ID_BITMAP_LIMIT = 1 << 28
+
+
+def verify_snapshot_sha256(path: Path, chunk_bytes: int = SNAPSHOT_READ_CHARS) -> str:
+    """The snapshot's SHA-256, hashed in chunks; refuses unless it matches the recorded one."""
+    path = Path(path)
+    recorded = path.with_name(path.name + ".sha256").read_text().strip()
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(chunk_bytes), b""):
+            h.update(chunk)
+    if h.hexdigest() != recorded:
+        raise RuntimeError(f"metadata snapshot hash mismatch: {path}")
+    return recorded
+
+
+def iter_snapshot(path: Path, chunk_chars: int = SNAPSHOT_READ_CHARS) -> Iterator[dict]:
+    """The markets of a snapshot (one JSON array of objects) one at a time, in file
+    order, holding about one chunk of text. Same values as ``json.loads``."""
+    decoder = json.JSONDecoder()
+    buf, pos, eof, state = "", 0, False, "start"  # start -> first -> (sep <-> value) -> end
+    with open(path, encoding="utf-8") as fh:
+        while True:
+            while pos < len(buf) and buf[pos] in " \t\r\n":
+                pos += 1
+            if pos < len(buf) and state in ("first", "value") and not (state == "first" and buf[pos] == "]"):
+                try:
+                    obj, end = decoder.raw_decode(buf, pos)
+                except json.JSONDecodeError:
+                    if eof or len(buf) - pos > MAX_RECORD_CHARS:
+                        raise
+                    obj = None  # an object cut by the chunk boundary: read more
+                if obj is not None:
+                    if not isinstance(obj, dict):
+                        raise ValueError(f"{path}: snapshot element at char {pos} is not an object")
+                    yield obj
+                    pos, state = end, "sep"
+                    continue
+            elif pos < len(buf):
+                c = buf[pos]
+                pos += 1
+                if state == "start" and c == "[":
+                    state = "first"
+                elif state in ("first", "sep") and c == "]":
+                    state = "end"
+                elif state == "sep" and c == ",":
+                    state = "value"
+                else:
+                    raise ValueError(f"{path}: unexpected {c!r} in state {state!r}")
+                continue
+            if eof:
+                break
+            chunk = fh.read(chunk_chars)
+            buf, pos, eof = buf[pos:] + chunk, 0, not chunk
+    if state != "end" or buf[pos:].strip():
+        raise ValueError(f"{path}: snapshot is truncated or has trailing data (state {state!r})")
+
+
+class _SeenIds:
+    """Exact membership for market IDs: canonical numeric IDs in a bitmap, others in a set."""
+
+    def __init__(self) -> None:
+        self.bits = bytearray()
+        self.other: set = set()
+
+    def add(self, mid: str) -> bool:
+        """True if ``mid`` was already seen."""
+        if mid.isascii() and mid.isdigit() and (mid == "0" or mid[0] != "0") and len(mid) < 10 \
+                and int(mid) < ID_BITMAP_LIMIT:
+            i = int(mid)
+            byte, bit = i >> 3, 1 << (i & 7)
+            if byte >= len(self.bits):
+                self.bits.extend(bytes(max(byte + 1 - len(self.bits), len(self.bits))))
+            if self.bits[byte] & bit:
+                return True
+            self.bits[byte] |= bit
+            return False
+        if mid in self.other:
+            return True
+        self.other.add(mid)
+        return False
+
+
+class StreamingCountReport:
+    """``count_report`` one market at a time, for a snapshot too big to load.
+
+    Same filters, in the same order, as ``select_markets``; the threshold-independent
+    ones run once per market. One per event: at the main threshold only the current
+    best (lowest ``_unit``) per event is kept, as (unit, close month, decision month,
+    archived); at the other thresholds the report needs only how many events have an
+    eligible market, so only the event IDs are kept. Duplicate IDs: ``_SeenIds``."""
+
+    _SHARED = ("raw", "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no",
+               "missing_token_ids", "void_50_50", "near_0_1_not_exact", "interior_final_price",
+               "malformed_prices", "missing_dates")
+
+    def __init__(self, thresholds: Sequence[float] = COUNT_THRESHOLDS_USDC,
+                 main: float = MIN_FINAL_VOLUME_USDC) -> None:
+        if main not in thresholds:
+            raise ValueError("the main threshold must be one of the thresholds")
+        self.thresholds, self.main = tuple(thresholds), main
+        self.shared: Dict[str, int] = {k: 0 for k in self._SHARED}
+        self.per = {v: {"below_min_volume": 0, "no_decision_window": 0, "closed_before_decision": 0,
+                        "eligible_before_event_choice": 0} for v in self.thresholds}
+        self.best: Dict[str, Tuple[float, str, str, bool]] = {}  # main threshold
+        self.events = {v: set() for v in self.thresholds if v != main}  # the others
+        self.seen = _SeenIds()
+        self.archived_in_raw = self.amm = self.uma = 0
+        self.years: Dict[str, int] = {}
+        self._month: Dict[Tuple[int, int], str] = {}
+
+    def _ym(self, t: datetime) -> str:
+        k = (t.year, t.month)
+        if k not in self._month:
+            self._month[k] = t.strftime("%Y-%m")
+        return self._month[k]
+
+    def add(self, m: Mapping) -> None:
+        c = self.shared
+        c["raw"] += 1
+        self.archived_in_raw += bool(m.get("archived"))
+        self.amm += bool(m.get("marketMakerAddress"))
+        self.uma += _uma_resolved(m)
+        t = parse_time(m.get("createdAt") or m.get("startDate"))
+        y = t.strftime("%Y") if t else "unknown"
+        self.years[y] = self.years.get(y, 0) + 1
+        mid = str(m.get("id"))
+        if self.seen.add(mid):
+            c["duplicate_id"] += 1
+            return
+        if not m.get("closed"):
+            c["not_closed"] += 1
+            return
+        names = _json_list(m.get("outcomes"))
+        if not names or len(names) != 2:
+            c["multi_outcome"] += 1
+            return
+        if [str(n).strip().lower() for n in names] != ["yes", "no"]:
+            c["two_named_outcomes_not_yes_no"] += 1
+            return
+        tokens = _json_list(m.get("clobTokenIds"))
+        if not tokens or len(tokens) != 2:
+            c["missing_token_ids"] += 1
+            return
+        res = _resolution(_json_list(m.get("outcomePrices")))
+        if res == "void":
+            c["void_50_50"] += 1
+            return
+        if res not in ("yes", "no"):
+            c[res] += 1
+            return
+        start = parse_time(m.get("startDate") or m.get("createdAt"))
+        end = parse_time(m.get("endDate"))
+        closed = parse_time(m.get("closedTime"))
+        if start is None or end is None or closed is None:
+            c["missing_dates"] += 1
+            return
+        volume = float(m.get("volumeNum") or 0.0)
+        drawn, td, unit, event_id = False, None, 0.0, ""
+        for v in self.thresholds:
+            p = self.per[v]
+            if volume < v:
+                p["below_min_volume"] += 1
+                continue
+            if not drawn:
+                drawn, td = True, decision_time(mid, start, end)
+                if td is not None and closed > td:
+                    events = m.get("events") or []
+                    event_id = str(events[0].get("id")) if events and events[0].get("id") is not None \
+                        else f"market:{mid}"
+                    unit = _unit(EVENT_CHOICE_SEED, mid)
+            if td is None:
+                p["no_decision_window"] += 1
+                continue
+            if closed <= td:
+                p["closed_before_decision"] += 1
+                continue
+            p["eligible_before_event_choice"] += 1
+            if v == self.main:
+                cur = self.best.get(event_id)
+                if cur is None or unit < cur[0]:  # strict: the earlier market wins a tie, as in select_markets
+                    self.best[event_id] = (unit, self._ym(closed), self._ym(td), bool(m.get("archived")))
+            else:
+                self.events[v].add(event_id)
+
+    def counts(self, v: float) -> Dict[str, int]:
+        """``select_markets(raw, v).counts``, same keys in the same order (``archived_selected``
+        is tracked at the main threshold only; elsewhere it is 0)."""
+        p = self.per[v]
+        n = len(self.best) if v == self.main else len(self.events[v])
+        out = dict(self.shared)
+        out.update(below_min_volume=p["below_min_volume"], no_decision_window=p["no_decision_window"],
+                   closed_before_decision=p["closed_before_decision"],
+                   eligible_before_event_choice=p["eligible_before_event_choice"],
+                   dropped_one_per_event=p["eligible_before_event_choice"] - n, selected=n,
+                   archived_selected=sum(b[3] for b in self.best.values()) if v == self.main else 0)
+        return out
+
+    def report(self) -> dict:
+        """Exactly ``count_report`` (same keys, order and values). No outcome, no price."""
+        main, thresholds = self.main, self.thresholds
+        sc = {v: self.counts(v) for v in thresholds}
+        s = sc[main]
+
+        def months(i: int) -> Dict[str, int]:
+            out: Dict[str, int] = {}
+            for b in self.best.values():
+                out[b[i]] = out.get(b[i], 0) + 1
+            return dict(sorted(out.items()))
+
+        return {
+            "note": "counts only; no outcome or price is reported",
+            "raw_markets": s["raw"],
+            "archived_in_raw": self.archived_in_raw,
+            "resolved_binary_markets": s["raw"] - sum(s[k] for k in (
+                "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no", "missing_token_ids",
+                "void_50_50", "near_0_1_not_exact", "interior_final_price", "malformed_prices")),
+            "era_and_status_in_raw": {
+                "amm_market_maker_address_present": self.amm,
+                "uma_resolution_status_resolved": self.uma,
+                "created_year": dict(sorted(self.years.items()))},
+            f"exclusions_by_reason_at_{main:g}": {k: v for k, v in s.items() if k not in (
+                "raw", "eligible_before_event_choice", "selected", "archived_selected")},
+            "one_per_event": {f">={v:g}": {"eligible_before_event_choice": sc[v]["eligible_before_event_choice"],
+                                           "dropped_one_per_event": sc[v]["dropped_one_per_event"],
+                                           "selected": sc[v]["selected"]} for v in thresholds},
+            "qualifying_one_per_event": {f">={v:g}": sc[v]["selected"] for v in thresholds},
+            f"selected_at_{main:g}_by_close_month": months(1),
+            f"selected_at_{main:g}_by_decision_month": months(2),
+            f"archived_selected_at_{main:g}": s["archived_selected"],
+        }
+
+
+def count_report_from_snapshot(path: Path, progress: Optional[Callable[[int], None]] = None,
+                               every: int = 250_000, chunk_chars: int = SNAPSHOT_READ_CHARS) -> Tuple[str, dict]:
+    """(SHA-256, ``count_report``) for a saved snapshot, streamed. The hash is checked
+    over the whole file BEFORE any market is parsed."""
+    digest = verify_snapshot_sha256(path)
+    acc = StreamingCountReport()
+    for i, m in enumerate(iter_snapshot(path, chunk_chars), 1):
+        acc.add(m)
+        if progress is not None and i % every == 0:
+            progress(i)
+    return digest, acc.report()
 
 
 # --------------------------------------------------------------------------- #

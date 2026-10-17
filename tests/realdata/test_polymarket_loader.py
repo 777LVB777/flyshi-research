@@ -711,3 +711,99 @@ def test_refused_redirects_and_permanent_http_errors_are_not_retried(tmp_path):
     with pytest.raises(RuntimeError, match="HTTP 404"):
         client(tmp_path / "x", server).get(pm.GAMMA_MARKETS, {}) if (tmp_path / "x").mkdir() is None else None
     assert server.calls == 1
+
+
+# ---- streaming count report (offline, for a snapshot too big to load) ------------------- #
+def _streamed(raw):
+    acc = pm.StreamingCountReport()
+    for m in raw:
+        acc.add(m)
+    return acc.report()
+
+
+def _same(a, b):
+    """Equal, and with the same key order (the printed report is identical)."""
+    return json.dumps(a) == json.dumps(b)
+
+
+def _synthetic_raw(n=4000, seed=7):
+    """Fixture markets as templates, with shuffled IDs (duplicates, leading zeros,
+    non-numeric, huge), shared events and volumes on and around every threshold."""
+    rng = random.Random(seed)
+    templates = _raw() + _real_page()["markets"]
+    ids = [str(i) for i in range(1, 2500)] + ["007", "7", "abc", "None", "99999999999", "1e3", "٣"]
+    vols = [999.99, 1000, 1000.01, 9999, 10000, 100000, 99999.9, 0, None, "12345.5"]
+    out = []
+    for _ in range(n):
+        m = json.loads(json.dumps(rng.choice(templates)))
+        m["id"] = rng.choice(ids) if rng.random() < 0.97 else None
+        r = rng.random()
+        m["events"] = [] if r < 0.1 else [{"id": None}] if r < 0.15 else [{"id": str(rng.randrange(400))}]
+        m["volumeNum"] = rng.choice(vols) if rng.random() < 0.3 else 10 ** rng.uniform(2, 5.5)
+        m["archived"] = rng.random() < 0.3
+        if rng.random() < 0.02:
+            m["endDate"] = None
+        out.append(m)
+    return out
+
+
+@pytest.mark.parametrize("raw", [_raw(), _real_page()["markets"], _raw() + _real_page()["markets"],
+                                 _synthetic_raw(), _synthetic_raw(seed=11)],
+                         ids=["fixture", "realformat", "both", "synthetic7", "synthetic11"])
+def test_streaming_count_report_is_exactly_the_in_memory_one(raw):
+    assert _same(_streamed(raw), pm.count_report(raw))
+
+
+def test_streaming_report_from_a_snapshot_matches_read_snapshot_at_every_chunk_size(tmp_path):
+    snap = tmp_path / "snap.json"
+    pm.write_snapshot(_synthetic_raw(), snap)
+    whole = pm.read_snapshot(snap)
+    expected = pm.count_report(whole)
+    for chunk in (1, 7, 333, 1 << 20):
+        assert list(pm.iter_snapshot(snap, chunk)) == whole
+        digest, rep = pm.count_report_from_snapshot(snap, chunk_chars=chunk)
+        assert _same(rep, expected) and digest == snap.with_name("snap.json.sha256").read_text().strip()
+    # the synthetic set exercises every path it should
+    c = pm.select_markets(whole).counts
+    assert c["duplicate_id"] > 0 and c["dropped_one_per_event"] > 0 and c["missing_dates"] > 0
+    assert expected["qualifying_one_per_event"][">=100000"] > 0
+
+
+def test_streaming_snapshot_is_refused_on_a_hash_mismatch_before_any_parsing(tmp_path, monkeypatch):
+    snap = tmp_path / "snap.json"
+    pm.write_snapshot(_raw(), snap)
+    snap.write_text(snap.read_text().replace('"closed":true', '"closed":false', 1))
+    monkeypatch.setattr(pm, "iter_snapshot", lambda *a, **k: pytest.fail("parsed before the hash check"))
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        pm.count_report_from_snapshot(snap)
+
+
+@pytest.mark.parametrize("text", ['[{"id":"1"},{"id":"2"}', '[{"id":"1"},{"id":"2', '[{"id":"1"}]x',
+                                  '[{"id":"1"},]', '[1]', '{"id":"1"}', ''])
+def test_a_truncated_or_malformed_snapshot_is_an_error(tmp_path, text):
+    p = tmp_path / "s.json"
+    p.write_text(text)
+    with pytest.raises(ValueError):
+        list(pm.iter_snapshot(p, 3))
+
+
+def test_empty_snapshot_streams_nothing(tmp_path):
+    p = tmp_path / "s.json"
+    p.write_text(" [ ] \n")
+    assert list(pm.iter_snapshot(p, 2)) == []
+    assert _same(_streamed([]), pm.count_report([]))
+
+
+def test_cli_streams_the_count_offline_and_freezes_nothing(tmp_path, capsys):
+    d = tmp_path / "d"
+    snap = d / "metadata_closed_markets_X.json"
+    raw = _synthetic_raw(seed=3)
+    pm.write_snapshot(raw, snap)
+    assert _cli().main(["select", "--count-only", "--from-metadata", str(snap), "--data-dir", str(d)],
+                       now=NOW) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out.pop("offline_from_snapshot") is True and out.pop("snapshot") == str(snap)
+    assert out.pop("snapshot_sha256") == (d / "metadata_closed_markets_X.json.sha256").read_text().strip()
+    assert out == pm.count_report(pm.read_snapshot(snap))
+    assert not (d / "frozen_market_list.json").exists() and not list(d.glob("*.outcomes.json"))
+    assert not (d / "request_log.jsonl").exists()

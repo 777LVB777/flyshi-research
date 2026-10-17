@@ -14,6 +14,9 @@ redistributed):
                               blinded count report; freeze nothing
              (default)        select and freeze the market list with SHA-256
              --from-metadata  select and freeze from a saved snapshot [no network]
+             --from-metadata --count-only
+                              the same blinded count report from a saved snapshot,
+                              streamed (hash checked first); freeze nothing [no network]
   history  fetch each frozen market's price history ending at its decision time
            (CLOB /prices-history)                                    [network]
   build    features strictly before the decision time, train/test split, and the
@@ -29,6 +32,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -110,6 +114,17 @@ def main(argv=None, transport=None, now=None) -> int:
             print("TERMS CHANGED since 2026-10-11: stop; the owner must review them before any request.",
                   file=sys.stderr)
             return 3
+        return 0
+    if args.step == "select" and args.from_metadata and args.count_only:
+        started = time.monotonic()
+
+        def progress(n: int) -> None:
+            print(f"  {n:,} markets read ({time.monotonic() - started:.0f} s)", file=sys.stderr, flush=True)
+
+        print(f"verifying the SHA-256 of {args.from_metadata} ...", file=sys.stderr, flush=True)
+        digest, report = pm.count_report_from_snapshot(args.from_metadata, progress)
+        print(json.dumps({"offline_from_snapshot": True, "snapshot": str(args.from_metadata),
+                          "snapshot_sha256": digest, **report}, indent=1))
         return 0
     if args.step == "select" and args.from_metadata:
         raw = pm.read_snapshot(args.from_metadata)
