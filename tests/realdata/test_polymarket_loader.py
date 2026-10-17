@@ -807,3 +807,139 @@ def test_cli_streams_the_count_offline_and_freezes_nothing(tmp_path, capsys):
     assert out == pm.count_report(pm.read_snapshot(snap))
     assert not (d / "frozen_market_list.json").exists() and not list(d.glob("*.outcomes.json"))
     assert not (d / "request_log.jsonl").exists()
+
+
+# ---- streamed freeze (select from a snapshot without loading it) ------------------------ #
+def _select_markets_reference(raw, min_volume=pm.MIN_FINAL_VOLUME_USDC):
+    """VERBATIM copy of select_markets as committed in ffae1f5 (in memory: every ID in
+    a set, every volume in a list, every eligible market kept). The compact one-pass
+    version must give exactly this."""
+    counts = {k: 0 for k in (
+        "raw", "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no",
+        "missing_token_ids", "void_50_50", "near_0_1_not_exact", "interior_final_price", "malformed_prices",
+        "missing_dates", "below_min_volume", "no_decision_window",
+        "closed_before_decision", "eligible_before_event_choice", "dropped_one_per_event", "selected", "archived_selected")}
+    seen, eligible = set(), []
+    volumes = []
+    outcomes = {}
+    for m in raw:
+        counts["raw"] += 1
+        mid = str(m.get("id"))
+        if mid in seen:
+            counts["duplicate_id"] += 1
+            continue
+        seen.add(mid)
+        if not m.get("closed"):
+            counts["not_closed"] += 1
+            continue
+        names = pm._json_list(m.get("outcomes"))
+        if not names or len(names) != 2:
+            counts["multi_outcome"] += 1
+            continue
+        if [str(n).strip().lower() for n in names] != ["yes", "no"]:
+            counts["two_named_outcomes_not_yes_no"] += 1
+            continue
+        tokens = pm._json_list(m.get("clobTokenIds"))
+        if not tokens or len(tokens) != 2:
+            counts["missing_token_ids"] += 1
+            continue
+        res = pm._resolution(pm._json_list(m.get("outcomePrices")))
+        if res == "void":
+            counts["void_50_50"] += 1
+            continue
+        if res not in ("yes", "no"):
+            counts[res] += 1
+            continue
+        start = pm.parse_time(m.get("startDate") or m.get("createdAt"))
+        end = pm.parse_time(m.get("endDate"))
+        closed = pm.parse_time(m.get("closedTime"))
+        if start is None or end is None or closed is None:
+            counts["missing_dates"] += 1
+            continue
+        volume = float(m.get("volumeNum") or 0.0)
+        volumes.append(volume)
+        if volume < min_volume:
+            counts["below_min_volume"] += 1
+            continue
+        td = pm.decision_time(mid, start, end)
+        if td is None:
+            counts["no_decision_window"] += 1
+            continue
+        if closed <= td:
+            counts["closed_before_decision"] += 1
+            continue
+        events = m.get("events") or []
+        event_id = str(events[0].get("id")) if events and events[0].get("id") is not None else f"market:{mid}"
+        eligible.append(pm.SelectedMarket(
+            market_id=mid, event_id=event_id, yes_token_id=str(tokens[0]), question=str(m.get("question") or ""),
+            start=start.isoformat(), end=end.isoformat(), closed_time=closed.isoformat(),
+            decision_time=td.isoformat(), final_volume=volume, archived=bool(m.get("archived"))))
+        outcomes[mid] = 1 if res == "yes" else 0
+    counts["eligible_before_event_choice"] = len(eligible)
+    chosen = {}
+    for s in eligible:
+        cur = chosen.get(s.event_id)
+        if cur is None or pm._unit(pm.EVENT_CHOICE_SEED, s.market_id) < pm._unit(pm.EVENT_CHOICE_SEED, cur.market_id):
+            chosen[s.event_id] = s
+    selected = sorted(chosen.values(), key=lambda s: s.market_id)
+    counts["dropped_one_per_event"] = len(eligible) - len(selected)
+    counts["selected"] = len(selected)
+    counts["archived_selected"] = sum(s.archived for s in selected)
+    sens = {f">={v:g}": sum(x >= v for x in volumes) for v in (*pm.VOLUME_SENSITIVITY_USDC, min_volume)}
+    return pm.Selection(pm.selection_params(min_volume), selected,
+                        {s.market_id: outcomes[s.market_id] for s in selected}, counts, sens)
+
+
+def _same_selection(a, b):
+    return (a.params == b.params and a.markets == b.markets and _same(a.outcomes, b.outcomes)
+            and _same(a.counts, b.counts) and _same(a.volume_sensitivity, b.volume_sensitivity)
+            and pm.frozen_hash(pm._frozen_payload(a)) == pm.frozen_hash(pm._frozen_payload(b)))
+
+
+@pytest.mark.parametrize("min_volume", [1000.0, 10000.0, 12345.5, 100000.0, 0.0])
+@pytest.mark.parametrize("raw", [_raw(), _real_page()["markets"], _synthetic_raw(), _synthetic_raw(seed=11)],
+                         ids=["fixture", "realformat", "synthetic7", "synthetic11"])
+def test_compact_select_markets_is_exactly_the_in_memory_reference(raw, min_volume):
+    new = pm.select_markets(iter(raw), min_volume)  # a one-shot stream is enough
+    assert _same_selection(new, _select_markets_reference(raw, min_volume))
+
+
+def test_select_from_snapshot_streams_one_pass_and_matches_the_in_memory_freeze(tmp_path):
+    snap = tmp_path / "snap.json"
+    pm.write_snapshot(_synthetic_raw(seed=5), snap)
+    whole = pm.read_snapshot(snap)
+    ref = _select_markets_reference(whole)
+    for chunk in (1, 97, 1 << 20):
+        digest, sel, report = pm.select_from_snapshot(snap, chunk_chars=chunk)
+        assert _same_selection(sel, ref) and _same(report, pm.count_report(whole))
+        assert digest == (tmp_path / "snap.json.sha256").read_text().strip()
+    assert sel.counts["selected"] > 50 and sel.counts["dropped_one_per_event"] > 0
+
+
+def test_cli_freeze_from_snapshot_is_streamed_and_freezes_the_same_list(tmp_path, capsys, monkeypatch):
+    d = tmp_path / "d"
+    snap = d / "metadata_closed_markets_X.json"
+    pm.write_snapshot(_synthetic_raw(seed=5), snap)
+    whole = pm.read_snapshot(snap)
+    expected = pm.freeze_selection(_select_markets_reference(whole), tmp_path / "ref" / "frozen.json")
+    monkeypatch.setattr(pm, "read_snapshot", lambda *a, **k: pytest.fail("the freeze path loaded the snapshot"))
+    assert _cli().main(["select", "--from-metadata", str(snap), "--data-dir", str(d)], now=NOW) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out.pop("frozen_sha256") == expected and out.pop("from_snapshot") == str(snap)
+    assert out.pop("snapshot_sha256") == (d / "metadata_closed_markets_X.json.sha256").read_text().strip()
+    assert out == pm.count_report(whole)
+    frozen, digest = pm.load_frozen(d / "frozen_market_list.json")
+    assert digest == expected
+    assert (d / "frozen_market_list.json.outcomes.json").read_text() == \
+        (tmp_path / "ref" / "frozen.json.outcomes.json").read_text()
+    assert not (d / "request_log.jsonl").exists()
+
+
+def test_cli_freeze_refuses_a_snapshot_with_a_bad_hash_and_writes_nothing(tmp_path, capsys):
+    d = tmp_path / "d"
+    snap = d / "s.json"
+    pm.write_snapshot(_raw(), snap)
+    snap.write_text(snap.read_text().replace('"closed":true', '"closed":false', 1))
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        _cli().main(["select", "--from-metadata", str(snap), "--data-dir", str(d)], now=NOW)
+    assert not (d / "frozen_market_list.json").exists() and not list(d.glob("*.outcomes.json"))

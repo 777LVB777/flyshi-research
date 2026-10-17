@@ -13,7 +13,8 @@ redistributed):
              --count-only     save a private metadata snapshot and print the
                               blinded count report; freeze nothing
              (default)        select and freeze the market list with SHA-256
-             --from-metadata  select and freeze from a saved snapshot [no network]
+             --from-metadata  select and freeze from a saved snapshot, streamed
+                              (hash checked first)                 [no network]
              --from-metadata --count-only
                               the same blinded count report from a saved snapshot,
                               streamed (hash checked first); freeze nothing [no network]
@@ -115,23 +116,22 @@ def main(argv=None, transport=None, now=None) -> int:
                   file=sys.stderr)
             return 3
         return 0
-    if args.step == "select" and args.from_metadata and args.count_only:
+    if args.step == "select" and args.from_metadata:  # streamed: the snapshot is never loaded whole
         started = time.monotonic()
 
         def progress(n: int) -> None:
             print(f"  {n:,} markets read ({time.monotonic() - started:.0f} s)", file=sys.stderr, flush=True)
 
         print(f"verifying the SHA-256 of {args.from_metadata} ...", file=sys.stderr, flush=True)
-        digest, report = pm.count_report_from_snapshot(args.from_metadata, progress)
-        print(json.dumps({"offline_from_snapshot": True, "snapshot": str(args.from_metadata),
-                          "snapshot_sha256": digest, **report}, indent=1))
-        return 0
-    if args.step == "select" and args.from_metadata:
-        raw = pm.read_snapshot(args.from_metadata)
-        sel = pm.select_markets(raw, args.min_volume)
+        if args.count_only:
+            digest, report = pm.count_report_from_snapshot(args.from_metadata, progress)
+            print(json.dumps({"offline_from_snapshot": True, "snapshot": str(args.from_metadata),
+                              "snapshot_sha256": digest, **report}, indent=1))
+            return 0
+        snap_sha, sel, report = pm.select_from_snapshot(args.from_metadata, args.min_volume, progress)
         digest = pm.freeze_selection(sel, frozen_path)
         print(json.dumps({"frozen_sha256": digest, "from_snapshot": str(args.from_metadata),
-                          **pm.count_report(raw)}, indent=1))
+                          "snapshot_sha256": snap_sha, **report}, indent=1))
         return 0
     try:
         if args.step == "select":

@@ -26,6 +26,11 @@ the end of item 6. Later the same day, the owner resolved the conflict by
 allowing CLOB `/prices-history` alongside Gamma (amendment at the end of
 item 6).
 
+**Update 2026-10-14:** Polymarket support answered the follow-up. Publication of
+aggregate results and sharing market IDs with reviewers and editors are cleared.
+CLOB `/prices-history` was not covered and a question about it is pending. See
+the 2026-10-14 revision at the end of item 6.
+
 ## 1. Degree-preserving shuffle scope
 
 The implemented shuffle exchanges the targets of two directed edges while
@@ -693,6 +698,69 @@ that saved configuration.
 >   responses only. No network request has been made and no data has been
 >   downloaded. Network is refused unless both `--allow-network` and a recorded
 >   permission file covering the endpoint are given. No permission file exists.
+
+> **REVISION 2026-10-14 (project owner): Polymarket follow-up answered;
+> publication and reviewer sharing cleared; `/prices-history` still pending.**
+> Everything above is kept unchanged as the record.
+>
+> *The follow-up exchange.* It continues the same support ticket as the
+> 2026-10-11 transcript recorded in the 2026-10-12 revision above. The replies
+> of 2026-10-13 and 2026-10-14 are from "Roni", the same human support agent who
+> gave the 2026-10-11 reply. As before, Roni is a support agent, not Polymarket's
+> legal team.
+>
+> *What it settles:*
+>
+> - **Publication of aggregate results** in an academic or research paper is
+>   cleared: "We have no objection". Crediting Polymarket as the data source is
+>   encouraged.
+> - **Sharing market IDs and other reproducibility metadata** with journal peer
+>   reviewers **and editors** is cleared: "completely fine".
+> - **Stated limit:** no re-distributing or reselling of the raw API bulk dataset
+>   as one's own commercial product.
+>
+> *What it does not settle:*
+>
+> - **CLOB `/prices-history`.** The follow-up did not ask about it. The
+>   2026-10-12 amendment above says the 2026-10-12 follow-up asked about the CLOB
+>   endpoint; the verbatim message below shows that it asked only about
+>   publication and reviewer sharing. A one-line question about
+>   `GET clob.polymarket.com/prices-history` was sent on 2026-10-14 in reply to
+>   Roni's check-in. **PENDING:** no answer has been recorded.
+>   `/prices-history` remains unpermitted, and no permission file for it exists.
+> - **Public release** of market IDs or derived per-market features was not
+>   asked about. The reply covers reviewers and editors only.
+>
+> *Transcript, verbatim* as supplied by the project owner (the spellings
+> "unauthenticat" and "re-distributing" are in the original):
+>
+> ```text
+> Luca (2026-10-12): Thank you, Roni, that's very helpful. One follow-up: since the documentation doesn't address it, could you confirm whether Polymarket has any objection to (1) publishing aggregate results in a paper that credits Polymarket as the data source, and (2) sharing the list of market IDs used with journal peer reviewers? I wouldn't redistribute the raw data publicly.
+>
+> Luca (2026-10-13): Hey, I just wanted to follow up on this
+>
+> Roni (2026-10-13): Thanks for following up.
+>
+> To answer your questions directly:
+>
+> 1. Publishing Aggregate Results & Citation: We have no objection to you publishing aggregate analytical results in an academic or research paper. Crediting Polymarket as the data source is encouraged.
+> 2. Sharing Market IDs with Peer Reviewers: Sharing the list of market IDs (or other metadata used for reproducibility) with journal peer reviewers and editors is completely fine.
+>
+> Because Polymarket's market data is publicly accessible and stored transparently on-chain, using aggregated metrics and sharing research methodology/IDs for peer review and academic reproducibility aligns with our open data ecosystem.
+> As long as you are not re-distributing or reselling the raw API bulk dataset as your own commercial product, you are good to go!
+> Let us know if you need anything else or if you'd like to share a copy of your paper with us once it's published—we always love seeing how researchers use Polymarket data.
+>
+> Roni (2026-10-14): Hi there, just checking in one more time to see if you need any additional assistance. If there's anything else we can help with, please don't hesitate to let us know before we close the ticket.
+>
+> Luca (2026-10-14): Thank you, Roni! One last quick check before you close the ticket: does the same apply to the public prices-history endpoint (clob.polymarket.com/prices-history), accessed read-only and unauthenticat within rate limits, for the same research? That's everything; I'll gladly share the paper once it's out.
+> ```
+>
+> *Effect on the design* ([`phase2-design.md`](phase2-design.md), Section 1):
+>
+> - Condition 7 (publication and reviewer sharing on hold) is **cleared**.
+> - Condition 6 (no public redistribution of raw data) **stands**.
+> - CLOB `/prices-history` remains **unpermitted** pending Roni's answer. No
+>   permission file for it is to be written until then.
 
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 

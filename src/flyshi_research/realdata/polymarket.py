@@ -516,6 +516,35 @@ class Selection:
     volume_sensitivity: Dict[str, int] = field(default_factory=dict)
 
 
+#: numeric market IDs below this are remembered in a bitmap (at most 32 MB); others in a set
+ID_BITMAP_LIMIT = 1 << 28
+
+
+class _SeenIds:
+    """Exact membership for market IDs: canonical numeric IDs in a bitmap, others in a set."""
+
+    def __init__(self) -> None:
+        self.bits = bytearray()
+        self.other: set = set()
+
+    def add(self, mid: str) -> bool:
+        """True if ``mid`` was already seen."""
+        if mid.isascii() and mid.isdigit() and (mid == "0" or mid[0] != "0") and len(mid) < 10 \
+                and int(mid) < ID_BITMAP_LIMIT:
+            i = int(mid)
+            byte, bit = i >> 3, 1 << (i & 7)
+            if byte >= len(self.bits):
+                self.bits.extend(bytes(max(byte + 1 - len(self.bits), len(self.bits))))
+            if self.bits[byte] & bit:
+                return True
+            self.bits[byte] |= bit
+            return False
+        if mid in self.other:
+            return True
+        self.other.add(mid)
+        return False
+
+
 #: tolerance used ONLY to name an exclusion reason (never to accept a market)
 NEAR_SETTLED_TOLERANCE = 0.02
 
@@ -559,22 +588,27 @@ def selection_params(min_volume: float = MIN_FINAL_VOLUME_USDC) -> dict:
 
 def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_USDC) -> Selection:
     """Resolved binary markets, final volume >= ``min_volume``, one market per event.
-    Every exclusion is counted; archived markets are included and counted."""
+    Every exclusion is counted; archived markets are included and counted.
+
+    One pass over ``raw``, which may be a stream (``iter_snapshot``). Memory is
+    compact: seen IDs in ``_SeenIds``, volume-sensitivity counters instead of a list
+    of volumes, and only the current choice per event (lowest ``_unit``; the earlier
+    market wins a tie), never every eligible market."""
     counts: Dict[str, int] = {k: 0 for k in (
         "raw", "duplicate_id", "not_closed", "multi_outcome", "two_named_outcomes_not_yes_no",
         "missing_token_ids", "void_50_50", "near_0_1_not_exact", "interior_final_price", "malformed_prices",
         "missing_dates", "below_min_volume", "no_decision_window",
         "closed_before_decision", "eligible_before_event_choice", "dropped_one_per_event", "selected", "archived_selected")}
-    seen, eligible = set(), []
-    volumes: List[float] = []
-    outcomes: Dict[str, int] = {}
+    seen = _SeenIds()
+    sens_at = {f">={v:g}": v for v in (*VOLUME_SENSITIVITY_USDC, min_volume)}
+    sens = {k: 0 for k in sens_at}
+    chosen: Dict[str, Tuple[float, SelectedMarket, int]] = {}  # event -> (unit, market, outcome)
     for m in raw:
         counts["raw"] += 1
         mid = str(m.get("id"))
-        if mid in seen:
+        if seen.add(mid):
             counts["duplicate_id"] += 1
             continue
-        seen.add(mid)
         if not m.get("closed"):
             counts["not_closed"] += 1
             continue
@@ -603,7 +637,8 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
             counts["missing_dates"] += 1
             continue
         volume = float(m.get("volumeNum") or 0.0)
-        volumes.append(volume)
+        for k, v in sens_at.items():
+            sens[k] += volume >= v
         if volume < min_volume:
             counts["below_min_volume"] += 1
             continue
@@ -616,24 +651,21 @@ def select_markets(raw: Iterable[Mapping], min_volume: float = MIN_FINAL_VOLUME_
             continue
         events = m.get("events") or []
         event_id = str(events[0].get("id")) if events and events[0].get("id") is not None else f"market:{mid}"
-        eligible.append(SelectedMarket(
-            market_id=mid, event_id=event_id, yes_token_id=str(tokens[0]), question=str(m.get("question") or ""),
-            start=start.isoformat(), end=end.isoformat(), closed_time=closed.isoformat(),
-            decision_time=td.isoformat(), final_volume=volume, archived=bool(m.get("archived"))))
-        outcomes[mid] = 1 if res == "yes" else 0
-    counts["eligible_before_event_choice"] = len(eligible)
-    chosen: Dict[str, SelectedMarket] = {}
-    for s in eligible:  # outcome-blind and price-blind choice
-        cur = chosen.get(s.event_id)
-        if cur is None or _unit(EVENT_CHOICE_SEED, s.market_id) < _unit(EVENT_CHOICE_SEED, cur.market_id):
-            chosen[s.event_id] = s
-    selected = sorted(chosen.values(), key=lambda s: s.market_id)
-    counts["dropped_one_per_event"] = len(eligible) - len(selected)
+        counts["eligible_before_event_choice"] += 1
+        unit = _unit(EVENT_CHOICE_SEED, mid)  # outcome-blind and price-blind choice
+        cur = chosen.get(event_id)
+        if cur is None or unit < cur[0]:
+            chosen[event_id] = (unit, SelectedMarket(
+                market_id=mid, event_id=event_id, yes_token_id=str(tokens[0]),
+                question=str(m.get("question") or ""), start=start.isoformat(), end=end.isoformat(),
+                closed_time=closed.isoformat(), decision_time=td.isoformat(), final_volume=volume,
+                archived=bool(m.get("archived"))), 1 if res == "yes" else 0)
+    picks = sorted(chosen.values(), key=lambda c: c[1].market_id)
+    selected = [c[1] for c in picks]
+    counts["dropped_one_per_event"] = counts["eligible_before_event_choice"] - len(selected)
     counts["selected"] = len(selected)
     counts["archived_selected"] = sum(s.archived for s in selected)
-    sens = {f">={v:g}": sum(x >= v for x in volumes) for v in (*VOLUME_SENSITIVITY_USDC, min_volume)}
-    return Selection(selection_params(min_volume), selected,
-                     {s.market_id: outcomes[s.market_id] for s in selected}, counts, sens)
+    return Selection(selection_params(min_volume), selected, {c[1].market_id: c[2] for c in picks}, counts, sens)
 
 
 # --------------------------------------------------------------------------- #
@@ -728,8 +760,6 @@ def count_report(raw: Sequence[Mapping], thresholds: Sequence[float] = COUNT_THR
 SNAPSHOT_READ_CHARS = 8 * 1024 * 1024
 #: no single market comes near this; a longer undecodable run means a damaged file
 MAX_RECORD_CHARS = 64 * 1024 * 1024
-#: numeric market IDs below this are remembered in a bitmap (at most 32 MB); others in a set
-ID_BITMAP_LIMIT = 1 << 28
 
 
 def verify_snapshot_sha256(path: Path, chunk_bytes: int = SNAPSHOT_READ_CHARS) -> str:
@@ -785,31 +815,6 @@ def iter_snapshot(path: Path, chunk_chars: int = SNAPSHOT_READ_CHARS) -> Iterato
             buf, pos, eof = buf[pos:] + chunk, 0, not chunk
     if state != "end" or buf[pos:].strip():
         raise ValueError(f"{path}: snapshot is truncated or has trailing data (state {state!r})")
-
-
-class _SeenIds:
-    """Exact membership for market IDs: canonical numeric IDs in a bitmap, others in a set."""
-
-    def __init__(self) -> None:
-        self.bits = bytearray()
-        self.other: set = set()
-
-    def add(self, mid: str) -> bool:
-        """True if ``mid`` was already seen."""
-        if mid.isascii() and mid.isdigit() and (mid == "0" or mid[0] != "0") and len(mid) < 10 \
-                and int(mid) < ID_BITMAP_LIMIT:
-            i = int(mid)
-            byte, bit = i >> 3, 1 << (i & 7)
-            if byte >= len(self.bits):
-                self.bits.extend(bytes(max(byte + 1 - len(self.bits), len(self.bits))))
-            if self.bits[byte] & bit:
-                return True
-            self.bits[byte] |= bit
-            return False
-        if mid in self.other:
-            return True
-        self.other.add(mid)
-        return False
 
 
 class StreamingCountReport:
@@ -973,6 +978,25 @@ def count_report_from_snapshot(path: Path, progress: Optional[Callable[[int], No
         if progress is not None and i % every == 0:
             progress(i)
     return digest, acc.report()
+
+
+def select_from_snapshot(path: Path, min_volume: float = MIN_FINAL_VOLUME_USDC,
+                         progress: Optional[Callable[[int], None]] = None, every: int = 250_000,
+                         chunk_chars: int = SNAPSHOT_READ_CHARS) -> Tuple[str, Selection, dict]:
+    """(SHA-256, ``select_markets``, ``count_report``) for a saved snapshot, in ONE
+    streamed pass after the hash is checked over the whole file. Nothing is written."""
+    digest = verify_snapshot_sha256(path)
+    acc = StreamingCountReport()
+
+    def markets() -> Iterator[dict]:
+        for i, m in enumerate(iter_snapshot(path, chunk_chars), 1):
+            acc.add(m)
+            yield m
+            if progress is not None and i % every == 0:
+                progress(i)
+
+    sel = select_markets(markets(), min_volume)
+    return digest, sel, acc.report()
 
 
 # --------------------------------------------------------------------------- #

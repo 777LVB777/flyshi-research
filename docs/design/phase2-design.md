@@ -12,11 +12,20 @@ Section 9.
   the owner chose option (i): CLOB `/prices-history` is allowed alongside Gamma
   under the same conditions, pending Polymarket's confirmation (Section 1). The
   rest of the design stays venue-neutral.
+- **Update 2026-10-14.** Polymarket support answered the follow-up (item 6,
+  revision 2026-10-14). Condition 7 (publication and reviewer sharing on hold)
+  is cleared. Condition 6 stands. CLOB `/prices-history` remains unpermitted
+  pending an answer to a question sent 2026-10-14 (Section 1).
 - **Update 2026-10-12 (later).** Decisions on signal, comparator, liquidity and
   size, a draft Polymarket loader, and three proposals awaiting confirmation are
   in Section 10. Section 10 governs where it differs from earlier sections.
+- **Update 2026-10-16.** The Gamma metadata count is done: 40,893 qualifying
+  markets, one per event, at ≥ $10,000 (Section 10.10). Proposals for the
+  cutoff, the sample and the threshold, **not adopted**, are in Section 10.11.
 - **What was done.** No market data has been downloaded and no simulation was
-  run.
+  run. (Update 2026-10-16: Gamma market **metadata** only has now been
+  downloaded, under the Section 10.9 permission. No price history has been
+  downloaded, and no simulation has been run.)
 - **Unverified figures.** Every figure marked **unverified** comes from
   documentation or arithmetic. None comes from data or from a model run.
 
@@ -122,8 +131,22 @@ recorded verbatim in [`open-decisions.md`](open-decisions.md), item 6, revision
 
 The reply is **not a definitive written confirmation**. It does not address
 attribution, publication or sharing with reviewers. The owner sent a follow-up
-on 2026-10-12. It asks whether the reply also covers CLOB `/prices-history`,
-and asks about publication and reviewer sharing. It has not been answered.
+on 2026-10-12. It asks about publication and reviewer sharing.
+
+**Update 2026-10-14.** The text above earlier said the 2026-10-12 follow-up also
+asked about CLOB `/prices-history`. The verbatim message shows that it did not.
+Roni, the same human support agent, answered on 2026-10-13 (transcript in
+[`open-decisions.md`](open-decisions.md), item 6, revision 2026-10-14):
+
+- publishing aggregate results crediting Polymarket: no objection, and credit
+  is encouraged;
+- sharing market IDs and other reproducibility metadata with peer reviewers and
+  editors: "completely fine";
+- stated limit: no re-distributing or reselling the raw API bulk dataset as
+  one's own commercial product.
+
+A one-line question about `GET clob.polymarket.com/prices-history` was sent on
+2026-10-14. It is **PENDING**.
 
 **Conditions on any Polymarket use (project owner, 2026-10-12).** Each is
 binding on the data-retrieval code and its run log:
@@ -134,7 +157,9 @@ binding on the data-retrieval code and its run log:
      clob.polymarket.com/prices-history`, nothing else on the CLOB host.
 
    This is *pending Polymarket's confirmation* that the support reply also
-   covers `/prices-history`. That was asked in the 2026-10-12 follow-up. If
+   covers `/prices-history`. That was asked on 2026-10-14 (not in the
+   2026-10-12 follow-up, as first written here). Until it is answered,
+   `/prices-history` is unpermitted and no permission file for it is written. If
    Polymarket says no, `/prices-history` is dropped and the owner revisits
    option (ii).
 
@@ -154,10 +179,18 @@ binding on the data-retrieval code and its run log:
    storage. The repository and any public release contain only code, the frozen
    hashed market-ID list and aggregate results. Public release of market IDs
    and derived per-market features waits for the follow-up answer.
+   **Stands (2026-10-14).** The 2026-10-13 reply did not address public release
+   of market IDs or derived features; it cleared sharing with reviewers and
+   editors only (condition 7). Polymarket's own stated limit, no commercial
+   redistribution or resale of the raw bulk dataset, is narrower than this
+   condition.
 7. **Publication and reviewer sharing are on hold** until Polymarket answers the
    follow-up. No manuscript or preprint naming Polymarket data, and no reviewer
    data package, goes out before then. If the answer is no or never comes,
    this is an open decision for the owner.
+   **Cleared 2026-10-14** by Roni's reply of 2026-10-13: publication of
+   aggregate results crediting Polymarket, and sharing market IDs and
+   reproducibility metadata with peer reviewers and editors, may go ahead.
 8. **Re-check before download.** Reread the Terms of Use, compare the SHA-256
    checksum with the 2026-10-11 value above, and record the result.
 
@@ -549,10 +582,10 @@ At 213 runs/h and $0.266/h, server time only:
 1. **Venue:** *planned 2026-10-12: Polymarket primary under the Section 1
    conditions, Manifold backup.* Still open:
    - Polymarket's confirmation that the reply covers CLOB `/prices-history`
-     (option (i), chosen 2026-10-12; Section 1);
-   - a liquidity measure built only from allowed data (open decision 4);
-   - what happens if the publication and reviewer follow-up is refused or not
-     answered.
+     (option (i), chosen 2026-10-12; asked 2026-10-14, pending; Section 1);
+   - a liquidity measure built only from allowed data (open decision 4).
+
+   Publication and reviewer sharing were cleared on 2026-10-14 (condition 7).
 
    The options originally listed were:
    - Polymarket (real money; terms usable with conditions);
@@ -835,7 +868,8 @@ documented schemas. No test can build the real transport.
 - **Permission file:**
   `repro/polymarket/permissions/gamma_markets_keyset_20261012.json`.
   - It covers **Gamma `/markets/keyset` only.** CLOB `/prices-history` stays
-    unpermitted until Polymarket answers the 2026-10-12 follow-up.
+    unpermitted until Polymarket answers. (Update 2026-10-14: the question was
+    sent on 2026-10-14, not in the 2026-10-12 follow-up; it is pending.)
   - Its basis is the 2026-10-11 human support reply ("Roni"), including that the
     reply is not definitive.
 - **Published rate limit.** Recorded from
@@ -870,3 +904,257 @@ documented schemas. No test can build the real transport.
   final `outcomePrices`, which the selection needs in order to detect void and
   resolved markets. That field is stored in the private snapshot, but it is never
   printed or summarised.
+
+### 10.10 Gamma metadata count: result (2026-10-16)
+
+**Counts only. No outcome or price was printed, summarised or read.**
+
+- **Run.** `select --count-only`, Gamma `/markets/keyset` only, under the 10.9
+  permission file, finished 2026-10-16. All pages were fetched.
+- **Snapshot (private, git-ignored).**
+  `data/polymarket/metadata_closed_markets_20261016T213329Z.json`, 3.0 GB,
+  SHA-256 `2b226bd69ed57736413b2688ebc78949ec581729db36af850b8c2a67ca679245`.
+- **The report.** The in-memory report step stalled on the 8 GB Mac and was
+  stopped. The report was produced offline from the snapshot by the streamed
+  count, `select --count-only --from-metadata`. That check verifies the snapshot
+  checksum first, and a test shows it gives exactly the in-memory report.
+- **The report file in the repository.**
+  [`repro/polymarket/count_report_20261016T213329Z.json`](../../repro/polymarket/count_report_20261016T213329Z.json).
+  It holds counts only.
+
+**Universe:**
+
+| quantity | count |
+|---|---:|
+| raw closed markets | 4,227,473 |
+| of which created in 2026 | 3,953,904 (93.5%) |
+| of which created in 2025 | 248,608 |
+| of which created before 2025 | 24,961 |
+| archived, in raw | 0 |
+| AMM market-maker address present | 26,198 |
+| UMA resolution status "resolved" | 4,223,516 |
+| resolved binary (Yes/No, two tokens, exact 0/1 settlement) | 1,438,961 |
+
+**Exclusions at ≥ $10,000, in filter order:**
+
+| reason | count |
+|---|---:|
+| duplicate ID | 0 |
+| not closed | 0 |
+| more than two outcomes | 40 |
+| two named outcomes, not Yes/No (e.g. team against team) | 2,770,994 (65.5% of raw) |
+| missing token IDs | 49 |
+| void (50/50) | 14,025 |
+| near 0/1 but not exact (AMM era) | 3,327 |
+| interior final price | 71 |
+| malformed prices | 6 |
+| missing dates | 6,323 |
+| below $10,000 final volume | 1,279,987 |
+| no decision window | 14,791 |
+| closed before the decision time | 10,098 |
+| eligible before the event choice | 127,762 |
+| dropped by one per event | 86,869 |
+| **selected** | **40,893** |
+
+**Qualifying, one per event, by threshold:**
+
+| threshold | eligible | dropped (one per event) | **selected** |
+|---|---:|---:|---:|
+| ≥ $1,000 | 298,812 | 227,571 | 71,241 |
+| **≥ $10,000 (FINAL)** | 127,762 | 86,869 | **40,893** |
+| ≥ $100,000 | 34,097 | 21,421 | 12,676 |
+
+**Time profile of the 40,893:**
+
+- **By close month:**
+  - 2023: 256;
+  - 2024: 2,134;
+  - 2025: 9,302;
+  - 2026, January–October 16: **29,201 (71.4%)**.
+- **By decision month:** the same pattern, from 2022-02 to 2026-10. The month
+  tables are in the report file.
+- The last month (2026-10) is partial, because the snapshot was taken on
+  2026-10-16.
+
+**What this settles, and what it raises:**
+
+- **Size.** Design A needs about 10,000 distinct markets. The count is
+  40,893, about 4×, so Design A is feasible on count. Attrition at the
+  price-history step is still unknown (10.5, unverified items).
+- **The universe is recent.** 93.5% of raw markets were created in 2026. The
+  "2–3 year window" of Section 5, criterion 3, is in effect about one year of
+  dense data plus a thin tail.
+- **No archived markets.** `archived_in_raw` is 0. Either Polymarket has no
+  archived closed markets, or `/markets/keyset` with `closed=true` does not
+  return them by default. Survivorship safeguard 12 requires archived markets
+  to be included. **This is an open check.** It needs either the Gamma
+  documentation or one permitted request, and it cannot be settled offline.
+- **Mostly non-Yes/No markets.** Two thirds of raw markets have two named
+  outcomes that are not Yes/No. They are excluded by the binary rule (10.6), as
+  designed.
+
+### 10.11 Proposals after the count (2026-10-16): NOT ADOPTED
+
+**Status.** Every item below is **PROPOSED** and awaits the owner's decision.
+Each is based **only** on the counts in 10.10, with no outcome or price. The
+month tables give the marginal close and decision months, not their joint
+distribution, so pool sizes are **approximate**:
+
+- months are counted whole;
+- the 7-day gap is pro-rated within its month.
+
+The exact sizes come from `split_train_test`'s counts after the freeze.
+
+**What Design A needs.** 40 disjoint chains × (70 training + 180 test):
+
+- **2,800 training markets** resolved before `T_s`;
+- **7,200 test markets** with `t_d` ≥ `T_s` + gap.
+
+So the test pool is the binding constraint.
+
+#### (a) Cutoff `T_s` and gap
+
+**Proposed: `T_s` = 2026-03-01 00:00 UTC, gap 7 days, test `t_d` in
+[2026-03-08, 2026-09-01).**
+
+| `T_s` | training pool (closed before `T_s`) | × 2,800 | test pool (`t_d` from `T_s` + 7 d to 2026-09-01) | × 7,200 |
+|---|---:|---:|---:|---:|
+| 2026-01-01 | 11,692 | 4.2 | ≈ 22,490 | 3.1 |
+| **2026-03-01** | **16,992** | **6.1** | **≈ 17,780** | **2.5** |
+| 2026-04-01 | 18,231 | 6.5 | ≈ 15,510 | 2.2 |
+| 2026-05-01 | 21,990 | 7.9 | ≈ 11,960 | 1.7 |
+
+- **Why 2026-03-01.**
+  - Both pools exceed their need by at least 2.5×, leaving room for unknown
+    history attrition.
+  - Training stays close to the test period: 10,890 of the 16,992 training
+    markets (64%) closed in 2025-09 to 2026-02.
+  - Under an earlier cutoff, the frozen weights would also have to carry over
+    a longer test horizon.
+- **Alternative: 2026-01-01**, if more test margin is wanted (3.1×). Its cost is
+  an older training pool and an 8-month test horizon.
+- **Gap: keep 7 days.**
+  - The look-ahead rule is already met by "resolved before `T_s`".
+  - The gap guards the feature windows. A history request covers
+    [`t_d` − 3 d, `t_d`] (10.5), so any gap of at least 3 days keeps every test
+    feature window out of the training period. 7 days adds a margin.
+  - Its cost is about 410 test markets: 7/31 of March's 1,819 decisions.
+  - A 30-day gap would cost about one month (about 1,800) and buy little.
+  - No practical gap addresses repeating series. That is what per-series caps
+    are for.
+- **Test upper end, 2026-09-01.**
+  - The snapshot contains only markets closed by 2026-10-16. The later a
+    market's `t_d`, the more the sample favours markets that closed quickly.
+    That shifts `time_to_resolution` and the market mix at the end of the test
+    window (right censoring).
+  - Ending the window at 2026-09-01 gives every test market at least
+    6.5 weeks to close. It gives up 4,870 decisions in 2026-09 and 2026-10,
+    which are not needed.
+  - The training pool is not affected: "closed before `T_s`" is complete in
+    the snapshot.
+  - **A stronger option, not yet countable:** also require the *scheduled* end
+    to fall before a date. The scheduled end is known at `t_d` and is not an
+    outcome. This needs a count by scheduled-end month, which the report lacks.
+    That would be one more offline run of about 2 minutes on the same snapshot,
+    with no network.
+
+#### (b) Choosing about 10,000 of the 40,893
+
+**Proposed: freeze all qualifying markets, then fill each pool in a
+pre-stated hash order.**
+
+1. **Freeze.** The freeze covers the full list (what `select --from-metadata`
+   already does: metadata only, no outcomes, no prices).
+2. **Pools.** Split by the (a) rule into a training pool and a test pool.
+3. **Rank.** Within each pool, rank markets by the SHA-256 of
+   `flyshi-phase2-sample-<date>|<market id>`. The seed is stated before any
+   history is fetched.
+4. **Fetch and build.** Fetch price history and build in rank order, until the
+   pool holds its requirement plus a pre-stated reserve, for example 10%:
+   3,080 training and 7,920 test built markets.
+5. **Assign chains.** Assign chains by built rank (Section 7: disjoint, seeded).
+
+Properties:
+
+- **Blind.** The order uses only the market ID. The stopping rule depends only
+  on whether usable history exists (10.5's exclusions), never on a price value
+  or an outcome.
+- **Representative.** It is a simple random sample within each pool, so the
+  month mix matches the pool in expectation.
+- **Handles attrition.** Unknown attrition is absorbed without re-selecting.
+- **Downloads only what is needed.** About (requirement ÷ build rate) requests
+  instead of both whole pools (about 34,800 markets at the proposed cutoff). That matters while
+  CLOB `/prices-history` is unpermitted (Section 1).
+- **New code.** The current `history` step fetches every frozen market, so
+  "fill in rank order" is new code. It is not written yet.
+
+**Alternatives considered:**
+
+- **Stratified by month, proportional allocation.**
+  - It forces exact month proportions.
+  - The gain is small at these pool sizes (thousands per pool), and it adds a
+    parameter.
+- **Stratified by month, equal allocation.** It over-weights the thin 2023–24
+  months. Not recommended.
+- **All markets in a narrow date window.**
+  - Example: test `t_d` in 2026-04 to 2026-06, about 9,170 markets.
+  - It needs no sampling, but the window becomes a free choice made after
+    seeing the month counts.
+  - It concentrates the test on one quarter.
+  - Its margin (1.27×) may not survive attrition.
+- **Fetch history for every market in both pools.** It is the most robust to
+  attrition, but downloads about 3× more than needed.
+
+**Still open, and not decidable from this snapshot:** per-series caps (10.6).
+The snapshot keeps only the event ID and the question text, with no series or
+category. Caps need either pre-stated rules on the question text or more Gamma
+fields, which would mean another permitted download. This is the owner's
+decision.
+
+#### (c) Threshold: keep $10,000, or move to $100,000?
+
+**Proposed: keep $10,000 (FINAL since 2026-10-12). Pre-state ≥ $100,000 as
+a reported, non-gating subset of the test markets.**
+
+**$100,000. Pros:**
+
+- More actively traded markets, so fewer stale prices and fewer build-step
+  exclusions.
+- A cleaner and harder comparator: "beat liquid markets".
+- Fewer history requests.
+
+**$100,000. Cons:**
+
+- **Too few markets.**
+  - 12,676 in total against about 10,000 needed is 1.27×, before the split,
+    straddling markets and attrition.
+  - Month tables exist only at $10,000. If the ≥ $100,000 markets have the
+    same time profile (31% of each month; **unverified**), the 2026-03-01
+    cutoff gives about 5,270 training and 5,510 test markets. The test pool is
+    then below 7,200.
+  - No cutoff fits Design A's test need with any margin.
+- **Stronger selection on attention.** Final volume is known only afterwards.
+  The 10.6 limitation, that heavily traded markets may resolve more
+  surprisingly, grows.
+- **Re-opens a FINAL decision.** Doing so after seeing counts is
+  outcome-blind, but it should be recorded as such.
+
+**The middle course.** Keep $10,000 for selection and gating. Report the
+≥ $100,000 test markets as a secondary analysis, stated now:
+
+- about 31% of 7,200 is about 2,230 markets;
+- its MDE is about 1.8× Design A's (√(7,200 / 2,230)).
+
+**$1,000** (71,241) is not needed. It would only add thinner, staler markets.
+
+**Streamed freeze (2026-10-16).**
+
+- `select --from-metadata <snapshot>` now streams the snapshot: hash first,
+  then one pass. It never loads the snapshot whole.
+- `select_markets` keeps only compact state:
+  - seen IDs in a bitmap;
+  - volume-sensitivity counters;
+  - the current choice per event.
+- A test shows it gives the same frozen list and the same hash as the earlier
+  in-memory version.
+- **Nothing has been frozen yet.**
