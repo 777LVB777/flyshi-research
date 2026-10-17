@@ -1,0 +1,22 @@
+# systemd unit for the flyshi autopilot (docs/cloud/autopilot.md, step 8).
+# Install: cp this file /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now flyshi-autopilot
+[Unit]
+Description=flyshi autopilot: finish Phase 1, run Phase 2, publish, notify (never deletes the server)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/flyshi-autopilot
+ExecStart=/usr/bin/python3 /root/flyshi-autopilot/bin/autopilot.py run --config /root/.config/flyshi-autopilot/config.json
+Restart=on-failure
+RestartSec=60
+# Stop or restart only the autopilot: the launchers it started keep running.
+KillMode=process
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=append:/root/flyshi-autopilot/autopilot.log
+StandardError=append:/root/flyshi-autopilot/autopilot.log
+
+[Install]
+WantedBy=multi-user.target

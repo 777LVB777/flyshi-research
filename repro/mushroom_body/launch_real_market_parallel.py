@@ -47,7 +47,7 @@ class RealLauncher(Launcher):
 
     def __init__(self, run_dir: Path, slots: int, gb_per_proc: float = DEFAULT_GB_PER_PROC,
                  headroom_gb: float = 2.0, stagger_s: float = DEFAULT_STAGGER_S, poll_s: float = 5.0,
-                 argv_for=None, mem_reader=available_gb, log=print, finish=None) -> None:
+                 argv_for=None, mem_reader=available_gb, log=print, finish=None, stop_file=None) -> None:
         if slots < 1:
             raise ValueError("slots must be >= 1")
         import run_real_market_experiment as runner
@@ -62,6 +62,7 @@ class RealLauncher(Launcher):
         self.arms = None
         self.jobs = rm.plan_jobs()
         self.all_jobs = self.jobs
+        self.stop_file = stop_file
 
 
 def parser() -> argparse.ArgumentParser:
@@ -72,6 +73,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--headroom-gb", type=float, default=None)
     p.add_argument("--max-procs", type=int, default=None)
     p.add_argument("--stagger-s", type=float, default=DEFAULT_STAGGER_S)
+    p.add_argument("--stop-file", type=Path, default=None,
+                   help="Once this file exists no new job starts; running jobs finish (the autopilot's budget stop).")
     return p
 
 
@@ -98,10 +101,15 @@ def main(argv=None) -> int:
     if args.dry_run:
         print("dry run: no process started, nothing written.")
         return 0
-    result = RealLauncher(args.run_dir, slots, args.gb_per_proc, head, args.stagger_s).run()
+    result = RealLauncher(args.run_dir, slots, args.gb_per_proc, head, args.stagger_s,
+                          stop_file=args.stop_file).run()
     if result["verdict"] is not None:
         print(f"success: {result['verdict']['success']}")
         return 0
+    if result.get("stopped"):
+        print(f"[launcher] stopped by {args.stop_file}: {len(result['done'])} of {len(jobs)} jobs done; "
+              "no verdict (it needs all jobs).")
+        return 3
     print(f"[launcher] not finished: failed {result['failed']}, blocked {result['blocked']}.")
     return 1
 

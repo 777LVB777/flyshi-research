@@ -1,0 +1,18 @@
+{
+  "ntfy_topic": "PUT-YOUR-LONG-RANDOM-TOPIC-HERE (guide step 5; never commit it)",
+  "git_user_name": "Luca Volpi Benowitz (flyshi autopilot)",
+  "git_user_email": "PUT-THE-EMAIL-FOR-THE-AUTOPILOT-COMMITS-HERE",
+  "push_url": "git@github-flyshi:777LVB777/flyshi-research.git",
+  "market_sha256": "0777ae92f0dd6b950e1a0e3495c72c3a89280b421265f2a53cdac3c3b9e2c686",
+  "drive_signoff_sha256": "",
+  "frozen_tag": "phase2-frozen",
+  "max_procs": 4,
+  "gb_per_proc": 3.6,
+  "price_per_hour": 0.266,
+  "spend_warn_usd": 85,
+  "spend_stop_usd": 95,
+  "stall_hours": 12,
+  "disk_min_free_fraction": 0.10,
+  "alive_every_hours": 24,
+  "poll_seconds": 300
+}

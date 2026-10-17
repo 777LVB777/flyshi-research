@@ -117,6 +117,18 @@ def parts(base):
     return {p.name: p.read_bytes() for p in sorted(d.glob("*.json"))}
 
 
+def test_launcher_starts_no_new_job_once_the_stop_file_exists(tmp_path):
+    """The autopilot's budget stop: with the stop file present nothing new starts."""
+    base = tmp_path / "results"
+    stop = tmp_path / "STOP_LAUNCHING"
+    stop.write_text("budget stop")
+    launcher = launcher_for(tmp_path, base, arms=sm.RUN_PHASES[1])
+    launcher.stop_file = stop
+    result = launcher.run()
+    assert result["stopped"] and result["done"] == [] and result["verdict"] is None
+    assert parts(base) == {}
+
+
 def test_job_outputs_are_identical_whether_arms_run_together_or_apart(tmp_path):
     finished_apart, finished_together = [], []
     first = launcher_for(tmp_path, tmp_path / "apart", sm.RUN_PHASES[1], finished_apart).run()

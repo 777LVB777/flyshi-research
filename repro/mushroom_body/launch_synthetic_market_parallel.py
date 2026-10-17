@@ -117,7 +117,7 @@ class Launcher:
                  mem_reader: Callable[[], Optional[float]] = available_gb,
                  log: Callable[[str], None] = print,
                  finish: Optional[Callable[[], dict]] = None,
-                 arms: Optional[Sequence[str]] = None) -> None:
+                 arms: Optional[Sequence[str]] = None, stop_file: Optional[Path] = None) -> None:
         if slots < 1:
             raise ValueError("slots must be >= 1")
         # Imported here, not at module level, so --dry-run stays as light as possible.
@@ -133,6 +133,12 @@ class Launcher:
         self.arms = tuple(arms) if arms else None
         self.jobs = sm.run_order(sm.plan_jobs(cfg, self.arms))
         self.all_jobs = sm.plan_jobs(cfg)
+        self.stop_file = stop_file
+
+    def _stop_requested(self) -> bool:
+        """True once the stop file exists: no new job starts; running jobs finish."""
+        stop = getattr(self, "stop_file", None)
+        return stop is not None and Path(stop).exists()
 
     def _log_path(self, job: sm.Job) -> Path:
         return self.paths.log(job)
@@ -160,6 +166,7 @@ class Launcher:
         blocked: Set[str] = set()
         running: Dict[str, tuple] = {}  # job id -> (Popen, job, log handle)
         last_start = -math.inf
+        stopped = False
         self.log(f"[launcher] {len(done)} jobs already done, {len(pending)} to run, "
                  f"up to {self.slots} at once; logs in {self.log_dir}")
         try:
@@ -180,7 +187,13 @@ class Launcher:
                     if any(d in failed or d in blocked for d in j.deps):
                         pending.remove(j)
                         blocked.add(j.id)
-                if len(running) < self.slots and time.monotonic() - last_start >= self.stagger_s:
+                if self._stop_requested():
+                    if not stopped:
+                        stopped = True
+                        self.log(f"[launcher] stop file {self.stop_file} present: no new job is started")
+                    if not running:
+                        break
+                elif len(running) < self.slots and time.monotonic() - last_start >= self.stagger_s:
                     j = next_ready(pending, done)
                     if j is not None and (not running or self._memory_ok()):
                         pending.remove(j)
@@ -210,7 +223,7 @@ class Launcher:
                 fh.close()
             raise
         result = {"done": sorted(done), "failed": sorted(failed), "blocked": sorted(blocked),
-                  "verdict": None, "sweep_complete": False}
+                  "verdict": None, "sweep_complete": False, "stopped": stopped}
         if not failed and not blocked and len(done) == len(self.jobs):
             # The verdict needs every arm. A subset run (e.g. phase 1) never triggers it.
             result["sweep_complete"] = all(self.paths.done(j) for j in self.all_jobs)
