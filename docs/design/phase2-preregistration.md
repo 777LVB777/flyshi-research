@@ -251,3 +251,14 @@ tests show:
 - the reported-only analyses never change the verdict;
 - the script refuses on a missing job, misaligned arms, or a test market in the
   comparator's training set.
+
+## 12. Phase 2 and the Phase 1 verdict (dated deviation, 2026-10-17)
+
+**Decided 2026-10-17 (project owner), before any Phase 1 verdict exists.** Sections
+1–11 did not say whether Phase 2 depends on the synthetic sweep's Phase 1 verdict.
+Phase 2 runs regardless of the Phase 1 verdict; the two phases answer different
+questions (synthetic vs. real markets), and this was fixed on 2026-10-17 before any
+verdict was computed. The line below is read by the server autopilot
+([`../cloud/autopilot.md`](../cloud/autopilot.md)).
+
+<!-- autopilot-phase2-rule: run-regardless -->
