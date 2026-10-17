@@ -20,8 +20,10 @@ Section 9.
   size, a draft Polymarket loader, and three proposals awaiting confirmation are
   in Section 10. Section 10 governs where it differs from earlier sections.
 - **Update 2026-10-16.** The Gamma metadata count is done: 40,893 qualifying
-  markets, one per event, at ≥ $10,000 (Section 10.10). Proposals for the
-  cutoff, the sample and the threshold, **not adopted**, are in Section 10.11.
+  markets, one per event, at ≥ $10,000 (Section 10.10). The cutoff, the
+  sample rule and the threshold were confirmed **FINAL** on 2026-10-16
+  (Section 10.11). The 15% reserve is still proposed. Whether archived markets
+  are listed is still an open check, with one prepared request (10.10).
 - **What was done.** No market data has been downloaded and no simulation was
   run. (Update 2026-10-16: Gamma market **metadata** only has now been
   downloaded, under the Section 10.9 permission. No price history has been
@@ -653,7 +655,8 @@ the decision-time rule (10.5) and the volume threshold (10.6).
 >    sensitivity.
 >
 > Still open: the 7-day gap, the cutoff `T_s` (chosen after the metadata count)
-> and per-series caps.
+> and per-series caps. (Update 2026-10-16: the gap and `T_s` are FINAL in 10.11.
+> Per-series caps are still open.)
 
 ### 10.1 Signal: none (decision 1)
 
@@ -804,7 +807,8 @@ simpler, but it is a step function and its edges are arbitrary.
   - **Training:** markets **resolved** before the cutoff `T_s`, in resolution
     order.
   - **Test:** markets with `t_d` ≥ `T_s` + gap, in `t_d` order. The gap is
-    **7 days** (proposed).
+    **7 days** (proposed). (FINAL 2026-10-16: `T_s` = 2026-03-01, gap 7 days,
+    test `t_d` before 2026-09-01; 10.11.)
   - Markets in between are excluded and counted.
   - `T_s` is to be chosen after the metadata count, before any price history is
     fetched.
@@ -989,14 +993,52 @@ documented schemas. No test can build the real transport.
   return them by default. Survivorship safeguard 12 requires archived markets
   to be included. **This is an open check.** It needs either the Gamma
   documentation or one permitted request, and it cannot be settled offline.
+  - **Docs, read 2026-10-16:**
+    `docs.polymarket.com/api-reference/markets/list-markets-keyset-pagination.md`
+    and `.../list-markets.md`. Neither endpoint has an `archived` query
+    parameter; `archived` is only a nullable response field. `closed` defaults
+    to false, and `closed=any` is allowed only in an identifier lookup (at most
+    100 IDs). Neither page says whether archived markets are returned. **The
+    docs do not settle it.**
+  - **ID gaps in the snapshot.** The IDs run up to 5,787,701, but only 4,227,473
+    closed markets were listed. That leaves 1,560,228 gaps, including 99,823 of
+    the IDs below 100,000. Markets that old can no longer be open.
+  - **The settling request (prepared 2026-10-16, NOT sent).**
+    `repro/polymarket/archived_check.py` makes one identifier lookup on the
+    permitted endpoint:
+    `GET /markets/keyset?closed=any&id=…&limit=100`.
+    - It asks for the 98 lowest absent IDs, plus two present IDs (12 and 17)
+      as controls.
+    - It goes through every loader gate: the flag, the permission file, the
+      terms check, the rate cap and the request log.
+    - It prints only `id`, `closed`, `archived` and `active`, with a verdict.
+    - Verdicts:
+      - absent IDs come back with `archived=true`: the listing excludes
+        archived markets;
+      - they come back closed and not archived: the listing missed markets;
+      - none comes back: these IDs are not served at all;
+      - a control does not come back: inconclusive.
 - **Mostly non-Yes/No markets.** Two thirds of raw markets have two named
   outcomes that are not Yes/No. They are excluded by the binary rule (10.6), as
   designed.
 
-### 10.11 Proposals after the count (2026-10-16): NOT ADOPTED
+### 10.11 Split, sample and threshold after the count (2026-10-16)
 
-**Status.** Every item below is **PROPOSED** and awaits the owner's decision.
-Each is based **only** on the counts in 10.10, with no outcome or price. The
+> **CONFIRMED 2026-10-16 (project owner): (a), (b) and (c) are FINAL.**
+>
+> 1. **(a) Split:** `T_s` = 2026-03-01 00:00 UTC, gap 7 days, test `t_d` in
+>    [2026-03-08, 2026-09-01).
+> 2. **(b) Sample:** freeze all 40,893 qualifying markets. Order each pool by
+>    the SHA-256 of `flyshi-phase2-sample-20261016|<market id>`. Fetch price
+>    history in that order until each pool holds its need plus a pre-stated
+>    reserve.
+> 3. **(c) Threshold:** keep $10,000. The ≥ $100,000 test subset is
+>    pre-stated as a reported, non-gating analysis.
+>
+> **Still PROPOSED:** the reserve, 15% (see (b)).
+
+**Status.** Below is the reasoning as proposed on 2026-10-16, kept as the
+record. Each part is based **only** on the counts in 10.10, with no outcome or price. The
 month tables give the marginal close and decision months, not their joint
 distribution, so pool sizes are **approximate**:
 
@@ -1014,8 +1056,10 @@ So the test pool is the binding constraint.
 
 #### (a) Cutoff `T_s` and gap
 
-**Proposed: `T_s` = 2026-03-01 00:00 UTC, gap 7 days, test `t_d` in
-[2026-03-08, 2026-09-01).**
+**FINAL (confirmed 2026-10-16): `T_s` = 2026-03-01 00:00 UTC, gap 7 days,
+test `t_d` in [2026-03-08, 2026-09-01).** In code: `SPLIT_CUTOFF`,
+`SPLIT_GAP`, `TEST_DECISION_END`, `pool_of` and `split_train_test(...,
+test_end)`.
 
 | `T_s` | training pool (closed before `T_s`) | × 2,800 | test pool (`t_d` from `T_s` + 7 d to 2026-09-01) | × 7,200 |
 |---|---:|---:|---:|---:|
@@ -1060,18 +1104,22 @@ So the test pool is the binding constraint.
 
 #### (b) Choosing about 10,000 of the 40,893
 
-**Proposed: freeze all qualifying markets, then fill each pool in a
-pre-stated hash order.**
+**FINAL (confirmed 2026-10-16): freeze all qualifying markets, then fill
+each pool in a pre-stated hash order.**
 
 1. **Freeze.** The freeze covers the full list (what `select --from-metadata`
    already does: metadata only, no outcomes, no prices).
 2. **Pools.** Split by the (a) rule into a training pool and a test pool.
-3. **Rank.** Within each pool, rank markets by the SHA-256 of
-   `flyshi-phase2-sample-<date>|<market id>`. The seed is stated before any
-   history is fetched.
-4. **Fetch and build.** Fetch price history and build in rank order, until the
-   pool holds its requirement plus a pre-stated reserve, for example 10%:
-   3,080 training and 7,920 test built markets.
+3. **Rank.** Within each pool, rank markets by the full SHA-256 digest of
+   `flyshi-phase2-sample-20261016|<market id>` (`SAMPLE_ORDER_SEED`), with the
+   market ID breaking a tie. The seed is stated here, before any history is
+   fetched.
+4. **Fetch and build.** Fetch price history in rank order, until the pool holds
+   its requirement plus the reserve in usable markets.
+   - "Usable" means passing 10.5's exclusions. They are judged by
+     `history_exclusion`, from the history's **timestamps only**.
+   - With the proposed 15% reserve the targets are **3,220 training** and
+     **8,280 test** markets.
 5. **Assign chains.** Assign chains by built rank (Section 7: disjoint, seeded).
 
 Properties:
@@ -1085,8 +1133,37 @@ Properties:
 - **Downloads only what is needed.** About (requirement ÷ build rate) requests
   instead of both whole pools (about 34,800 markets at the proposed cutoff). That matters while
   CLOB `/prices-history` is unpermitted (Section 1).
-- **New code.** The current `history` step fetches every frozen market, so
-  "fill in rank order" is new code. It is not written yet.
+- **Code (2026-10-16).** The code is `pool_order`, `pool_targets`,
+  `history_exclusion` and `fill_pools`, with the CLI `history` step using them.
+  - Histories are appended one line per market, so a restart resumes and
+    nothing is fetched twice.
+  - A fill plan with IDs and counts only is saved. The step exits 5 if a pool
+    runs out before its target.
+  - Tests show:
+    - the order depends only on the ID;
+    - the fill stops exactly at the target, walks in order and resumes without
+      refetching;
+    - changing every price value, or flipping every outcome, leaves the plan
+      identical;
+    - `history_exclusion` agrees with `decision_features` on 500 random
+      histories, and ignores a point exactly at `t_d`.
+
+**Reserve: 15% (PROPOSED 2026-10-16, awaiting confirmation).**
+
+- **What it is for.** Losses *after* the fill:
+  - markets excluded once the 10.5 unverified items are checked (whether `p`
+    is a midpoint or a last trade, or an edited `endDate`);
+  - chain assembly, which needs exactly 70 + 180 per chain;
+  - a training set for the isotonic calibrator that stays above 3,000.
+- **Why not more.** Attrition *during* the fill is already absorbed by
+  filling, so the reserve need not cover it.
+- **What it costs.** About 1,500 more usable markets (420 training, 1,080
+  test), or 1,500 ÷ build rate more requests. That is about 25 minutes per
+  1,500 requests at 1 request per second.
+- **It fits.** The test pool (about 17,780) still reaches 8,280 if as few as
+  47% of its histories are usable.
+- **Alternatives.** 10% leaves little spare for the unverified items. 25% adds
+  downloads with no stated use.
 
 **Alternatives considered:**
 
@@ -1113,8 +1190,10 @@ decision.
 
 #### (c) Threshold: keep $10,000, or move to $100,000?
 
-**Proposed: keep $10,000 (FINAL since 2026-10-12). Pre-state ≥ $100,000 as
-a reported, non-gating subset of the test markets.**
+**FINAL (confirmed 2026-10-16): keep $10,000. Pre-stated: the ≥ $100,000
+test markets are reported as a secondary, non-gating analysis**: the same arms
+and comparator, restricted to test markets with final volume ≥ $100,000, and
+reported next to the main result. They never enter the gate.
 
 **$100,000. Pros:**
 

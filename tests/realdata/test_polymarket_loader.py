@@ -367,8 +367,13 @@ def test_cli_runs_end_to_end_on_the_fake_server_when_both_are_given(tmp_path, ca
     args = ["--allow-network", "--permission", str(p), "--data-dir", str(tmp_path / "d")]
     assert cli.main(["terms", "--terms-file", str(terms), "--data-dir", str(tmp_path / "d")], now=NOW) == 0
     assert cli.main(["select", *args], transport=server, now=NOW) == 0
-    assert cli.main(["history", *args], transport=server, now=NOW) == 0
-    assert cli.main(["build", "--data-dir", str(tmp_path / "d"), "--cutoff", "2025-06-01"]) == 0
+    split = ["--cutoff", "2025-06-01"]
+    # the fixtures cannot reach Design A's targets: every pool market is fetched, and exit 5 says so
+    assert cli.main(["history", *args, *split], transport=server, now=NOW) == 5
+    plan = json.loads(next((tmp_path / "d").glob("fill_plan_*.json")).read_text())
+    assert plan["pools"]["train"]["considered"] == plan["pools"]["train"]["pool_size"] == 2
+    assert plan["pools"]["test"]["considered"] == plan["pools"]["test"]["pool_size"] == 1
+    assert cli.main(["build", "--data-dir", str(tmp_path / "d"), *split]) == 0
     out = next((tmp_path / "d").glob("markets_*_cutoff_2025-06-01.json"))
     tr, te = pm.load_market_file(out)
     assert (len(tr), len(te)) == (2, 1)
@@ -943,3 +948,239 @@ def test_cli_freeze_refuses_a_snapshot_with_a_bad_hash_and_writes_nothing(tmp_pa
     with pytest.raises(RuntimeError, match="hash mismatch"):
         _cli().main(["select", "--from-metadata", str(snap), "--data-dir", str(d)], now=NOW)
     assert not (d / "frozen_market_list.json").exists() and not list(d.glob("*.outcomes.json"))
+
+
+# ---- pool order and fill (FINAL 2026-10-16): blind to outcomes and prices --------------- #
+def test_final_split_and_sample_parameters_are_pinned():
+    assert pm.SPLIT_CUTOFF == datetime(2026, 3, 1, tzinfo=timezone.utc)
+    assert pm.SPLIT_GAP == timedelta(days=7)
+    assert pm.TEST_DECISION_END == datetime(2026, 9, 1, tzinfo=timezone.utc)
+    assert pm.SAMPLE_ORDER_SEED == "flyshi-phase2-sample-20261016"
+    assert pm.POOL_NEED == {"train": 2800, "test": 7200}  # 40 chains x 70 and x 180
+    assert pm.pool_targets() == {"train": 3220, "test": 8280}  # +15%, integer arithmetic
+    assert pm.pool_targets({"x": 7}, 15) == {"x": 9}  # rounded up
+
+
+def _sm(i, closed, td, **kw):
+    """A frozen market with the given close and decision times (UTC ISO strings)."""
+    base = dict(market_id=str(i), event_id=f"e{i}", yes_token_id=f"tok{i}", question=f"q{i}",
+                start="2025-01-01T00:00:00+00:00", end="2027-01-01T00:00:00+00:00", closed_time=closed,
+                decision_time=td, final_volume=20000.0, archived=False)
+    return pm.SelectedMarket(**{**base, **kw})
+
+
+def _frozen_world(n=600, seed=1):
+    rng = random.Random(seed)
+    out = []
+    for i in range(n):
+        td = pm.SPLIT_CUTOFF + timedelta(days=rng.uniform(-300, 250))
+        closed = td + timedelta(days=rng.uniform(0.01, 60))
+        out.append(_sm(1000 + i, closed.isoformat(), td.isoformat()))
+    return out
+
+
+def _fake_history(m, price=0.42, kind=None):
+    """Hourly points over [t_d - 3 d, t_d); some markets get an unusable history."""
+    td = int(pm.parse_time(m.decision_time).timestamp())
+    kind = kind or ("ok", "ok", "ok", "none", "stale", "short")[int(m.market_id) % 6]
+    if kind == "none":
+        return []
+    if kind == "stale":
+        return [(td - 30 * 3600 - h * 3600, price) for h in range(10)]
+    if kind == "short":
+        return [(td - h * 3600, price) for h in range(1, 10)]
+    return [(td - h * 3600, price) for h in range(1, 72)]
+
+
+def test_pool_of_is_the_split_rule_of_split_train_test():
+    frozen = _frozen_world()
+    built = [pm.BuiltMarket(m, pm.Features(0.5, 0.0, 1.0, 0), 0) for m in frozen]
+    train, test, counts = pm.split_train_test(built, pm.SPLIT_CUTOFF, pm.SPLIT_GAP, pm.TEST_DECISION_END)
+    pools = {m.market_id: pm.pool_of(m) for m in frozen}
+    assert {b.market.market_id for b in train} == {k for k, v in pools.items() if v == "train"}
+    assert {b.market.market_id for b in test} == {k for k, v in pools.items() if v == "test"}
+    assert counts["straddling_excluded"] == sum(v == "straddling" for v in pools.values()) > 0
+    assert counts["after_test_window_excluded"] == sum(v == "after_test_window" for v in pools.values()) > 0
+    # without test_end the split is unchanged from before (no new count)
+    assert set(pm.split_train_test(built, pm.SPLIT_CUTOFF)[2]) == {"train", "test", "straddling_excluded"}
+
+
+def test_boundaries_of_the_pools():
+    c, g, e = pm.SPLIT_CUTOFF, pm.SPLIT_GAP, pm.TEST_DECISION_END
+    iso = lambda t: t.isoformat()
+    second = timedelta(seconds=1)
+    assert pm.pool_of(_sm(1, iso(c - second), iso(c - 2 * second))) == "train"
+    assert pm.pool_of(_sm(2, iso(c), iso(c - second))) == "straddling"  # resolved AT the cutoff
+    assert pm.pool_of(_sm(3, iso(c + g + 9 * second), iso(c + g - second))) == "straddling"
+    assert pm.pool_of(_sm(4, iso(c + g + 9 * second), iso(c + g))) == "test"
+    assert pm.pool_of(_sm(5, iso(e + 9 * second), iso(e - second))) == "test"
+    assert pm.pool_of(_sm(6, iso(e + 9 * second), iso(e))) == "after_test_window"
+
+
+def test_pool_order_is_the_seeded_hash_of_the_id_and_nothing_else():
+    import hashlib
+    frozen = _frozen_world()
+    pools, counts = pm.pool_order(frozen)
+    for p in pm.POOLS:
+        ids = [m.market_id for m in pools[p]]
+        assert ids == sorted(ids, key=lambda i: hashlib.sha256(f"flyshi-phase2-sample-20261016|{i}".encode()).digest())
+    assert sum(counts.values()) == len(frozen)
+    # input order, question, token, volume, event and archived flag change nothing
+    rng = random.Random(3)
+    other = [pm.SelectedMarket(**{**m.__dict__, "question": "x", "yes_token_id": "y", "event_id": "z",
+                                  "final_volume": rng.random() * 1e6, "archived": True})
+             for m in rng.sample(frozen, len(frozen))]
+    pools2, _ = pm.pool_order(other)
+    assert all([m.market_id for m in pools[p]] == [m.market_id for m in pools2[p]] for p in pm.POOLS)
+    # a different seed gives a different order
+    assert [m.market_id for m in pm.pool_order(frozen, seed="other")[0]["test"]] != \
+        [m.market_id for m in pools["test"]]
+
+
+def test_history_exclusion_matches_decision_features_on_random_histories():
+    rng = random.Random(9)
+    td = datetime(2026, 5, 1, 12, tzinfo=timezone.utc)
+    for _ in range(500):
+        t0 = int(td.timestamp())
+        hist = [(t0 + rng.randint(-4 * 86400, 86400), rng.random()) for _ in range(rng.randint(0, 6))]
+        features, why = pm.decision_features(hist, td, td + timedelta(days=30))
+        assert pm.history_exclusion([t for t, _ in hist], td) == why
+
+
+def test_fill_stops_at_the_target_walks_in_order_and_resumes_without_refetching():
+    frozen = _frozen_world()
+    calls = []
+
+    def fetch(m):
+        calls.append(m.market_id)
+        return _fake_history(m)
+
+    targets = {"train": 40, "test": 55}
+    plan = pm.fill_pools(frozen, fetch, targets=targets)
+    pools, _ = pm.pool_order(frozen)
+    for p in pm.POOLS:
+        x = plan["pools"][p]
+        assert x["reached"] and x["usable"] == targets[p] == len(x["usable_ids"])
+        walked = [m.market_id for m in pools[p]][:x["considered"]]
+        assert x["usable_ids"] == [i for i in walked if pm.history_exclusion(
+            [t for t, _ in _fake_history(next(m for m in frozen if m.market_id == i))],
+            pm.parse_time(next(m for m in frozen if m.market_id == i).decision_time)) is None]
+        assert pm.history_exclusion([t for t, _ in _fake_history(pools[p][x["considered"] - 1])],
+                                    pm.parse_time(pools[p][x["considered"] - 1].decision_time)) is None  # stops on a usable one
+        assert set(x["excluded_by_reason"]) <= {"no_price_before_decision", "stale_price", "no_price_before_window"}
+        assert x["considered"] == x["usable"] + sum(x["excluded_by_reason"].values())
+    assert calls == [m.market_id for p in pm.POOLS for m in pools[p][:plan["pools"][p]["considered"]]]
+    # resume after an interruption: what was fetched is reused, the rest continues in order
+    half = calls[: len(calls) // 2]
+    have = {i: _fake_history(next(m for m in frozen if m.market_id == i)) for i in half}
+    calls.clear()
+    again = pm.fill_pools(frozen, fetch, have, targets=targets)
+    assert calls and not set(calls) & set(half)
+    for p in pm.POOLS:
+        again["pools"][p].pop("fetched_now"), plan["pools"][p].pop("fetched_now")
+    assert again == plan
+
+
+def test_fill_reports_a_pool_that_runs_out():
+    frozen = _frozen_world(60)
+    plan = pm.fill_pools(frozen, _fake_history, targets={"train": 1000, "test": 1000})
+    for p in pm.POOLS:
+        x = plan["pools"][p]
+        assert not x["reached"] and x["considered"] == x["pool_size"] > 0
+
+
+def test_fill_is_blind_to_prices_and_outcomes():
+    """Every price value changed, and every outcome flipped before selection: the
+    same markets are fetched, in the same order, and the same ones are usable."""
+    frozen = _frozen_world()
+    targets = {"train": 30, "test": 45}
+    base = pm.fill_pools(frozen, _fake_history, targets=targets)
+    rng = random.Random(5)
+    repriced = pm.fill_pools(frozen, lambda m: [(t, rng.random()) for t, _ in _fake_history(m)], targets=targets)
+    assert repriced == base
+    import inspect
+    assert not any("outcome" in name for name in inspect.signature(pm.fill_pools).parameters)
+    raw = _synthetic_raw(seed=5)
+    flipped = json.loads(json.dumps(raw))
+    for m in flipped:
+        if m["outcomePrices"] in ('["1", "0"]', '["0", "1"]'):
+            m["outcomePrices"] = '["0", "1"]' if m["outcomePrices"] == '["1", "0"]' else '["1", "0"]'
+    a, b = pm.select_markets(raw), pm.select_markets(flipped)
+    assert a.outcomes != b.outcomes
+    kw = dict(targets={"train": 5, "test": 5}, cutoff=pm.parse_time("2025-04-01T00:00:00Z"), test_end=None)
+    assert pm.fill_pools(a.markets, _fake_history, **kw) == pm.fill_pools(b.markets, _fake_history, **kw)
+
+
+def test_list_query_parameters_repeat_their_key_and_scalar_urls_are_unchanged(tmp_path):
+    server = FakeServer()
+    c = client(tmp_path, server)
+    c.get(pm.GAMMA_MARKETS, {"closed": "true", "limit": 100})
+    c.get(pm.GAMMA_MARKETS, {"closed": "any", "id": ["12", "1", "17"], "limit": 100})
+    assert server.calls[0][0] == "https://gamma-api.polymarket.com/markets/keyset?closed=true&limit=100"
+    assert server.calls[1][0] == ("https://gamma-api.polymarket.com/markets/keyset"
+                                  "?closed=any&id=12&id=1&id=17&limit=100")
+
+
+def test_history_exclusion_ignores_a_point_exactly_at_the_decision_time():
+    td = datetime(2026, 5, 1, 12, tzinfo=timezone.utc)
+    t0 = int(td.timestamp())
+    assert pm.history_exclusion([t0], td) == "no_price_before_decision"
+    assert pm.history_exclusion([t0, t0 - 30 * 3600], td) == "stale_price"
+    assert pm.history_exclusion([t0 - 3600, t0 - 24 * 3600], td) is None
+    assert pm.history_exclusion([t0 - 3600, t0 - 24 * 3600 + 1], td) == "no_price_before_window"
+
+
+# ---- archived check (one Gamma identifier lookup; never sent by a test) ----------------- #
+def _archived_cli():
+    spec = importlib.util.spec_from_file_location("archived_check_test", REPO / "repro" / "polymarket" / "archived_check.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class LookupServer:
+    def __init__(self, markets):
+        self.markets, self.calls = markets, []
+
+    def __call__(self, url, headers):
+        self.calls.append(url)
+        return 200, json.dumps({"markets": self.markets, "next_cursor": None}).encode(), {}
+
+
+def _market(i, closed=True, archived=False):
+    return {"id": str(i), "closed": closed, "archived": archived, "active": True,
+            "outcomePrices": '["1", "0"]', "lastTradePrice": 0.99, "question": "SECRET"}
+
+
+def test_archived_check_is_one_gated_identifier_lookup_and_prints_no_price(tmp_path, monkeypatch, capsys):
+    ac = _archived_cli()
+    assert len(ac.PROBE_IDS) == 98 and len(set(ac.PROBE_IDS) | set(ac.CONTROL_IDS)) == 100
+    d = tmp_path / "d"
+    server = LookupServer([_market(12), _market(17), _market(3, archived=True)])
+    assert ac.main(["--data-dir", str(d)], transport=server) == 2  # no flag, no permission
+    p = _perm_file(tmp_path, endpoints=(pm.GAMMA_MARKETS,))
+    args = ["--allow-network", "--permission", str(p), "--data-dir", str(d)]
+    assert ac.main(args, transport=server, now=NOW) == 2  # no terms check yet
+    assert server.calls == []
+    terms = _fake_terms(tmp_path, monkeypatch)
+    _cli().main(["terms", "--terms-file", str(terms), "--data-dir", str(d)], now=NOW)
+    capsys.readouterr()
+    assert ac.main(args, transport=server, now=NOW) == 0
+    assert len(server.calls) == 1
+    url = server.calls[0]
+    assert url.startswith("https://gamma-api.polymarket.com/markets/keyset?closed=any&id=1&id=2&")
+    assert url.endswith("&id=151&id=12&id=17&limit=100")
+    out = capsys.readouterr().out
+    assert "LISTING EXCLUDES ARCHIVED" in out
+    assert "price" not in out.lower() and "SECRET" not in out
+    assert json.loads((d / "request_log.jsonl").read_text().splitlines()[-1])["url"] == url
+
+
+@pytest.mark.parametrize("markets,expect", [
+    ([_market(12), _market(17)], "NOT SERVED EVEN BY ID"),
+    ([_market(12), _market(17), _market(5)], "LISTING MISSED CLOSED"),
+    ([_market(12), _market(17), _market(5, closed=False)], "PROBES RETURNED AS OPEN"),
+    ([_market(5, archived=True)], "INCONCLUSIVE"),
+])
+def test_archived_check_verdicts(markets, expect):
+    assert _archived_cli().verdict(markets).startswith(expect)

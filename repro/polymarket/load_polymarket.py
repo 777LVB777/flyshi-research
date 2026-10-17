@@ -18,8 +18,9 @@ redistributed):
              --from-metadata --count-only
                               the same blinded count report from a saved snapshot,
                               streamed (hash checked first); freeze nothing [no network]
-  history  fetch each frozen market's price history ending at its decision time
-           (CLOB /prices-history)                                    [network]
+  history  fill the training and test pools: walk each pool in its pre-stated hash
+           order, fetching price histories that end at the decision time, until
+           need + reserve markets are usable (CLOB /prices-history)  [network]
   build    features strictly before the decision time, train/test split, and the
            Market file the synthetic runner consumes                 [no network]
 
@@ -63,8 +64,11 @@ def parser() -> argparse.ArgumentParser:
                    help="Trial only (needs --count-only and --max-pages): look at markets whose scheduled end"
                         " is on or after this date (Gamma end_date_min). Never used for the real count; it"
                         " writes no progress file, so the full run is unaffected.")
-    p.add_argument("--cutoff", help="build: training markets resolved before this UTC date (YYYY-MM-DD).")
-    p.add_argument("--gap-days", type=float, default=pm.DEFAULT_SPLIT_GAP.days)
+    p.add_argument("--cutoff", default=pm.SPLIT_CUTOFF.strftime("%Y-%m-%d"),
+                   help="history/build: training markets resolved before this UTC date (FINAL: %(default)s).")
+    p.add_argument("--gap-days", type=float, default=pm.SPLIT_GAP.days)
+    p.add_argument("--test-end", default=pm.TEST_DECISION_END.strftime("%Y-%m-%d"),
+                   help="history/build: test decision times before this UTC date (FINAL: %(default)s).")
     return p
 
 
@@ -84,6 +88,18 @@ def network_client(args, endpoint: str, now: datetime, transport=None) -> pm.Pol
     c.policy.check(endpoint)
     pm.require_fresh_terms_check(args.data_dir / "terms_check.json", now)
     return c
+
+
+def split_args(args):
+    cutoff = pm.parse_time(args.cutoff + "T00:00:00Z")
+    return cutoff, timedelta(days=args.gap_days), pm.parse_time(args.test_end + "T00:00:00Z")
+
+
+def read_histories(path: Path) -> dict:
+    """market id -> [(t, p), ...] from the append-only history file."""
+    if not path.exists():
+        return {}
+    return {e["market_id"]: [tuple(x) for x in e["history"]] for e in pm._read_progress(path)}
 
 
 def main(argv=None, transport=None, now=None) -> int:
@@ -161,14 +177,23 @@ def main(argv=None, transport=None, now=None) -> int:
         if args.step == "history":
             c = network_client(args, pm.CLOB_PRICES_HISTORY, now, transport)
             frozen, digest = pm.load_frozen(frozen_path)
-            hist_path = d / f"histories_{digest[:12]}.json"
-            have = json.loads(hist_path.read_text()) if hist_path.exists() else {}
-            for m in frozen:
-                if m.market_id not in have:  # restartable
-                    have[m.market_id] = pm.fetch_price_history(c, m)
-                    hist_path.write_text(json.dumps(have))
-            print(f"histories for {len(have)}/{len(frozen)} markets in {hist_path} ({c.requests} requests)")
-            return 0
+            hist_path = d / f"histories_{digest[:12]}.jsonl"  # one line per market, appended: restartable
+
+            def fetch(m):
+                h = pm.fetch_price_history(c, m)
+                pm._append_progress(hist_path, {"market_id": m.market_id, "history": h})
+                return h
+
+            cutoff, gap, test_end = split_args(args)
+            plan = pm.fill_pools(frozen, fetch, read_histories(hist_path), cutoff=cutoff, gap=gap,
+                                 test_end=test_end)
+            plan["frozen_sha256"] = digest
+            plan_path = d / f"fill_plan_{digest[:12]}.json"
+            plan_path.write_text(json.dumps(plan, indent=1))
+            print(json.dumps({"plan": str(plan_path), "requests": c.requests, "categories": plan["categories"],
+                              "pools": {p: {k: v for k, v in x.items() if k != "usable_ids"}
+                                        for p, x in plan["pools"].items()}}, indent=1))
+            return 0 if all(x["reached"] for x in plan["pools"].values()) else 5
     except pm.NetworkRefused as why:
         print(f"REFUSED: {why}", file=sys.stderr)
         return 2
@@ -176,15 +201,12 @@ def main(argv=None, transport=None, now=None) -> int:
         print(f"STOPPED: {failed}", file=sys.stderr)
         return 4
     # build: no network
-    if not args.cutoff:
-        raise SystemExit("build needs --cutoff YYYY-MM-DD")
     frozen, digest = pm.load_frozen(frozen_path)
     outcomes = json.loads(frozen_path.with_name(frozen_path.name + ".outcomes.json").read_text())
-    hist = json.loads((d / f"histories_{digest[:12]}.json").read_text())
-    built, counts = pm.build_markets(frozen, {k: [tuple(x) for x in v] for k, v in hist.items()}, outcomes)
-    cutoff = pm.parse_time(args.cutoff + "T00:00:00Z")
-    gap = timedelta(days=args.gap_days)
-    train, test, split = pm.split_train_test(built, cutoff, gap)
+    hist = read_histories(d / f"histories_{digest[:12]}.jsonl")
+    built, counts = pm.build_markets(frozen, hist, outcomes)
+    cutoff, gap, test_end = split_args(args)
+    train, test, split = pm.split_train_test(built, cutoff, gap, test_end)
     out = d / f"markets_{digest[:12]}_cutoff_{args.cutoff}.json"
     pm.write_market_file(out, train, test, digest, cutoff, gap, {**counts, **split})
     print(json.dumps({"output": str(out), **counts, **split}, indent=1))

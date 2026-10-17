@@ -89,6 +89,18 @@ SIGNAL_MIDPOINT = 0.5
 LIQUIDITY_MIDPOINT = 0.5
 MARKET_FILE_FORMAT = "flyshi.simulator.Market/v1"
 
+# ---- split and sample (FINAL 2026-10-16, phase2-design.md 10.11) ------------------- #
+#: training: resolved (closed) before SPLIT_CUTOFF; test: SPLIT_CUTOFF + SPLIT_GAP <= t_d < TEST_DECISION_END
+SPLIT_CUTOFF = datetime(2026, 3, 1, tzinfo=timezone.utc)
+SPLIT_GAP = DEFAULT_SPLIT_GAP
+TEST_DECISION_END = datetime(2026, 9, 1, tzinfo=timezone.utc)
+#: each pool is fetched in order of sha256(SAMPLE_ORDER_SEED|market id)
+SAMPLE_ORDER_SEED = "flyshi-phase2-sample-20261016"
+#: Design A: 40 disjoint chains x (70 training + 180 test)
+POOL_NEED = {"train": 2_800, "test": 7_200}
+#: usable markets fetched beyond the need, in percent (PROPOSED 2026-10-16, awaiting confirmation)
+POOL_RESERVE_PERCENT = 15
+
 
 class NetworkRefused(RuntimeError):
     """A request was refused before any transport ran."""
@@ -308,8 +320,9 @@ class PolymarketClient:
         if self._transport is None:
             self._transport = urllib_transport()
         base = endpoint.split(" ", 1)[1]
-        url = base + ("?" + urllib.parse.urlencode(sorted((k, str(v)) for k, v in params.items()))
-                      if params else "")
+        pairs = [(k, str(x)) for k, v in sorted(params.items())
+                 for x in (v if isinstance(v, (list, tuple)) else (v,))]  # a list repeats its key
+        url = base + ("?" + urllib.parse.urlencode(pairs) if pairs else "")
         if not url.startswith("https://"):
             raise NetworkRefused("https only")
         if any(h.lower() in _FORBIDDEN_HEADERS for h in REQUEST_HEADERS):
@@ -1088,6 +1101,106 @@ def decision_features(history: Sequence[Tuple[int, float]], td: datetime,
 
 
 # --------------------------------------------------------------------------- #
+# sample order and fill (FINAL 2026-10-16): blind to outcomes and prices
+# --------------------------------------------------------------------------- #
+POOLS = ("train", "test")
+
+
+def pool_of(m: SelectedMarket, cutoff: datetime = SPLIT_CUTOFF, gap: timedelta = SPLIT_GAP,
+            test_end: Optional[datetime] = TEST_DECISION_END) -> str:
+    """'train', 'test', 'straddling' or 'after_test_window', from the market's dates
+    only; the same rule as ``split_train_test``."""
+    if parse_time(m.closed_time) < cutoff:
+        return "train"
+    td = parse_time(m.decision_time)
+    if td < cutoff + gap:
+        return "straddling"
+    return "after_test_window" if test_end is not None and td >= test_end else "test"
+
+
+def sample_rank(market_id: str, seed: str = SAMPLE_ORDER_SEED) -> bytes:
+    return hashlib.sha256(f"{seed}|{market_id}".encode()).digest()
+
+
+def pool_order(frozen: Iterable[SelectedMarket], cutoff: datetime = SPLIT_CUTOFF, gap: timedelta = SPLIT_GAP,
+               test_end: Optional[datetime] = TEST_DECISION_END,
+               seed: str = SAMPLE_ORDER_SEED) -> Tuple[Dict[str, List[SelectedMarket]], Dict[str, int]]:
+    """Each pool in fetch order (sha256(seed|market id), the full digest), plus the
+    count of markets in every category. Uses market IDs and dates only."""
+    pools: Dict[str, List[SelectedMarket]] = {p: [] for p in POOLS}
+    counts = {k: 0 for k in (*POOLS, "straddling", "after_test_window")}
+    for m in frozen:
+        p = pool_of(m, cutoff, gap, test_end)
+        counts[p] += 1
+        if p in pools:
+            pools[p].append(m)
+    for p in POOLS:
+        pools[p].sort(key=lambda m: (sample_rank(m.market_id, seed), m.market_id))
+    return pools, counts
+
+
+def pool_targets(need: Mapping[str, int] = POOL_NEED, reserve_percent: int = POOL_RESERVE_PERCENT) -> Dict[str, int]:
+    """Need plus the reserve, rounded up (integer arithmetic, so 7,200 + 15% is 8,280)."""
+    return {p: n + -(-n * reserve_percent // 100) for p, n in need.items()}
+
+
+def history_exclusion(times: Iterable[int], td: datetime) -> Optional[str]:
+    """Why a price history is unusable at ``td`` (the same reasons, in the same order,
+    as ``decision_features``), or None. Takes the TIMESTAMPS only, so whether a market
+    counts toward its pool can never depend on a price value."""
+    limit = td.timestamp()
+    past = [t for t in times if t < limit]
+    if not past:
+        return "no_price_before_decision"
+    if limit - max(past) > MAX_PRICE_STALENESS.total_seconds():
+        return "stale_price"
+    if not any(t <= limit - RECENT_CHANGE_WINDOW.total_seconds() for t in past):
+        return "no_price_before_window"
+    return None
+
+
+def fill_pools(frozen: Sequence[SelectedMarket], fetch: Callable[[SelectedMarket], Sequence[Tuple[int, float]]],
+               have: Mapping[str, Sequence[Sequence[float]]] = (), targets: Optional[Mapping[str, int]] = None,
+               cutoff: datetime = SPLIT_CUTOFF, gap: timedelta = SPLIT_GAP,
+               test_end: Optional[datetime] = TEST_DECISION_END, seed: str = SAMPLE_ORDER_SEED) -> dict:
+    """Walk each pool in ``pool_order`` and stop once ``targets[pool]`` markets have a
+    usable history. Histories already in ``have`` are reused (restartable); others are
+    fetched with ``fetch`` in order. Sees no outcome (the frozen list has none) and
+    judges each history by its timestamps alone (``history_exclusion``).
+
+    Returns the plan: per pool the target, the pool size, how many were considered
+    and newly fetched, the exclusions by reason, whether the target was reached and the
+    usable market IDs in order."""
+    targets = dict(pool_targets() if targets is None else targets)
+    have = dict(have or {})
+    pools, categories = pool_order(frozen, cutoff, gap, test_end, seed)
+    plan: dict = {"seed": seed, "cutoff": cutoff.isoformat(), "gap_days": gap.total_seconds() / 86400,
+                  "test_end": test_end.isoformat() if test_end else None, "categories": categories, "pools": {}}
+    for p in POOLS:
+        usable: List[str] = []
+        excluded: Dict[str, int] = {}
+        considered = fetched = 0
+        for m in pools[p]:
+            if len(usable) >= targets[p]:
+                break
+            considered += 1
+            if m.market_id in have:
+                hist = have[m.market_id]
+            else:
+                hist = have[m.market_id] = fetch(m)
+                fetched += 1
+            why = history_exclusion((int(pt[0]) for pt in hist), parse_time(m.decision_time))
+            if why is None:
+                usable.append(m.market_id)
+            else:
+                excluded[why] = excluded.get(why, 0) + 1
+        plan["pools"][p] = {"target": targets[p], "pool_size": len(pools[p]), "considered": considered,
+                            "fetched_now": fetched, "usable": len(usable), "excluded_by_reason": excluded,
+                            "reached": len(usable) >= targets[p], "usable_ids": usable}
+    return plan
+
+
+# --------------------------------------------------------------------------- #
 # split and output
 # --------------------------------------------------------------------------- #
 @dataclass
@@ -1120,16 +1233,22 @@ def build_markets(frozen: Sequence[SelectedMarket], histories: Mapping[str, Sequ
     return built, counts
 
 
-def split_train_test(built: Sequence[BuiltMarket], cutoff: datetime,
-                     gap: timedelta = DEFAULT_SPLIT_GAP) -> Tuple[List[BuiltMarket], List[BuiltMarket], Dict[str, int]]:
+def split_train_test(built: Sequence[BuiltMarket], cutoff: datetime, gap: timedelta = DEFAULT_SPLIT_GAP,
+                     test_end: Optional[datetime] = None) -> Tuple[List[BuiltMarket], List[BuiltMarket], Dict[str, int]]:
     """Training: resolved before ``cutoff``, in resolution order. Test: decided at or
-    after ``cutoff + gap``, in decision-time order. Everything else is counted."""
+    after ``cutoff + gap`` (and before ``test_end``, if given), in decision-time order.
+    Everything else is counted."""
     train = sorted((b for b in built if parse_time(b.market.closed_time) < cutoff),
                    key=lambda b: (parse_time(b.market.closed_time), b.market.market_id))
-    test = sorted((b for b in built if parse_time(b.market.decision_time) >= cutoff + gap),
+    late = [b for b in built if test_end is not None and parse_time(b.market.decision_time) >= test_end]
+    test = sorted((b for b in built if cutoff + gap <= parse_time(b.market.decision_time)
+                   and (test_end is None or parse_time(b.market.decision_time) < test_end)),
                   key=lambda b: (parse_time(b.market.decision_time), b.market.market_id))
-    straddling = len(built) - len(train) - len(test)
-    return train, test, {"train": len(train), "test": len(test), "straddling_excluded": straddling}
+    straddling = len(built) - len(train) - len(test) - len(late)
+    counts = {"train": len(train), "test": len(test), "straddling_excluded": straddling}
+    if test_end is not None:
+        counts["after_test_window_excluded"] = len(late)
+    return train, test, counts
 
 
 def _record(b: BuiltMarket, sequence: int) -> dict:
