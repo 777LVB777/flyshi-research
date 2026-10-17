@@ -1,0 +1,28 @@
+{
+ "recorded_on": "2026-10-16",
+ "recorded_by": "Luca Volpi Benowitz (project owner), written at the owner's instruction",
+ "scope_note": "CLOB GET /prices-history ONLY. Gamma /markets/keyset has its own file (gamma_markets_keyset_20261012.json). No other CLOB endpoint is permitted, including POST /batch-prices-history (phase2-design.md, Section 1, condition 1).",
+ "endpoints": [
+  {
+   "endpoint": "GET https://clob.polymarket.com/prices-history",
+   "basis": "Human Polymarket support reply ('Roni', polymarket.com support chat, 2026-10-15, answering the owner's 2026-10-14 question; ticket closed 2026-10-16; transcript verbatim in open-decisions item 6, revision 2026-10-16): the public prices-history endpoint is accessible via unauthenticated, read-only requests within rate limits, with no fees or licensing requirements for non-commercial purposes including academic research, 'as long as you comply with rate limits and do not scrape the site'; private storage for research, use with a learning model, and publishing aggregate results crediting Polymarket are consistent with the intended use; sharing with peer reviewers is acceptable provided the raw data is not redistributed publicly. The reply states it is NOT a formal written confirmation and is based on the intended public, read-only use of the API.",
+   "published_limit": {
+    "requests": 1000,
+    "per_seconds": 10,
+    "source": "https://docs.polymarket.com/api-reference/rate-limits.md, read 2026-10-17T02:20:59Z (2026-10-16 ET), SHA-256 1a238b502342564ff0afb087a725aad2bf16e5fa5978d19bcf414ea81d2a84a5 (identical to the 2026-10-12 reading). CLOB API, Market Data table: /prices-history 1,000 req / 10s (100 req/s). The page says limits are IP-based, enforced by Cloudflare, and excess requests are throttled (delayed/queued) on sliding windows."
+   },
+   "our_rate_requests_per_second": 1.0,
+   "our_rate_fraction_of_published": 0.01
+  }
+ ],
+ "conditions": [
+  "read-only GET, unauthenticated: no account, key, wallet, signature or cookie",
+  "no interaction with the platform or contracts",
+  "within the published limit: our pre-set rate 1 req/s = 1% of the /prices-history limit (cap in code: 25%)",
+  "every request logged (data/polymarket/request_log.jsonl)",
+  "raw data stored privately under data/polymarket/ (git-ignored); no public redistribution of raw data",
+  "no scraping of the website; only this documented API endpoint",
+  "each request's window ends at the market's decision time (look-ahead guard, phase2-design.md 10.5)",
+  "terms re-checked (SHA-256) within 24 h before any request (loader 'terms' step)"
+ ]
+}

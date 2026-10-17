@@ -16,6 +16,11 @@ Section 9.
   revision 2026-10-14). Condition 7 (publication and reviewer sharing on hold)
   is cleared. Condition 6 stands. CLOB `/prices-history` remains unpermitted
   pending an answer to a question sent 2026-10-14 (Section 1).
+- **Update 2026-10-16.** Roni answered the `/prices-history` question on
+  2026-10-15, and the ticket was closed on 2026-10-16 (open-decisions item 6,
+  revision 2026-10-16). CLOB `GET /prices-history` is now **PERMITTED** under
+  all the Section 1 conditions. The reply is not a formal written
+  confirmation.
 - **Update 2026-10-12 (later).** Decisions on signal, comparator, liquidity and
   size, a draft Polymarket loader, and three proposals awaiting confirmation are
   in Section 10. Section 10 governs where it differs from earlier sections.
@@ -152,6 +157,21 @@ Roni, the same human support agent, answered on 2026-10-13 (transcript in
 A one-line question about `GET clob.polymarket.com/prices-history` was sent on
 2026-10-14. It is **PENDING**.
 
+**Update 2026-10-16.** Roni answered on 2026-10-15, and the ticket was closed on
+2026-10-16 (transcript in [`open-decisions.md`](open-decisions.md), item 6,
+revision 2026-10-16). For non-commercial academic research, the reply confirms:
+
+- unauthenticated, read-only access to
+  `GET clob.polymarket.com/prices-history` within rate limits, with no fees or
+  licensing, "as long as you comply with rate limits and do not scrape the
+  site";
+- private storage;
+- use with a learning model;
+- publication of aggregate results crediting Polymarket.
+
+Peer-reviewer sharing is acceptable without public redistribution of raw data.
+The reply itself says it is **not a formal written confirmation**.
+
 **Conditions on any Polymarket use (project owner, 2026-10-12).** Each is
 binding on the data-retrieval code and its run log:
 
@@ -166,6 +186,26 @@ binding on the data-retrieval code and its run log:
    `/prices-history` is unpermitted and no permission file for it is written. If
    Polymarket says no, `/prices-history` is dropped and the owner revisits
    option (ii).
+
+   **PERMITTED 2026-10-16.** Roni's 2026-10-15 reply covers `/prices-history`.
+   It is permitted under all the conditions below:
+   - read-only and unauthenticated;
+   - a pre-set rate under the published limit;
+   - a request log;
+   - no platform or contract interaction;
+   - no public redistribution of raw data;
+   - the terms re-checked before download;
+   - no website scraping.
+
+   Permission file:
+   `repro/polymarket/permissions/clob_prices_history_20261016.json`. It covers
+   that endpoint only. The reply is not a formal written confirmation.
+   - **Published limit:** 1,000 requests per 10 s (100 per second), CLOB
+     "Market Data" table of `docs.polymarket.com/api-reference/rate-limits.md`.
+     Read 2026-10-16, SHA-256 `1a238b50…84a5`, identical to the 2026-10-12
+     reading.
+   - **Our rate:** 1 request per second, which is 1% of the limit. The code
+     caps it at 25%.
 
    Not allowed: any other Polymarket API (Data API, other CLOB endpoints,
    including the POST `/batch-prices-history`), website scraping, or chain
@@ -214,7 +254,8 @@ binding on the data-retrieval code and its run log:
    - **public** release of the ID list: not asked about, so it stays private
      (condition 6);
    - CLOB `/prices-history`: remains **unpermitted** pending Roni's answer to
-     the 2026-10-14 question (condition 1).
+     the 2026-10-14 question (condition 1). (Update 2026-10-16: answered
+     2026-10-15; now **PERMITTED**, see condition 1.)
 
    Transcript: [`open-decisions.md`](open-decisions.md), item 6, revision
    2026-10-14.
@@ -243,6 +284,7 @@ The owner was asked to choose one of two options before any download:
   `/prices-history`, with the same rate-limit rule, and ask support to confirm
   that the reply covers it. *Recommended*, because the design depends on it.
   **Chosen by the project owner, 2026-10-12**, pending confirmation.
+  (Confirmed by Roni's reply of 2026-10-15; permitted 2026-10-16.)
 - **(ii)** keep Gamma only, which leaves Polymarket unable to support this
   design. In that case Manifold, the backup, becomes primary.
 
@@ -612,7 +654,8 @@ At 213 runs/h and $0.266/h, server time only:
 1. **Venue:** *planned 2026-10-12: Polymarket primary under the Section 1
    conditions, Manifold backup.* Still open:
    - Polymarket's confirmation that the reply covers CLOB `/prices-history`
-     (option (i), chosen 2026-10-12; asked 2026-10-14, pending; Section 1);
+     (option (i), chosen 2026-10-12; asked 2026-10-14; **answered 2026-10-15,
+     permitted 2026-10-16**; Section 1);
    - a liquidity measure built only from allowed data (open decision 4).
 
    Publication and reviewer sharing were cleared on 2026-10-14 (condition 7).
@@ -863,7 +906,8 @@ simpler, but it is a step function and its edges are arbitrary.
 - **Off by default.** A request needs **both** `--allow-network` **and**
   `--permission <file>` naming that exact endpoint. Otherwise it is refused
   before any transport runs. No permission file exists yet: creating one is the
-  owner's act.
+  owner's act. (Update: Gamma `/markets/keyset`, 2026-10-12 (10.9); CLOB
+  `/prices-history`, 2026-10-16, `repro/polymarket/permissions/clob_prices_history_20261016.json`.)
 - **Only two endpoints exist in code:**
   - `GET https://gamma-api.polymarket.com/markets/keyset`;
   - `GET https://clob.polymarket.com/prices-history`.
@@ -902,6 +946,8 @@ documented schemas. No test can build the real transport.
   - It covers **Gamma `/markets/keyset` only.** CLOB `/prices-history` stays
     unpermitted until Polymarket answers. (Update 2026-10-14: the question was
     sent on 2026-10-14, not in the 2026-10-12 follow-up; it is pending.)
+    (Update 2026-10-16: answered 2026-10-15; permitted in its own file,
+    `repro/polymarket/permissions/clob_prices_history_20261016.json`.)
   - Its basis is the 2026-10-11 human support reply ("Roni"), including that the
     reply is not definitive.
 - **Published rate limit.** Recorded from
@@ -1179,7 +1225,8 @@ Properties:
 - **Handles attrition.** Unknown attrition is absorbed without re-selecting.
 - **Downloads only what is needed.** About (requirement ÷ build rate) requests
   instead of both whole pools (about 34,800 markets at the proposed cutoff). That matters while
-  CLOB `/prices-history` is unpermitted (Section 1).
+  CLOB `/prices-history` is unpermitted (Section 1). (Permitted 2026-10-16;
+  the request rate still matters.)
 - **Code (2026-10-16).** The code is `pool_order`, `pool_targets`,
   `history_exclusion` and `fill_pools`, with the CLI `history` step using them.
   - Histories are appended one line per market, so a restart resumes and
@@ -1328,4 +1375,6 @@ reported next to the main result. They never enter the gate.
 
 - **Next step: `history`.** It needs CLOB `/prices-history` permission, which
   is still pending (Section 1). No price history has been requested.
+  (Update 2026-10-16: the permission is granted, condition 1. Still no price
+  history has been requested.)
 

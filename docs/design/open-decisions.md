@@ -731,8 +731,17 @@ that saved configuration.
 > - **Public release** of market IDs or derived per-market features was not
 >   asked about. The reply covers reviewers and editors only.
 >
-> *Transcript, verbatim* as supplied by the project owner (the spellings
-> "unauthenticat" and "re-distributing" are in the original):
+> *Transcript, verbatim* as supplied by the project owner (the spelling
+> "re-distributing" is in the original).
+>
+> **Corrected 2026-10-16 (project owner).** This transcript first read
+> "unauthenticat" in Luca's 2026-10-14 message, and that was noted as the
+> original spelling. The owner confirmed that the original reads
+> "unauthenticated". "unauthenticat" was a copy error, not the original, so it
+> is corrected below.
+>
+> In Roni's 2026-10-13 reply, "always" is the original. The "ways" in a later
+> copy was also a copy error.
 >
 > ```text
 > Luca (2026-10-12): Thank you, Roni, that's very helpful. One follow-up: since the documentation doesn't address it, could you confirm whether Polymarket has any objection to (1) publishing aggregate results in a paper that credits Polymarket as the data source, and (2) sharing the list of market IDs used with journal peer reviewers? I wouldn't redistribute the raw data publicly.
@@ -752,7 +761,7 @@ that saved configuration.
 >
 > Roni (2026-10-14): Hi there, just checking in one more time to see if you need any additional assistance. If there's anything else we can help with, please don't hesitate to let us know before we close the ticket.
 >
-> Luca (2026-10-14): Thank you, Roni! One last quick check before you close the ticket: does the same apply to the public prices-history endpoint (clob.polymarket.com/prices-history), accessed read-only and unauthenticat within rate limits, for the same research? That's everything; I'll gladly share the paper once it's out.
+> Luca (2026-10-14): Thank you, Roni! One last quick check before you close the ticket: does the same apply to the public prices-history endpoint (clob.polymarket.com/prices-history), accessed read-only and unauthenticated within rate limits, for the same research? That's everything; I'll gladly share the paper once it's out.
 > ```
 >
 > *Effect on the design* ([`phase2-design.md`](phase2-design.md), Section 1):
@@ -777,6 +786,67 @@ that saved configuration.
 >   2026-10-14 question.
 > - Details: [`phase2-design.md`](phase2-design.md), Section 1, conditions 6
 >   and 7, and Section 10.12.
+
+> **REVISION 2026-10-16 (project owner): `/prices-history` answered (2026-10-15);
+> ticket closed 2026-10-16.** Everything above is kept unchanged as the record.
+>
+> *The exchange.* This is the last part of the same support ticket. Luca's
+> 2026-10-14 question, already shown in the 2026-10-14 transcript above, is
+> repeated here with the reply it received. Roni is the same human support
+> agent, not Polymarket's legal team. **The ticket was closed on 2026-10-16.**
+>
+> *What it settles.* For non-commercial academic research, the reply confirms
+> the following for `GET https://clob.polymarket.com/prices-history`:
+>
+> - unauthenticated, read-only access within rate limits ("no fees or licensing
+>   requirements … for non-commercial purposes, including academic research, as
+>   long as you comply with rate limits and do not scrape the site");
+> - storing the data privately for research;
+> - using it with a learning model;
+> - publishing aggregate results that credit Polymarket as the data source.
+>
+> **Peer-reviewer sharing** is acceptable, provided the raw data is not
+> redistributed publicly.
+>
+> *Its own caveat.* The reply says the documentation "does not provide formal
+> written confirmation or address every aspect of academic publishing". It is
+> based on "the intended public, read-only use of the API". So, like the
+> 2026-10-11 reply, it **is not a formal written confirmation**.
+>
+> *Transcript, verbatim* as supplied by the project owner on 2026-10-16.
+>
+> **Spelling, resolved 2026-10-16.** The owner confirmed that the originals read
+> "unauthenticated" (Luca, 2026-10-14) and "always" (Roni, 2026-10-13). The
+> variants "unauthenticat" and "ways" were copy errors, not originals. Both
+> transcripts now agree.
+>
+> ```text
+> Luca (2026-10-14): Thank you, Roni! One last quick check before you close the ticket: does the same apply to the public prices-history endpoint (clob.polymarket.com/prices-history), accessed read-only and unauthenticated within rate limits, for the same research? That's everything; I'll gladly share the paper once it's out.
+>
+> Roni (2026-10-15): Thanks for the response.
+>
+> The public prices-history endpoint (https://clob.polymarket.com/prices-history) is intended for retrieving historical price data for traded tokens and is accessible via unauthenticated, read-only requests within rate limits. There are no fees or licensing requirements for accessing or using this data for non-commercial purposes, including academic research, as long as you comply with rate limits and do not scrape the site.
+>
+> In addition, storing the data privately for research, using it with a learning model, and publishing aggregate results that credit Polymarket as the data source are all consistent with the intended use of the public API. The documentation does not specify restrictions on sharing market IDs or data with peer reviewers, provided you do not redistribute the raw data publicly.
+>
+> And there are no explicit objections or prohibitions in the documentation regarding your described use case. However, the documentation does not provide formal written confirmation or address every aspect of academic publishing, so this answer is based on the intended public, read-only use of the API as described in the sources.
+>
+> For more details, you can review the documentation at docs.polymarket.com and the prices-history endpoint.
+> ```
+>
+> *Effect on the design* ([`phase2-design.md`](phase2-design.md), Section 1):
+>
+> - CLOB `GET /prices-history` is **PERMITTED** under every existing condition:
+>   - read-only and unauthenticated;
+>   - a pre-set rate under the published limit;
+>   - a request log;
+>   - no platform or contract interaction;
+>   - no public redistribution of raw data;
+>   - the terms re-checked before download;
+>   - **no scraping of the website**.
+> - It is recorded in a permission file covering that endpoint only, under
+>   `repro/polymarket/permissions/`.
+> - Condition 6 stands: the market-ID list stays private.
 
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 

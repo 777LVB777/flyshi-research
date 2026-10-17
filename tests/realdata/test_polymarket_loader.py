@@ -1184,3 +1184,21 @@ def test_archived_check_is_one_gated_identifier_lookup_and_prints_no_price(tmp_p
 ])
 def test_archived_check_verdicts(markets, expect):
     assert _archived_cli().verdict(markets).startswith(expect)
+
+
+def test_the_recorded_clob_permission_covers_prices_history_only_at_a_safe_rate():
+    path = REPO / "repro" / "polymarket" / "permissions" / "clob_prices_history_20261016.json"
+    perm = pm.Permission.load(path)
+    assert [e.endpoint for e in perm.endpoints] == [pm.CLOB_PRICES_HISTORY]
+    assert perm.endpoints[0].published_rate == 100.0  # /prices-history 1,000 req / 10 s
+    raw = json.loads(path.read_text())
+    basis = raw["endpoints"][0]["basis"]
+    assert "Roni" in basis and "2026-10-15" in basis and "NOT a formal written confirmation" in basis
+    assert "1a238b502342564ff0afb087a725aad2bf16e5fa5978d19bcf414ea81d2a84a5" in raw["endpoints"][0]["published_limit"]["source"]
+    ours = raw["endpoints"][0]["our_rate_requests_per_second"]
+    assert ours <= pm.RATE_FRACTION * perm.endpoints[0].published_rate
+    pm.NetworkPolicy(True, perm, ours).check(pm.CLOB_PRICES_HISTORY)
+    with pytest.raises(pm.NetworkRefused, match="does not cover"):
+        pm.NetworkPolicy(True, perm, ours).check(pm.GAMMA_MARKETS)
+    with pytest.raises(pm.NetworkRefused, match="exceeds"):
+        pm.NetworkPolicy(True, perm, 26.0).check(pm.CLOB_PRICES_HISTORY)
