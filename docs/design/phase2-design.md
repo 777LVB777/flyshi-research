@@ -21,6 +21,10 @@ Section 9.
   revision 2026-10-16). CLOB `GET /prices-history` is now **PERMITTED** under
   all the Section 1 conditions. The reply is not a formal written
   confirmation.
+- **Update 2026-10-16 (later).** The Phase 2 code, run on fake data only, and
+  the **preregistration** are in
+  [`phase2-preregistration.md`](phase2-preregistration.md), written before any
+  price data exists.
 - **Update 2026-10-12 (later).** Decisions on signal, comparator, liquidity and
   size, a draft Polymarket loader, and three proposals awaiting confirmation are
   in Section 10. Section 10 governs where it differs from earlier sections.
@@ -417,6 +421,12 @@ example many short-dated markets. If more presentations land in the high-drive
 region, ignition will be more frequent than in any validated condition. Report
 this, and get sign-off before running.
 
+**Correction 2026-10-16.** 22.8–67.5 kHz and 2.12% are the **pre-revision**
+synthetic design's figures. The sweep as decided, design (b′), spans
+**19.3–70.7 kHz, with 3.06% above 60 kHz** (synthetic spec, ignition revision of
+2026-10-09). The drive check (`real_market.drive_check`) compares against design
+(b′) and reproduces both sets of figures in a test.
+
 ## 4. The signal: options and what each lets the paper claim
 
 | option | what it is | pros | cons | the paper could claim | the paper could not claim |
@@ -727,7 +737,7 @@ the decision-time rule (10.5) and the volume threshold (10.6).
 >
 > Still open: the 7-day gap, the cutoff `T_s` (chosen after the metadata count)
 > and per-series caps. (Update 2026-10-16: the gap and `T_s` are FINAL in 10.11.
-> Per-series caps are still open.)
+> Per-series caps: decided 2026-10-16, not applied; see 10.6.)
 
 ### 10.1 Signal: none (decision 1)
 
@@ -778,6 +788,12 @@ shrinkage, plus a training-only guard.**
   comparison easier to pass, which was exactly the synthetic failure. Taking the
   better of raw and calibrated on training data keeps the comparator at least as
   strong as the raw price in expectation.
+
+**Update 2026-10-16 (project owner), before any price download.** Shrinking each
+block toward its own mean price can leave adjacent shrunk values out of order.
+Pool-adjacent-violators is therefore applied again to the shrunk values, weighted
+by n + 20, so the calibration map is monotone non-decreasing as stated in item 3
+of the list above. Details: [`phase2-preregistration.md`](phase2-preregistration.md), Section 4.
 
 **Alternative:** 20 equal-count price bins with the same shrinkage. It is
 simpler, but it is a step function and its edges are arbitrary.
@@ -864,7 +880,9 @@ simpler, but it is a step function and its edges are arbitrary.
 - **One market per event.** Within an event, keep the market with the lowest
   SHA-256 of `flyshi-phase2-event-20261012|<market id>`. The choice is blind to
   outcome and price. A market with no event is its own event.
-- **Not yet decided.** Per-series caps (criterion 5 of Section 5).
+- **Per-series caps: not applied (decided 2026-10-16).** Markets in the same
+  series may be correlated, so bootstrap intervals over markets may be somewhat
+  narrow. Recorded as a limitation in the preregistration and the verdict.
 
 ### 10.7 Frozen list, split and output
 
@@ -1276,7 +1294,8 @@ Properties:
 - **Fetch history for every market in both pools.** It is the most robust to
   attrition, but downloads about 3× more than needed.
 
-**Still open, and not decidable from this snapshot:** per-series caps (10.6).
+**Per-series caps: decided 2026-10-16, not applied (10.6); recorded as a limitation.**
+The text below is the reasoning as it stood before that decision.
 The snapshot keeps only the event ID and the question text, with no series or
 category. Caps need either pre-stated rules on the question text or more Gamma
 fields, which would mean another permitted download. This is the owner's
@@ -1317,6 +1336,12 @@ reported next to the main result. They never enter the gate.
 
 - about 31% of 7,200 is about 2,230 markets;
 - its MDE is about 1.8× Design A's (√(7,200 / 2,230)).
+
+**Correction 2026-10-16 (from the frozen list's metadata only).** Only 13.9% of
+the test pool (2,497 of 17,944) is at ≥ $100,000; such markets are concentrated in
+the training period. 978 are among the first 7,200 test markets in the sample
+order. The subset is therefore about **980** markets, and its MDE about **2.7×**
+Design A's ([`phase2-preregistration.md`](phase2-preregistration.md), Section 9).
 
 **$1,000** (71,241) is not needed. It would only add thinner, staler markets.
 

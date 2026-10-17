@@ -533,32 +533,37 @@ def _first_learning_config():
     return ExperimentConfig()
 
 
-def run_dataset(
+def decision_loop(
     sim: Simulator,
     cfg: SyntheticConfig,
-    strength: float,
-    market_seed: int,
+    markets: Sequence[Market],
+    train_count: int,
     condition: str,
     *,
     kc_sides: Mapping[int, str],
+    seed_for,
+    exploration_key: int,
     innate_scores: Optional[Sequence[Tuple[float, float]]] = None,
-) -> dict:
-    """Run one strength/seed/condition chain on an injected simulator.
+    teach_as: Optional[str] = None,
+    teaching_markets: Optional[Sequence[Market]] = None,
+) -> Tuple[list, PlasticityParams]:
+    """The chronological Option B decision loop shared by the synthetic sweep
+    (``run_dataset``) and the Phase 2 real-market chains (``real_market``): one
+    encoder, readout, plasticity rule and teaching signal for both.
 
-    ``kc_sides`` (``{kc_root_id: "left" | "right"}``, from the frozen neuron-ID
-    table) is required: encoder pools are drawn from left-hemisphere KCs only and
-    guarded by :func:`assert_pools_left_only` before anything is presented."""
-    if strength not in cfg.signal_strengths or market_seed not in cfg.market_seeds:
-        raise ValueError("strength and market_seed must belong to the configured sweep")
-    if condition not in CONDITIONS:
-        raise ValueError(f"condition must be one of {CONDITIONS}")
-    if cfg.mitigation == INNATE_SCORE_SUBTRACTION:
-        if innate_scores is None or len(innate_scores) != cfg.markets_per_seed:
-            raise ValueError("innate-score subtraction needs one exact score pair per market")
-
-    markets = generate_signal_markets(
-        cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
-    )
+    Markets ``0 .. train_count - 1`` are training (plasticity on, seeded
+    exploration breaks ties); the rest are held out with the weights frozen.
+    ``seed_for(index)`` gives each presentation's simulation seed and
+    ``exploration_key`` keys the exploration draw. ``teach_as`` (default:
+    ``condition``) names the teaching rule, and ``teaching_markets`` (default:
+    ``markets``) supplies the outcome and quote the teaching signal reads; the
+    shuffled-outcome null control passes the profit rule with permuted outcomes.
+    Every record carries the market's TRUE outcome. Returns ``(records,
+    plasticity params used)``."""
+    teach_as = condition if teach_as is None else teach_as
+    teaching_markets = markets if teaching_markets is None else teaching_markets
+    if len(teaching_markets) != len(markets):
+        raise ValueError("teaching_markets must match markets one to one")
     encoder = setup_encoder(sim, cfg, kc_sides)
     readout = Readout(sim.mbon_labels, _first_learning_config())
     baseline = np.asarray(sim.baseline_weights(), dtype=float)
@@ -575,12 +580,10 @@ def run_dataset(
     records = []
 
     for index, market in enumerate(markets):
-        train = index < cfg.train_count
+        train = index < train_count
         sim.set_weights(plastic.weights if condition != LEARNING_OFF else baseline)
         pair = _stimuli(encoder, market, cfg)
-        shown = _score_pair(
-            sim, readout, pair, simulation_seed(cfg, strength, market_seed, index), cfg, kc_sides
-        )
+        shown = _score_pair(sim, readout, pair, seed_for(index), cfg, kc_sides)
         innate_yes, innate_no = (innate_scores[index] if innate_scores is not None else (None, None))
         difference = score_difference(
             shown.score_yes,
@@ -590,12 +593,13 @@ def run_dataset(
             innate_no_score=innate_no,
         )
         raw_probability = _sigmoid(difference / cfg.score_scale)
-        action = _action(difference, cfg, train=train, market_seed=market_seed, index=index)
+        action = _action(difference, cfg, train=train, market_seed=exploration_key, index=index)
         if train and condition != LEARNING_OFF and action is not Action.ABSTAIN:
             chosen_kc = shown.kc_yes if action is Action.YES else shown.kc_no
             plastic.record_decision(f"m{index}", chosen_kc, action.value)
             plastic.resolve(
-                f"m{index}", _teaching(condition, market, action, raw_probability, cfg)
+                f"m{index}",
+                _teaching(teach_as, teaching_markets[index], action, raw_probability, cfg),
             )
         records.append(
             {
@@ -623,6 +627,40 @@ def run_dataset(
                 "mbon_no": [round(float(x), 4) for x in shown.mbon_no],
             }
         )
+    return records, plasticity
+
+
+def run_dataset(
+    sim: Simulator,
+    cfg: SyntheticConfig,
+    strength: float,
+    market_seed: int,
+    condition: str,
+    *,
+    kc_sides: Mapping[int, str],
+    innate_scores: Optional[Sequence[Tuple[float, float]]] = None,
+) -> dict:
+    """Run one strength/seed/condition chain on an injected simulator.
+
+    ``kc_sides`` (``{kc_root_id: "left" | "right"}``, from the frozen neuron-ID
+    table) is required: encoder pools are drawn from left-hemisphere KCs only and
+    guarded by :func:`assert_pools_left_only` before anything is presented."""
+    if strength not in cfg.signal_strengths or market_seed not in cfg.market_seeds:
+        raise ValueError("strength and market_seed must belong to the configured sweep")
+    if condition not in CONDITIONS:
+        raise ValueError(f"condition must be one of {CONDITIONS}")
+    if cfg.mitigation == INNATE_SCORE_SUBTRACTION:
+        if innate_scores is None or len(innate_scores) != cfg.markets_per_seed:
+            raise ValueError("innate-score subtraction needs one exact score pair per market")
+
+    markets = generate_signal_markets(
+        cfg.markets_per_seed, market_seed, strength, cfg.price_deviation
+    )
+    records, plasticity = decision_loop(
+        sim, cfg, markets, cfg.train_count, condition, kc_sides=kc_sides,
+        seed_for=lambda index: simulation_seed(cfg, strength, market_seed, index),
+        exploration_key=market_seed, innate_scores=innate_scores,
+    )
 
     train_records, test_records = records[: cfg.train_count], records[cfg.train_count :]
     calibrated = fit_and_apply_calibration(

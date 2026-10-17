@@ -1258,7 +1258,9 @@ def _record(b: BuiltMarket, sequence: int) -> dict:
             "sequence": sequence,
             "meta": {"market_id": b.market.market_id, "event_id": b.market.event_id,
                      "decision_time": b.market.decision_time, "price_time_unix": b.features.price_time,
-                     "closed_time": b.market.closed_time}}
+                     "closed_time": b.market.closed_time,
+                     # selection metadata only, never an input: names the >= $100k reported subset
+                     "final_volume": b.market.final_volume}}
 
 
 def write_market_file(path: Path, train: Sequence[BuiltMarket], test: Sequence[BuiltMarket],
