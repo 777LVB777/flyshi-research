@@ -22,8 +22,10 @@ Section 9.
 - **Update 2026-10-16.** The Gamma metadata count is done: 40,893 qualifying
   markets, one per event, at ≥ $10,000 (Section 10.10). The cutoff, the
   sample rule and the threshold were confirmed **FINAL** on 2026-10-16
-  (Section 10.11). The 15% reserve is still proposed. Whether archived markets
-  are listed is still an open check, with one prepared request (10.10).
+  (Section 10.11), and the 15% reserve was confirmed FINAL the same day. The
+  archived check was run with one request. It shows the `closed=true` listing
+  is complete for `/markets/keyset`, so safeguard 12 is checked with a caveat
+  (10.10). The market list is frozen, SHA-256 `f3d41123…75f8` (10.12).
 - **What was done.** No market data has been downloaded and no simulation was
   run. (Update 2026-10-16: Gamma market **metadata** only has now been
   downloaded, under the Section 10.9 permission. No price history has been
@@ -186,6 +188,19 @@ binding on the data-retrieval code and its run log:
    editors only (condition 7). Polymarket's own stated limit, no commercial
    redistribution or resale of the raw bulk dataset, is narrower than this
    condition.
+   **Applied 2026-10-16 (project owner; the repository is public).** Public
+   release of the market-ID list was never asked about, so the list stays
+   **private**.
+   - The repository holds only hashes and aggregate files:
+     - the frozen list's SHA-256;
+     - the snapshot's SHA-256;
+     - the count report;
+     - the archived check, which contains its fields, the probe IDs and a
+       verdict.
+   - The frozen list, fill plans, outcomes, price histories, the snapshot and
+     the request log stay under the git-ignored `data/` directory.
+   - The ID list and reproducibility metadata are available to peer reviewers
+     and editors on request (condition 7).
 7. **Publication and reviewer sharing are on hold** until Polymarket answers the
    follow-up. No manuscript or preprint naming Polymarket data, and no reviewer
    data package, goes out before then. If the answer is no or never comes,
@@ -193,6 +208,16 @@ binding on the data-retrieval code and its run log:
    **Cleared 2026-10-14** by Roni's reply of 2026-10-13: publication of
    aggregate results crediting Polymarket, and sharing market IDs and
    reproducibility metadata with peer reviewers and editors, may go ahead.
+   **Confirmed 2026-10-16:**
+   - publication of aggregate results crediting Polymarket: cleared;
+   - sharing market IDs and metadata with peer reviewers and editors: cleared;
+   - **public** release of the ID list: not asked about, so it stays private
+     (condition 6);
+   - CLOB `/prices-history`: remains **unpermitted** pending Roni's answer to
+     the 2026-10-14 question (condition 1).
+
+   Transcript: [`open-decisions.md`](open-decisions.md), item 6, revision
+   2026-10-14.
 8. **Re-check before download.** Reread the Terms of Use, compare the SHA-256
    checksum with the 2026-10-11 value above, and record the result.
 
@@ -421,6 +446,9 @@ efficiency only.
     markets. For Kalshi this meant the `/historical/` endpoints and the archive
     cutoff (open-decisions item 6). For Polymarket and Manifold, closed and
     archived markets must be queried explicitly.
+    **Checked for Polymarket on 2026-10-16, with a caveat (10.10).** The
+    `closed=true` listing of `/markets/keyset` is complete for that endpoint.
+    It is not proven that no archived markets exist on other endpoints.
 13. **Counts at every step.** From the raw universe through each filter to the
     final list, by category and by period, in the results.
 14. **Excluded voided markets.** Their count and categories are reported, because
@@ -1018,6 +1046,22 @@ documented schemas. No test can build the real transport.
       - they come back closed and not archived: the listing missed markets;
       - none comes back: these IDs are not served at all;
       - a control does not come back: inconclusive.
+  - **Result (sent 2026-10-16 21:54 ET, i.e. 2026-10-17 01:54 UTC; one
+    request, logged; `data/polymarket/archived_check_20261017T015447Z.json`).**
+    - Controls 12 and 17 were returned, both `closed=true` and
+      `archived=false`.
+    - **None of the 98 lowest absent IDs was returned**, even by ID with
+      `closed=any`.
+    - Verdict: **not served even by ID.** The `closed=true` listing is complete
+      for `/markets/keyset`. Every closed market this endpoint will serve is in
+      the snapshot.
+  - **Safeguard 12 (Section 5): CHECKED 2026-10-16, with a caveat.**
+    - The residual limitation: this does **not** prove that archived markets
+      don't exist on other endpoints. The lookup cannot tell "archived and
+      hidden from this endpoint" apart from "deleted or never created".
+    - No other endpoint is permitted (Section 1, condition 1), so the
+      universe is defined as what `/markets/keyset` serves.
+    - This is reported as a limitation.
 - **Mostly non-Yes/No markets.** Two thirds of raw markets have two named
   outcomes that are not Yes/No. They are excluded by the binary rule (10.6), as
   designed.
@@ -1036,6 +1080,9 @@ documented schemas. No test can build the real transport.
 >    pre-stated as a reported, non-gating analysis.
 >
 > **Still PROPOSED:** the reserve, 15% (see (b)).
+>
+> **CONFIRMED 2026-10-16 (project owner): the 15% reserve is FINAL.** The
+> targets are 3,220 training and 8,280 test markets with usable histories.
 
 **Status.** Below is the reasoning as proposed on 2026-10-16, kept as the
 record. Each part is based **only** on the counts in 10.10, with no outcome or price. The
@@ -1148,7 +1195,7 @@ Properties:
     - `history_exclusion` agrees with `decision_features` on 500 random
       histories, and ignores a point exactly at `t_d`.
 
-**Reserve: 15% (PROPOSED 2026-10-16, awaiting confirmation).**
+**Reserve: 15% (proposed 2026-10-16; FINAL, confirmed 2026-10-16).**
 
 - **What it is for.** Losses *after* the fill:
   - markets excluded once the 10.5 unverified items are checked (whether `p`
@@ -1237,3 +1284,48 @@ reported next to the main result. They never enter the gate.
 - A test shows it gives the same frozen list and the same hash as the earlier
   in-memory version.
 - **Nothing has been frozen yet.**
+
+### 10.12 The frozen market list (2026-10-16)
+
+- **Command (offline, streamed):**
+  `select --from-metadata data/polymarket/metadata_closed_markets_20261016T213329Z.json`.
+  The snapshot's SHA-256 (`2b226bd6…9245`) was verified before parsing.
+- **Frozen list SHA-256:**
+  `f3d41123e20ef10b0651b24531e909cb41691e94e1c83df7b0f83a3f2d5975f8`.
+  - 40,893 markets at ≥ $10,000, one per event.
+  - Every count in the frozen list matches the offline count report exactly
+    (10.10). This was re-checked 2026-10-16 by `load_frozen`, which also
+    verifies the hash.
+- **Contents.** Per market: ID, event ID, YES token ID, question, scheduled
+  start and end, close time, `t_d`, final volume and archived flag. Plus the
+  selection parameters and all counts. **No outcome and no price.**
+- **Outcomes** are in `frozen_market_list.json.outcomes.json`, kept apart and
+  joined only at the build step. They are private and never committed.
+- **What is committed, and what is kept private** (2026-10-16; the repository
+  is public; Section 1, conditions 6 and 7).
+  - **Committed to `repro/polymarket/`:**
+    - `frozen_market_list.json.sha256`;
+    - `metadata_closed_markets_20261016T213329Z.json.sha256`;
+    - `archived_check_20261017T015447Z.json`;
+    - `count_report_20261016T213329Z.json`, committed earlier.
+  - **Kept privately under `data/polymarket/`, never committed:**
+    - the frozen list itself;
+    - any fill plan (both are market-ID lists).
+  - Both are **available to peer reviewers and editors** on request, which
+    Polymarket cleared on 2026-10-13.
+  - A reviewer can check them against the committed hashes.
+  - Outcomes, price histories, the snapshot and the request log stay private
+    as well. `.gitignore` excludes them by name wherever they are copied.
+- **Exact pools under the 10.11 split** (from the frozen dates only, by
+  `pool_order`):
+
+  | category | markets | target (need + 15%) | × target |
+  |---|---:|---:|---:|
+  | training (closed before 2026-03-01) | 16,992 | 3,220 | 5.3 |
+  | test (`t_d` in [2026-03-08, 2026-09-01)) | 17,944 | 8,280 | 2.2 |
+  | straddling (excluded) | 1,087 | – | – |
+  | after the test window (excluded) | 4,870 | – | – |
+
+- **Next step: `history`.** It needs CLOB `/prices-history` permission, which
+  is still pending (Section 1). No price history has been requested.
+

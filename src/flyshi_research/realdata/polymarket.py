@@ -98,7 +98,7 @@ TEST_DECISION_END = datetime(2026, 9, 1, tzinfo=timezone.utc)
 SAMPLE_ORDER_SEED = "flyshi-phase2-sample-20261016"
 #: Design A: 40 disjoint chains x (70 training + 180 test)
 POOL_NEED = {"train": 2_800, "test": 7_200}
-#: usable markets fetched beyond the need, in percent (PROPOSED 2026-10-16, awaiting confirmation)
+#: usable markets fetched beyond the need, in percent (FINAL 2026-10-16)
 POOL_RESERVE_PERCENT = 15
 
 

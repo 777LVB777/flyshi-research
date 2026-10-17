@@ -16,4 +16,21 @@ dist/
 third_party/
 
 # Phase 2 real-market data: private, never redistributed (phase2-design.md, Section 1, condition 6)
-data/
+/data/
+
+# Phase 2: files that hold outcomes, prices or raw API data are never committed, wherever
+# they are copied (phase2-design.md, Section 1 condition 6, and 10.12). data/ above
+# already covers their default location; these rules also cover copies elsewhere.
+*.outcomes.json
+histories_*.json
+histories_*.jsonl
+markets_*_cutoff_*.json
+metadata_closed_markets_*.json
+metadata_progress*.jsonl
+trial_metadata_*.json
+request_log.jsonl
+*.json.gz
+# the market-ID lists stay private while the repository is public (condition 6, 2026-10-16);
+# their .sha256 files are committed
+frozen_market_list.json
+fill_plan_*.json

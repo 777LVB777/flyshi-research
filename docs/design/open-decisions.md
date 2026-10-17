@@ -761,6 +761,22 @@ that saved configuration.
 > - Condition 6 (no public redistribution of raw data) **stands**.
 > - CLOB `/prices-history` remains **unpermitted** pending Roni's answer. No
 >   permission file for it is to be written until then.
+>
+> *Applied 2026-10-16 (project owner; the repository is public).*
+>
+> - The 2026-10-13 reply above is the record for publication and reviewer
+>   sharing.
+>   - Publication of aggregate results crediting Polymarket: **cleared**.
+>   - Sharing market IDs and metadata with peer reviewers and editors:
+>     **cleared**.
+> - **Public** release of the market-ID list was not asked about. The frozen
+>   list and any fill plan therefore stay **private**. Only their SHA-256
+>   hashes are committed, and the lists are available to reviewers and editors
+>   on request.
+> - CLOB `/prices-history` remains **unpermitted** pending Roni's answer to the
+>   2026-10-14 question.
+> - Details: [`phase2-design.md`](phase2-design.md), Section 1, conditions 6
+>   and 7, and Section 10.12.
 
 ## 7. Synthetic-market mitigation and the remaining encoder/eligibility placeholders
 
