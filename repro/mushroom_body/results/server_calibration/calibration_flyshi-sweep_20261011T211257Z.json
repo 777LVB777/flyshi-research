@@ -1,0 +1,212 @@
+{
+ "kind": "server_calibration",
+ "config_hash": "a325e6b206",
+ "started_unix": 1791753177.2923524,
+ "finished_unix": 1791755918.13274,
+ "machine": {
+  "total_gb": 30.600875854492188,
+  "available_gb_at_start": 29.91910171508789,
+  "logical_cpus": 8,
+  "headroom_gb": 3.060087585449219
+ },
+ "environment": {
+  "hostname": "flyshi-sweep",
+  "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+  "python": "3.10.21",
+  "cpu_model": "AMD EPYC-Milan Processor",
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           40 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  8\nOn-line CPU(s) list:                     0-7\nVendor ID:                               AuthenticAMD\nBIOS Vendor ID:                          QEMU\nModel name:                              AMD EPYC-Milan Processor\nBIOS Model name:                         NotSpecified  CPU @ 2.0GHz\nBIOS CPU family:                         1\nCPU family:                              25\nModel:                                   1\nThread(s) per core:                      2\nCore(s) per socket:                      4\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                4890.81\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr wbnoinvd arat umip pku ospke rdpid fsrm\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               128 KiB (4 instances)\nL1i cache:                               128 KiB (4 instances)\nL2 cache:                                2 MiB (4 instances)\nL3 cache:                                32 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-7\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Vulnerable: Safe RET, no microcode\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP conditional; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Vulnerable: Clear CPU buffers attempted, no microcode\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected",
+  "git_head": "5490da9f169a88bd7befbeb129f79fb9a8b8fc87",
+  "gcc": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+ },
+ "minutes_per_level": 12.0,
+ "levels": [
+  {
+   "procs_asked": 1,
+   "procs_run": 1,
+   "window_s": 720.5645792484283,
+   "seconds_per_run_mean": 65.95299999713897,
+   "seconds_per_run_max_process": 65.95299999713897,
+   "runs_per_hour": 54.58432520364755,
+   "peak_rss_gb_max": 3.0737037658691406,
+   "first_run_done_after_s_max": 69.51693534851074,
+   "min_available_gb": 26.923992156982422,
+   "complete": true,
+   "note": null,
+   "per_process": [
+    {
+     "job": "condition:profit:0:20261001",
+     "seconds_per_run": {
+      "runs_in_window": 11,
+      "mean_s": 65.95299999713897,
+      "min_s": 65.75,
+      "max_s": 66.17000007629395
+     },
+     "first_run_done_after_s": 69.51693534851074,
+     "peak_rss_gb": 3.0737037658691406
+    }
+   ]
+  },
+  {
+   "procs_asked": 4,
+   "procs_run": 4,
+   "window_s": 723.9383220672607,
+   "seconds_per_run_mean": 67.61924999952316,
+   "seconds_per_run_max_process": 68.0920000076294,
+   "runs_per_hour": 212.96147077279312,
+   "peak_rss_gb_max": 3.0740432739257812,
+   "first_run_done_after_s_max": 71.1516923904419,
+   "min_available_gb": 18.53594970703125,
+   "complete": true,
+   "note": null,
+   "per_process": [
+    {
+     "job": "condition:profit:0:20261001",
+     "seconds_per_run": {
+      "runs_in_window": 11,
+      "mean_s": 67.58599998950959,
+      "min_s": 67.41999983787537,
+      "max_s": 67.69000005722046
+     },
+     "first_run_done_after_s": 69.82990288734436,
+     "peak_rss_gb": 3.0740432739257812
+    },
+    {
+     "job": "condition:learning_off:0:20261001",
+     "seconds_per_run": {
+      "runs_in_window": 11,
+      "mean_s": 68.0920000076294,
+      "min_s": 67.74000000953674,
+      "max_s": 68.27999997138977
+     },
+     "first_run_done_after_s": 71.04389429092407,
+     "peak_rss_gb": 3.0693435668945312
+    },
+    {
+     "job": "condition:profit:0:20261002",
+     "seconds_per_run": {
+      "runs_in_window": 11,
+      "mean_s": 67.56400001049042,
+      "min_s": 67.17000007629395,
+      "max_s": 68.03999996185303
+     },
+     "first_run_done_after_s": 70.94785332679749,
+     "peak_rss_gb": 3.071949005126953
+    },
+    {
+     "job": "condition:learning_off:0:20261002",
+     "seconds_per_run": {
+      "runs_in_window": 11,
+      "mean_s": 67.23499999046325,
+      "min_s": 66.87000012397766,
+      "max_s": 67.72000002861023
+     },
+     "first_run_done_after_s": 71.1516923904419,
+     "peak_rss_gb": 3.073
+    }
+   ]
+  },
+  {
+   "procs_asked": 8,
+   "procs_run": 8,
+   "window_s": 720.875250339508,
+   "seconds_per_run_mean": 128.83037500381468,
+   "seconds_per_run_max_process": 129.25499999523163,
+   "runs_per_hour": 223.55137369796063,
+   "peak_rss_gb_max": 3.0873947143554688,
+   "first_run_done_after_s_max": 134.33269834518433,
+   "min_available_gb": 7.4649810791015625,
+   "complete": true,
+   "note": null,
+   "per_process": [
+    {
+     "job": "condition:profit:0:20261001",
+     "seconds_per_run": {
+      "runs_in_window": 5,
+      "mean_s": 129.25499999523163,
+      "min_s": 129.04999995231628,
+      "max_s": 129.46000003814697
+     },
+     "first_run_done_after_s": 69.97580599784851,
+     "peak_rss_gb": 3.065
+    },
+    {
+     "job": "condition:learning_off:0:20261001",
+     "seconds_per_run": {
+      "runs_in_window": 5,
+      "mean_s": 129.1700000166893,
+      "min_s": 128.89000010490417,
+      "max_s": 129.30999994277954
+     },
+     "first_run_done_after_s": 70.39953565597534,
+     "peak_rss_gb": 3.068370819091797
+    },
+    {
+     "job": "condition:profit:0:20261002",
+     "seconds_per_run": {
+      "runs_in_window": 6,
+      "mean_s": 129.02399997711183,
+      "min_s": 128.8600001335144,
+      "max_s": 129.2699999809265
+     },
+     "first_run_done_after_s": 71.49347448348999,
+     "peak_rss_gb": 3.073
+    },
+    {
+     "job": "condition:learning_off:0:20261002",
+     "seconds_per_run": {
+      "runs_in_window": 5,
+      "mean_s": 129.02000004053116,
+      "min_s": 128.8600001335144,
+      "max_s": 129.12000012397766
+     },
+     "first_run_done_after_s": 105.72735810279846,
+     "peak_rss_gb": 3.0720672607421875
+    },
+    {
+     "job": "condition:profit:0:20261003",
+     "seconds_per_run": {
+      "runs_in_window": 6,
+      "mean_s": 128.81399998664855,
+      "min_s": 128.39000010490417,
+      "max_s": 129.57999992370605
+     },
+     "first_run_done_after_s": 133.60118865966797,
+     "peak_rss_gb": 3.0873947143554688
+    },
+    {
+     "job": "condition:learning_off:0:20261003",
+     "seconds_per_run": {
+      "runs_in_window": 6,
+      "mean_s": 128.64000000953675,
+      "min_s": 128.37999987602234,
+      "max_s": 128.8600001335144
+     },
+     "first_run_done_after_s": 133.99557256698608,
+     "peak_rss_gb": 3.0530738830566406
+    },
+    {
+     "job": "condition:profit:0:20261004",
+     "seconds_per_run": {
+      "runs_in_window": 5,
+      "mean_s": 128.12999999523163,
+      "min_s": 127.80999994277954,
+      "max_s": 128.27999997138977
+     },
+     "first_run_done_after_s": 133.8993625640869,
+     "peak_rss_gb": 3.0538406372070312
+    },
+    {
+     "job": "condition:learning_off:0:20261004",
+     "seconds_per_run": {
+      "runs_in_window": 6,
+      "mean_s": 128.59000000953674,
+      "min_s": 128.46000003814697,
+      "max_s": 128.74000000953674
+     },
+     "first_run_done_after_s": 134.33269834518433,
+     "peak_rss_gb": 3.0554122924804688
+    }
+   ]
+  }
+ ]
+}
