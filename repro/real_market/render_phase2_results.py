@@ -170,9 +170,14 @@ def render(v: dict, h: dict) -> str:
     w("")
     w("### Limitations")
     w("")
-    w("- **This is not evidence of no edge.** The verdict says only that no edge larger than the realised "
-      f"MDE (about {r['vs_comparator']['mde']:.4f} over the comparator and "
-      f"{r['vs_learning_off']['mde']:.4f} over learning_off, in Brier units) was detected.")
+    up_c, up_o = g["profit_improvement_vs_comparator"]["upper"], g["profit_improvement_vs_learning_off"]["upper"]
+    if not (up_c < 0 and up_o < 0):
+        raise SystemExit("the limitation below assumes both upper bounds are below zero; rewrite it")
+    w("- **\"This is not evidence of no edge.\"** This is the verdict's pre-stated closing clause, written before "
+      "the result for an inconclusive outcome. Here both intervals lie entirely below zero (upper bounds "
+      f"{f4(up_c)} for `vs_comparator` and {f4(up_o)} for `vs_learning_off`), so for this circuit, set up "
+      "this way, the data rule out an improvement of any size at the 95% level. The clause means only that "
+      "setups this study did not test (other inputs, more training, a different readout) remain untested.")
     w("- **The circuit sees only three numbers per market**: the last recorded price before the decision "
       "time (at most 24 hours old), its change over the previous 24 hours, and the days to the scheduled end (Section 2; "
       "`realdata/polymarket.py`, `decision_features`). The encoder's other two pools, signal and "
