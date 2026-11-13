@@ -1027,5 +1027,222 @@ staggered starts. The 5 GB per process is not measured on the server.]*
 
 ## Results
 
-*None. Append results here after the selected mitigation has completed;
+*Append results here after the selected mitigation has completed;
 do not edit the protocol or criterion above in response to results.*
+
+### Phase 1 (gate arms): results, written 2026-10-29, before any Phase 2 result
+
+**Naming.** In this section, "phase 1" is this sweep's gate arms (`profit`,
+`learning_off`). This document's "phase 2" (the `accuracy` and `profit_drift_off`
+arms, Section 7 revisions of 2026-10-11) was dropped for budget and never run. It is
+**not** the real-market Phase 2 (Polymarket,
+[`phase2-preregistration.md`](phase2-preregistration.md)), which started on
+2026-10-27 on code `phase2-frozen` (`c9dba70`) and has no result at the time of
+writing.
+
+**Source.**
+
+- `repro/mushroom_body/results/synthetic_market_a325e6b206/verdict_phase1.json`
+  (commit `9d2ee5f`), config hash **`a325e6b206`**.
+- It was computed by `run_synthetic_market_experiment.py --finish-phase1` on the
+  server autopilot on 2026-10-27, at tag `phase2-frozen` (`c9dba70`).
+- The input was the 160 phase 1 job files in commit `1a59393`. Their SHA-256s
+  match the server's record, and their blobs match GitHub.
+- The sweep itself ran on `5490da9`.
+
+**The pre-stated test** (Section 6 and its 2026-10-09 revision):
+
+- For each held-out market, two paired Brier improvements of the profit arm's
+  calibrated forecast:
+  - *versus market*: the exact price-only Bayes posterior's squared error minus the
+    profit arm's ("signal edge over the best price-only forecast");
+  - *versus learning-off*: the learning-off arm's squared error minus the profit
+    arm's ("learning effect, any source").
+- 3,600 held-out markets per strength (180 per seed × 20 seeds). 95% percentile
+  bootstrap, 2,000 resamples by market. Seeds 20261099 + i and 20261199 + i.
+- A strength passes only if **both lower bounds are strictly above zero**.
+- Strength 0 is the null control and never sets the signal requirement. The signal
+  requirement is the smallest passing strength among 0.4, 0.8 and 1.0.
+
+**Results per strength.** Positive improvements favour the profit arm. The ideal
+edge is the pre-stated figure from the Section 1 revision. Brier scores are
+calibrated. The posterior's Brier score is the profit arm's minus the versus-market
+estimate, since it is not stored separately in the verdict; an independent
+recomputation from the job files gives the same value.
+
+| strength | role | versus market [95% CI] | versus learning-off [95% CI] | passes | ideal edge | Brier: posterior | learning-off | profit |
+|---|---|---|---|---|---:|---:|---:|---:|
+| 0 | null control | −0.0337 [−0.0392, −0.0280] | −0.0125 [−0.0168, −0.0085] | no | 0 | 0.2043 | 0.2254 | 0.2380 |
+| 0.4 | test (underpowered) | −0.0268 [−0.0322, −0.0215] | −0.0162 [−0.0206, −0.0118] | **no** | 0.0014 | 0.2043 | 0.2149 | 0.2311 |
+| 0.8 | test | −0.0257 [−0.0306, −0.0205] | −0.0205 [−0.0249, −0.0159] | **no** | 0.0074 | 0.2043 | 0.2094 | 0.2299 |
+| 1.0 | positive control | −0.0207 [−0.0254, −0.0161] | −0.0169 [−0.0215, −0.0127] | **no** | 0.0100 | 0.2043 | 0.2081 | 0.2250 |
+
+All eight intervals lie entirely below zero.
+
+**Verdict, as the pre-stated rule defines it.**
+
+- **Null control clean.** Strength 0 did not pass ("null control did not pass, as
+  expected"), so the verdict is not `NULL CONTROL FAILED`.
+- **No tested strength passes:** `success = false`, `signal_requirement = null`.
+  The result is **"no signal requirement demonstrated within 0.4–1"**
+  (`readings.overall`: `"no signal requirement demonstrated within 0.4-1"`).
+- **Pre-stated readings.**
+  - The non-pass at 0.4 is **undetermined, not absent**: ideal-forecaster power is
+    about 0.70.
+  - Each non-pass at 0.4, 0.8 and 1.0 is **ambiguous** between (a) no learning of
+    the signal and (b) learning-induced ignition degrading the readout. This sweep
+    cannot separate them (2026-10-12 revision, point 5).
+- **No instability.** No higher strength fails after a lower one passes
+  (`higher_strength_failures` is empty).
+
+**Ignition: reported only, never gating** (2026-10-12 revision, point 4; Section 6
+sensitivity analysis). None of this can turn a non-pass into a pass.
+
+| strength | `profit`: ignited trials [Wilson 95%] | `learning_off`: ignited trials [Wilson 95%] | profit − learning-off [Newcombe 95%] | `profit` decisions with an ignited framing: training / test |
+|---|---|---|---|---|
+| 0 | 2,125 / 50,000, 4.25% [4.08, 4.43] | 76 / 50,000, 0.15% [0.12, 0.19] | 4.10 [3.92, 4.28] pp | 251 / 1,400; 1,394 / 3,600 |
+| 0.4 | 2,302 / 50,000, 4.60% [4.42, 4.79] | 70 / 50,000, 0.14% [0.11, 0.18] | 4.46 [4.28, 4.65] pp | 272 / 1,400; 1,439 / 3,600 |
+| 0.8 | 2,524 / 50,000, 5.05% [4.86, 5.24] | 84 / 50,000, 0.17% [0.14, 0.21] | 4.88 [4.69, 5.08] pp | 282 / 1,400; 1,590 / 3,600 |
+| 1.0 | 2,295 / 50,000, 4.59% [4.41, 4.78] | 89 / 50,000, 0.18% [0.14, 0.22] | 4.41 [4.23, 4.60] pp | 280 / 1,400; 1,495 / 3,600 |
+
+- **Training against test.**
+  - `profit`: the ignited-trial rate is 2.15–2.50% in the training block and
+    5.07–6.04% in the test block, where weights are frozen.
+  - `learning_off`: 0.12–0.20% in both blocks. Descriptive; no trend test.
+- **Drive.** In `profit`, the ignited-trial rate falls with framing drive:
+  9.3–11.1% below 25 kHz, 7.9–8.8% at 30–40 kHz, 3.7–4.7% at 40–50 kHz and
+  1.2–1.6% at 50–70 kHz (ranges across strengths).
+- **Ignited trials are cascades.** Their median spread is 66% of non-stimulated
+  KCs, a median of about 3,110 recruited.
+- **Ignited training presentations** (safeguard not adopted).
+  - Profit-arm teaching decisions with an ignited framing: 251, 272, 282 and 280 of
+    1,400 per strength (1,085 of 5,600 pooled).
+  - Of those, the chosen (taught) framing ignited in 118, 128, 133 and 163.
+- **Sensitivity analysis excluding ignited test markets.** It excludes every
+  held-out market in which either framing ignited in either arm.
+
+  | strength | excluded / remaining | versus market [95% CI] | versus learning-off [95% CI] | both lower bounds above zero |
+  |---|---|---|---|---|
+  | 0 | 1,426 / 2,174 | −0.0172 [−0.0226, −0.0117] | +0.0010 [−0.0012, +0.0033] | no |
+  | 0.4 | 1,468 / 2,132 | −0.0099 [−0.0146, −0.0055] | −0.0003 [−0.0027, +0.0018] | no |
+  | 0.8 | 1,623 / 1,977 | −0.0075 [−0.0120, −0.0028] | −0.0036 [−0.0063, −0.0008] | no |
+  | 1.0 | 1,524 / 2,076 | −0.0021 [−0.0058, +0.0013] | +0.0011 [−0.0011, +0.0033] | no |
+
+  Its limits are pre-stated. The excluded markets are not random: they are
+  low-drive feature combinations. Learning from ignited training presentations
+  remains in the weights.
+
+**Deviations already on record.** Each was recorded before any phase 1 result was
+read.
+
+1. **2026-10-11: phase 2 arms dropped for budget** (Section 7, pre-stated
+   exception). `accuracy` and `profit_drift_off` were not run and appear in the
+   verdict as "not run (dropped for budget, 2026-10-11)". The accuracy-reward and
+   forgetting-off comparisons are therefore missing. Neither was part of the gate.
+2. **2026-10-12: gate-only evaluation.** `evaluate_phase1` (`--finish-phase1`) was
+   written and tested on fake job files before any result was read (commit
+   `a686626`). It applies the unchanged gate to the two phase 1 arms.
+3. **2026-10-12: an operational check beyond the pre-stated running summary.**
+   Ignition and drive fields of four strength-0 job files were read during the run,
+   through a field whitelist, with no score, action, forecast, outcome, reward or
+   P/L field. The sweep continued unchanged, and the ignition report above was
+   added as reported only.
+4. **Verdict code.** The verdict was computed with the code of `phase2-frozen`
+   (`c9dba70`), not the sweep's commit (`5490da9`)
+   ([`../cloud/autopilot.md`](../cloud/autopilot.md), note 7).
+   - Between the two commits, `src/flyshi_research/evaluation/` is unchanged
+     except for a new file used only by the real-market Phase 2
+     (`isotonic_comparator.py`).
+   - The gate function `evaluate_signal_requirement` changed only by an `arms`
+     parameter, whose default reproduces the earlier loop.
+
+**Limitations.**
+
+- A post-hoc comparison suggests the positive control was difficult to pass with
+  70 training markets: a logistic-regression baseline given the true probability
+  also scored below the price-only forecast (0.2072 vs 0.2043, point estimate).
+  This was not a preregistered test.
+- The sweep cannot separate readings (a) and (b) above.
+- The result holds only for the profit teaching signal at `drift_rate = 0.01`, the
+  arms that were run.
+- The synthetic markets are unverified as models of real market data (Section 1).
+
+#### Reported-only results (pre-stated, never gating)
+
+Figures are taken from `verdict_phase1.json`. None of them can change the verdict
+above.
+
+**Secondary: profit arm at strength s against strength 0** (Section 6 revision,
+point 3; same held-out markets; seeds 20261099 + 400 + i).
+
+| strength | paired Brier improvement [95% CI] | lower bound above zero |
+|---|---|---|
+| 0.4 | +0.0068 [+0.0014, +0.0123] | yes |
+| 0.8 | +0.0080 [+0.0024, +0.0137] | yes |
+| 1.0 | +0.0130 [+0.0078, +0.0185] | yes |
+
+**Circuit arms, all Section 5 metrics** (3,600 held-out markets per strength).
+
+- P/L is **after costs**: the 0.01 per-unit fee and 0.02 full spread of Section 5,
+  which are unverified synthetic placeholders. It is summed over the held-out
+  markets. The verdict contains no gross P/L.
+- P/L, drawdown, turnover and abstention depend only on actions, so they are the
+  same calibrated and uncalibrated.
+
+| strength | arm | Brier (cal.) | log loss (cal.) | ECE (cal.) | Brier (uncal.) | P/L after costs | max. drawdown | turnover | abstention |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | `profit` | 0.2380 | 0.6735 | 0.0519 | 0.4530 | −4.36 | 32.82 | 3600 | 0% |
+| 0 | `learning_off` | 0.2254 | 0.6481 | 0.0325 | 0.4336 | +35.58 | 31.91 | 3600 | 0% |
+| 0.4 | `profit` | 0.2311 | 0.6588 | 0.0491 | 0.4712 | +12.40 | 20.73 | 3600 | 0% |
+| 0.4 | `learning_off` | 0.2149 | 0.6249 | 0.0307 | 0.4638 | +28.18 | 24.34 | 3600 | 0% |
+| 0.8 | `profit` | 0.2299 | 0.6566 | 0.0394 | 0.4822 | −14.65 | 37.64 | 3600 | 0% |
+| 0.8 | `learning_off` | 0.2094 | 0.6122 | 0.0289 | 0.4926 | −2.79 | 23.66 | 3600 | 0% |
+| 1.0 | `profit` | 0.2250 | 0.6448 | 0.0340 | 0.4950 | +13.22 | 20.48 | 3600 | 0% |
+| 1.0 | `learning_off` | 0.2081 | 0.6100 | 0.0274 | 0.5070 | −18.48 | 30.23 | 3600 | 0% |
+
+**P/L after costs by price region** (Section 6 revision, point 5). Markets per
+region at every strength: clipped 123, outer 1,704, interior 1,773. The
+price-only Bayes trader uses no signal.
+
+| strength | `profit`: clipped / outer / interior | `learning_off`: clipped / outer / interior | price-only Bayes trader: clipped / outer / interior |
+|---|---|---|---|
+| 0 | +6.49 / +39.05 / −49.90 | +6.31 / +49.32 / −20.05 | +6.31 / +74.86 / +0.00 |
+| 0.4 | +4.45 / +40.39 / −32.44 | +6.31 / +62.24 / −40.36 | +6.31 / +74.86 / +0.00 |
+| 0.8 | +6.49 / +48.71 / −69.85 | +6.31 / +61.72 / −70.82 | +6.31 / +74.86 / +0.00 |
+| 1.0 | +0.39 / +56.77 / −43.94 | +6.31 / +65.43 / −90.22 | +6.31 / +74.86 / +0.00 |
+
+The price-only Bayes trader's total is +81.17 at every strength.
+
+**Baselines** (Section 5). Each is fitted per seed on the same 70 training markets
+and scored on the same 3,600 held-out markets. Every baseline except logistic
+regression is identical at every strength.
+
+| baseline | strength | Brier (cal.) | log loss (cal.) | ECE (cal.) | Brier (uncal.) | log loss (uncal.) | P/L after costs | max. drawdown |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `random` | all | 0.2575 | 0.7098 | 0.0587 | 0.3344 | 1.0072 | +31.33 | 22.29 |
+| `always_base_rate` | all | 0.2532 | 0.7000 | 0.0383 | 0.2532 | 0.7000 | +29.02 | 19.75 |
+| `market_price` | all | 0.2100 | 0.6121 | 0.0317 | 0.2065 | 0.6099 | +2.38 | 25.83 |
+| `momentum` | all | 0.2241 | 0.6408 | 0.0216 | 0.2533 | 3.8777 | +14.55 | 20.37 |
+| `logistic_regression` | 0 | 0.2194 | 0.6384 | 0.0589 | 0.2178 | 0.6307 | +3.58 | 29.01 |
+| `logistic_regression` | 0.4 | 0.2176 | 0.6339 | 0.0535 | 0.2161 | 0.6270 | +15.26 | 20.93 |
+| `logistic_regression` | 0.8 | 0.2089 | 0.6119 | 0.0466 | 0.2079 | 0.6073 | +130.26 | 13.17 |
+| `logistic_regression` | 1.0 | 0.2072 | 0.6076 | 0.0510 | 0.2063 | 0.6031 | +138.13 | 12.94 |
+
+**Innate policy** (Section 4 revision). The innate choice is the sign of the raw
+`learning_off` score at baseline weights, over all 250 markets per seed.
+
+| strength | decisions | YES | NO | tie | backing the higher-priced side | score on price: slope (Hz) | r | score on D_YES − D_NO: slope (Hz/kHz) | r |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 5,000 | 0.5044 | 0.4956 | 0.0000 | 0.1690 | −108.8 | −0.807 | −2.89 | −0.963 |
+| 0.4 | 5,000 | 0.4986 | 0.5014 | 0.0000 | 0.1024 | −128.9 | −0.894 | −2.93 | −0.968 |
+| 0.8 | 5,000 | 0.4960 | 0.5040 | 0.0000 | 0.0750 | −149.7 | −0.927 | −2.91 | −0.967 |
+| 1.0 | 5,000 | 0.4930 | 0.5070 | 0.0000 | 0.0712 | −161.6 | −0.932 | −2.91 | −0.967 |
+| pooled | 20,000 | 0.4980 | 0.5020 | 0.0000 | 0.1044 | −137.3 | −0.890 | −2.91 | −0.966 |
+
+Pooled YES fraction (and mean score difference) by price bin:
+
+| bin | 0.0–0.1 | 0.1–0.2 | 0.2–0.3 | 0.3–0.4 | 0.4–0.5 | 0.5–0.6 | 0.6–0.7 | 0.7–0.8 | 0.8–0.9 | 0.9–1.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| n | 1,236 | 1,668 | 2,208 | 2,324 | 2,664 | 2,284 | 2,640 | 2,324 | 1,464 | 1,188 |
+| YES | 0.999 | 0.994 | 0.976 | 0.906 | 0.688 | 0.289 | 0.096 | 0.022 | 0.005 | 0.000 |
+| mean score (Hz) | 62.2 | 47.5 | 33.4 | 20.6 | 6.8 | −7.6 | −20.9 | −34.2 | −48.0 | −62.3 |
