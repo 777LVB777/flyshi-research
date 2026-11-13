@@ -262,3 +262,91 @@ verdict was computed. The line below is read by the server autopilot
 ([`../cloud/autopilot.md`](../cloud/autopilot.md)).
 
 <!-- autopilot-phase2-rule: run-regardless -->
+
+## Phase 2 results (written 2026-11-12, after the verdict)
+
+*Appended after the verdict. Sections 1–12 above are unchanged. Every number in this section is read from the committed verdict by [`repro/real_market/render_phase2_results.py`](../../repro/real_market/render_phase2_results.py); none is typed by hand.*
+
+**Source.**
+
+- `repro/real_market/results/phase2_0777ae92f0dd/verdict.json` and `hashes.json` (commit `88152c7`). Verdict SHA-256 `6299398e785033b961ff4c5fcd76a703fc1fb3e9f3b93d8ae49be00efe9081a9`.
+- Computed by `run_real_market_experiment.py --finish` on the server autopilot, on code `c9dba70` (tag `phase2-frozen`), from 120 job files whose SHA-256s are in `hashes.json`.
+- Market file SHA-256 `0777ae92f0dd6b950e1a0e3495c72c3a89280b421265f2a53cdac3c3b9e2c686`; frozen market list `f3d41123e20ef10b0651b24531e909cb41691e94e1c83df7b0f83a3f2d5975f8`; locked circuit configuration `a325e6b206`.
+- Estimated Phase 2 server spend: $78.24.
+
+### Verdict
+
+`success = false`, `gate_passes = false`. The pre-stated reading (Section 8), verbatim from `readings.overall`:
+
+> does not pass: no detectable edge larger than the minimum detectable effect at the realised sigma_d (about 0.0062 over the comparator, 0.0061 over learning_off, in Brier units). This is not evidence of no edge.
+
+### The two gate comparisons (Section 5)
+
+Paired per-market Brier improvements of the `profit` arm on the 7,200 held-out test markets. Positive values favour the profit arm. 95% percentile bootstrap, 2,000 resamples by market. The MDE is 2.80 · σ_d / √n (Section 9), at the realised σ_d.
+
+| comparison | reading | estimate [95% CI] | realised σ_d | MDE | lower bound above zero | bootstrap seed |
+|---|---|---|---:|---:|---|---:|
+| `vs_comparator` | edge over the market price, calibrated on training markets only | −0.0409 [−0.0452, −0.0366] | 0.1864 | 0.0062 | no | 20261016 |
+| `vs_learning_off` | learning effect, any source | −0.0309 [−0.0354, −0.0267] | 0.1860 | 0.0061 | no | 20261116 |
+
+Both lower bounds above zero: **no**. Both intervals lie entirely below zero: on these markets the trained circuit's forecasts had a higher Brier score than the comparator and than its own learning-off control.
+
+**The comparator.** The pre-stated guard (Section 4) keeps the raw price unless the isotonic calibration has a lower 5-fold cross-validated Brier score on the training markets. On the 3,220 training markets the raw price scored 0.14070 and the calibrated price 0.14087, so the frozen comparator is **`raw_price`**: the market price itself. The pre-stated reading's phrase "calibrated on training markets only" therefore describes a calibration step that kept the raw price. Comparator SHA-256 `e9d71fbcae20b11a525c01da72f2c03b5f1a5fa0e9fad4c4001854fe4ae7b4a9`.
+
+**Brier scores on the test markets** (lower is better): `profit` 0.2257, `learning_off` 0.1948, `null_permuted` 0.2408, comparator 0.1848, raw price 0.1848.
+
+### Null control (Section 6)
+
+- `null_vs_comparator` (the profit arm taught with permuted training outcomes, against the comparator): −0.0560 [−0.0604, −0.0514], seed 20261216.
+- Lower bound above zero: no. `null_control.passes = false`: "null control did not pass, as expected". The null control is clean, so the verdict is not NULL CONTROL FAILED.
+
+### Test-set counts
+
+- 7,200 held-out test markets: 40 chains × 180, each chain after 70 training markets.
+- The comparator was fitted on 3,220 training markets, none of them a test market.
+
+| arm | test decisions | trades | abstentions |
+|---|---:|---:|---:|
+| `profit` | 7,200 | 7,104 | 96 |
+| `learning_off` | 7,200 | 7,104 | 96 |
+| `null_permuted` | 7,200 | 7,103 | 97 |
+
+### Reported only (Section 7; none of this can change the verdict)
+
+`readings.reported_only`: "the >= $100k subset, gross P&L, ignition exposure and the ignited-market sensitivity analysis cannot turn a non-pass into a pass or overturn a pass".
+
+**Gross P&L per arm: gross, before fees and spread, not achievable as stated.** One contract per test market at the decision-time price, no fee and no spread: YES earns outcome − price, NO earns price − outcome, ABSTAIN earns 0. The CLOB price history has no spread at the decision time, so P&L after costs is not computed. **The verdict does not use these numbers**, and a positive gross figure is not an edge: the gate above is the test.
+
+| arm | total, units (gross, before fees and spread, not achievable as stated) | per market [95% CI] | trades | abstentions |
+|---|---:|---|---:|---:|
+| `profit` | +157.02 | +0.0218 [+0.0124, +0.0316] | 7,104 | 96 |
+| `learning_off` | +239.01 | +0.0332 [+0.0235, +0.0428] | 7,104 | 96 |
+| `null_permuted` | +109.22 | +0.0152 [+0.0054, +0.0250] | 7,103 | 97 |
+
+**Markets with final volume ≥ $100,000** (1,012 test markets).
+
+| comparison | estimate [95% CI] | MDE | lower bound above zero |
+|---|---|---:|---|
+| `vs_comparator` | −0.0386 [−0.0497, −0.0278] | 0.0159 | no |
+| `vs_learning_off` | −0.0260 [−0.0366, −0.0147] | 0.0161 | no |
+
+**Ignition exposure** (decisions with an ignited framing, of 10,000 per arm):
+
+| arm | training | test |
+|---|---:|---:|
+| `profit` | 347 | 2,101 |
+| `learning_off` | 75 | 134 |
+| `null_permuted` | 1,356 | 5,383 |
+
+**Sensitivity analysis excluding ignited test markets** (2,199 excluded, 5,001 remaining): `vs_comparator` −0.0176 [−0.0201, −0.0149], `vs_learning_off` −0.0080 [−0.0101, −0.0060]; both lower bounds above zero: no. Reported only, never gating; excluded markets are not random, and learning from ignited training presentations cannot be removed.
+
+### Limitations
+
+- **This is not evidence of no edge.** The verdict says only that no edge larger than the realised MDE (about 0.0062 over the comparator and 0.0061 over learning_off, in Brier units) was detected.
+- **The circuit sees only three numbers per market**: the last recorded price before the decision time (at most 24 hours old), its change over the previous 24 hours, and the days to the scheduled end (Section 2; `realdata/polymarket.py`, `decision_features`). The encoder's other two pools, signal and liquidity, are set to the constant 0.5 (90 Hz in both framings) for every market, so they carry no market information. The result says nothing about a circuit given outside evidence.
+- **The price-only trading rule on the project website is a display choice made on 2026-10-18**, after this preregistration and before any real-market result. The preregistration defines no trading rule for the comparator; the website's rule (YES when the comparator's forecast is above the price, NO when below) is not part of the verdict. Because the comparator kept the raw price, that rule never trades.
+- Per-series caps were not applied: markets in the same series may be correlated, so the bootstrap intervals over markets may be somewhat narrow.
+- Final volume is known only afterwards and selects markets that drew attention (phase2-design.md, 10.6).
+- Markets that closed before their decision time are excluded, which under-represents early resolutions.
+- The universe is what Polymarket's /markets/keyset serves; archived markets on other endpoints are not covered.
+- The circuit configuration, encoder and learning rule are the synthetic sweep's, unchanged; the result holds for that configuration only.
